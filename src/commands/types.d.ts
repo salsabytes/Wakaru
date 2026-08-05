@@ -4,6 +4,7 @@ declare global {
   interface Command {
     name: string
     desc?: string
+    aliases?: string[]
     run: (ctx: CommandContext) => Promise<void> | void
   }
 

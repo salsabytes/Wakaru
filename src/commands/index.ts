@@ -7,6 +7,7 @@ export const PREFIX = '.'
 type Registered = Command & { category: string }
 
 const commands = new Map<string, Registered>()
+const resolve = new Map<string, string>()
 
 export async function loadCommands(): Promise<void> {
   for (const category of readdirSync(import.meta.dirname, { withFileTypes: true })) {
@@ -16,15 +17,18 @@ export async function loadCommands(): Promise<void> {
       if (!file.endsWith('.ts') || file.endsWith('.d.ts')) continue
       const mod = await import(pathToFileURL(join(categoryDir, file)).href)
       const cmd = mod.default as Command | undefined
-      if (cmd?.name && typeof cmd.run === 'function') {
-        commands.set(cmd.name, { ...cmd, category: category.name })
-      }
+      if (!cmd?.name || typeof cmd.run !== 'function') continue
+      const canonical = cmd.name.toLowerCase()
+      commands.set(canonical, { ...cmd, name: canonical, category: category.name })
+      resolve.set(canonical, canonical)
+      for (const alias of cmd.aliases ?? []) resolve.set(alias.toLowerCase(), canonical)
     }
   }
 }
 
 export function getCommand(name: string): Registered | undefined {
-  return commands.get(name)
+  const canonical = resolve.get(name.toLowerCase())
+  return canonical ? commands.get(canonical) : undefined
 }
 
 export function listCommands(): { name: string; category: string; desc?: string }[] {

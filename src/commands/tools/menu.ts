@@ -3,6 +3,7 @@ import { getCommand, listCommands } from '../index.ts'
 export default {
   name: 'menu',
   desc: 'list all commands',
+  aliases: ['help'],
   run: async (ctx: CommandContext) => {
     const byCategory = new Map<string, string[]>()
     for (const { name, category } of listCommands()) {
