@@ -1,6 +1,6 @@
 # Wakaru ✨
 
-An **imoets** WhatsApp bot built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript.
+A WhatsApp bot built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript.
 Runs on **Bun** (PC) *and* **Node** (Termux/Android) — yes, you can host a bot on your phone. 🫶
 
 > 🚧 **Status: work-in-progress skeleton (not done yet).**
