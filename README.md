@@ -1,84 +1,99 @@
 # Wakaru ✨
 
-A WhatsApp bot built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript.
-Runs on **Bun** (PC) *and* **Node** (Termux/Android) — yes, you can host a bot on your phone. 🫶
+A tiny, friendly WhatsApp bot built on [Baileys](https://github.com/whiskeysockets/Baileys) and TypeScript.
+One codebase, two runtimes — run it on your desktop with **Bun**, or right from your phone with **Node**. 🫶
 
-> 🚧 **Status: work-in-progress skeleton (not done yet).**
-> So far it can: connect, authenticate (QR / pairing code), auto-reconnect, and log incoming messages.
-> The reply/command handlers are still empty — they'll be filled in as we grow together.
+> 🚧 **Status:** still growing (work in progress). It connects, authenticates, auto-reconnects, runs a command system, and logs prettily. More replies come as we play together.
 
 ---
 
-## ✨ Current features
+## Features
 
-- 🔐 Authentication via **QR code** or **pairing code**
+- 🔐 Authenticate via QR code or pairing code
 - 🔁 Auto-reconnect with exponential backoff
-- 📥 Logs incoming text messages (📥 received / 📤 sent)
-- 🧩 Message handler already split into its own file for easy growth
-- 🗂️ Multi-file session storage (`sessions/` folder) — safe for bot use
+- 🧩 Command system: drop a file in `src/commands/<category>/` and it's live — no registry to edit
+- ✨ `.menu` command that lists every registered command
+- 🎨 Pretty charmbracelet-style console logger (clock-only timestamp)
+- 📱 One codebase runs on **Bun** (desktop) and **Node ≥ 23.6** (phone)
 
-## 🧰 Requirements
+## Quick start
 
-| Platform | Runtime | Notes |
-|---|---|---|
-| PC | **Bun** | `bun run start` |
-| Termux/Android | **Node 23.6+** (LTS) | `npm install`, then `node src/index.ts` |
+**Desktop (Bun):**
 
-`Node 23.6+` runs TypeScript directly (built-in type stripping) — no `tsx` needed.
-
-## 📦 Installation
-
-**On PC (Bun):**
 ```bash
 bun install
-bun run start          # scan QR
-bun run start:pairing  # use pairing code instead
+bun run start            # scan QR
+bun run start:pairing    # or use a pairing code
 ```
 
-**On Termux (Node):**
+**Phone / Termux:**
+
+Easiest — one-liner installs Bun + Wakaru + deps:
+
+```bash
+pkg install -y curl && \
+curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/scripts/termux-install.sh | bash
+```
+
+Or the plain Node path:
+
 ```bash
 pkg update && pkg install nodejs-lts
-cd wakaru
+git clone https://github.com/salsabytes/Wakaru.git && cd wakaru
 npm install
-node src/index.ts
+node src/index.ts                 # scan QR
+node src/index.ts --use-pairing-code
 ```
 
-> 🔧 Why doesn't `npm install` pull in `sharp`? Because `sharp` (an image library, a peer of baileys)
-> has **no Android prebuilt** — npm would try to build libvips from source and fail, breaking the
-> whole install. Our `.npmrc` sets `omit=peer` so the install goes through.
-> The only trade-off: no media thumbnails yet (and the `jimp` fallback isn't used either — the bot
-> is text-only right now, so we're fine). Full reasoning lives in `.npmrc`.
+Node ≥ 23.6 runs the TypeScript files directly — no `tsx`, no build step.
 
-## ⚙️ Configuration
+### Can Bun run on Termux?
 
-Via environment variables:
+Officially no: Bun ships no Android binaries. Community builds exist — the maintained one is [Happ1ness-dev/bun-termux](https://github.com/Happ1ness-dev/bun-termux), a native glibc-runner wrapper with no root/proot. It's unofficial and can break on Bun updates; Node is the boring, safe path on phones.
+
+### Why `npm install` doesn't pull in `sharp`
+
+`sharp` (an image library, a peer of baileys) has no Android prebuilt — npm would try to compile libvips from source on Termux and fail the whole install. The repo's `.npmrc` sets `omit=peer`, so the install goes through. Trade-off: no media thumbnails yet (the bot is text-only; when media lands, baileys' pure-JS `jimp` fallback covers Termux without native builds).
+
+## Commands
+
+```
+.menu  — list all available commands
+```
+
+## Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `SESSION_DIR` | `sessions` | Folder where the login session is stored |
-| `PAIRING_CODE` | — | Set to `1` to use pairing code |
+| `PAIRING_CODE` | — | Set to `1` to use a pairing code |
 
 Or pass the flag: `--use-pairing-code`.
 
-## 🗂️ Code structure
+## Project structure
 
 ```
 src/
-├── index.ts            # socket config + connect + connection handler + shutdown
-├── store.ts            # in-memory message store (getMessage for baileys)
+├── index.ts             # socket config, connect, connection handler, shutdown
+├── logger.ts            # charmbracelet-style console logger (no deps)
+├── store.ts             # in-memory message store (getMessage for baileys)
+├── commands/
+│   ├── index.ts         # command loader + types + PREFIX
+│   └── <category>/      # one file per command, auto-scanned
 └── handlers/
-    └── messages.ts     # messages.upsert handler (logs + stores messages)
+    └── messages.ts      # messages.upsert handler (log + dispatch)
 ```
 
-## ⚠️ Important notes
+## Notes
 
-- **Never run 2 instances sharing the same `sessions/` folder** — you'll hit status `440`
-  (`connectionReplaced`) and the bots will kick each other. Run one instance only.
-- If the bot gets logged out: delete the `sessions/` folder and scan again.
-- `sessions/` is gitignored — credentials never end up in the repo.
+- Never run two instances sharing the same `sessions/` folder — they'll kick each other (status `440`, `connectionReplaced`).
+- Logged out? Delete `sessions/` and scan again.
+- `sessions/` is gitignored — credentials never reach the repo.
+- Keep the phone awake with `termux-wake-lock` when hosting on Termux.
 
-## 🗺️ Roadmap
+## Roadmap
 
-- [ ] Reply / command handlers (e.g. `.menu`, auto-reply)
+- [ ] AI agent that writes its own commands
+- [ ] More commands
 - [ ] Sending media (needs `jimp` for thumbnails on Termux)
-- [ ] Poll updates & chat status reading
+- [ ] Poll updates and chat status handling

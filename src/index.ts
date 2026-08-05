@@ -15,14 +15,15 @@ import {
 } from 'baileys'
 import { getMessage } from './store.ts'
 import { handleMessagesUpsert } from './handlers/messages.ts'
+import { loadCommands } from './commands/index.ts'
+import { logger } from './logger.ts'
 
 const SESSION_DIR = process.env.SESSION_DIR ?? 'sessions'
 const usePairingCode = process.argv.includes('--use-pairing-code') || !!process.env.PAIRING_CODE
 
-// logger senyap: baileys butuh objek logger, tapi kita gak mau noise-nya
-const logger = {
+const silentLog = {
   level: 'silent',
-  child: () => logger,
+  child: () => silentLog,
   trace: () => {},
   debug: () => {},
   info: () => {},
@@ -51,9 +52,9 @@ async function connectToWhatsApp(): Promise<void> {
   waka = makeWASocket({
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
+      keys: makeCacheableSignalKeyStore(state.keys, silentLog),
     },
-    logger,
+    logger: silentLog,
     getMessage,
     browser: Browsers.appropriate('Google Chrome'),
     markOnlineOnConnect: true,
@@ -86,14 +87,14 @@ async function handleConnectionUpdate(
   if (connection === 'close') {
     const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode
     if (statusCode === DisconnectReason.loggedOut) {
-      console.error(`Koneksi ditutup: kamu sudah logout. Hapus folder "${SESSION_DIR}/" lalu scan ulang.`)
+      logger.error(`Disconnected: you've been logged out. Delete the "${SESSION_DIR}/" folder and scan again.`)
       process.exit(1)
     }
     if (!isShuttingDown) {
       const delay = Math.min(3000 * 2 ** reconnectAttempts, 60_000)
       reconnectAttempts++
-      console.warn(
-        `Koneksi terputus${statusCode ? ` (status ${statusCode})` : ''} — mencoba reconnect dalam ${delay / 1000}s...`,
+      logger.warn(
+        `Connection lost${statusCode ? ` (status ${statusCode})` : ''} — reconnecting in ${delay / 1000}s...`,
       )
       reconnectTimer = setTimeout(connectToWhatsApp, delay)
     }
@@ -102,7 +103,7 @@ async function handleConnectionUpdate(
 
   if (connection === 'open') {
     reconnectAttempts = 0
-    console.log('✅ Bot berhasil terhubung!')
+    logger.info('✅ Bot connected!')
     return
   }
 
@@ -112,15 +113,15 @@ async function handleConnectionUpdate(
     isAskingPairingCode = true
     try {
       const phoneNumber = await question(
-        'Masukkan nomor HP (format internasional, contoh: 628123456789): ',
+        'Enter phone number (international format, e.g. 628123456789): ',
       )
       const code = await waka.requestPairingCode(phoneNumber)
-      console.log(`\nKode pairing kamu: ${code}\n`)
+      logger.info(`\nPairing code: ${code}\n`)
     } finally {
       isAskingPairingCode = false
     }
   } else {
-    console.log('\n📱 Scan QR ini dengan WhatsApp  (HP > Perangkat Tertaut):')
+    logger.info('\n📱 Scan this QR with WhatsApp  (Phone > Linked Devices):')
     qrcode.generate(qr, { small: true })
   }
 }
@@ -128,11 +129,11 @@ async function handleConnectionUpdate(
 async function shutdown(signal: string): Promise<void> {
   isShuttingDown = true
   if (reconnectTimer) clearTimeout(reconnectTimer)
-  console.log(`Menerima ${signal} — mematikan bot...`)
+  logger.info(`Received ${signal} — shutting down...`)
   try {
-    await waka?.end(new Error('Bot dimatikan manual'))
+    await waka?.end(new Error('Bot stopped manually'))
   } catch (err) {
-    console.error('Gagal menutup koneksi:', err)
+    logger.error('Failed to close connection:', err)
   }
   rl.close()
   process.exit(0)
@@ -141,10 +142,12 @@ async function shutdown(signal: string): Promise<void> {
 process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 process.on('unhandledRejection', (err) => {
-  console.error('Unhandled rejection:', err)
+  logger.error('Unhandled rejection:', err)
 })
 
-connectToWhatsApp().catch((err) => {
-  console.error('Gagal memulai bot:', err)
-  process.exit(1)
-})
+loadCommands()
+  .then(connectToWhatsApp)
+  .catch((err) => {
+    logger.error('Failed to start bot:', err)
+    process.exit(1)
+  })
