@@ -1,0 +1,22 @@
+{
+  "name": "wakaru",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "start:pairing": "bun src/index.ts --use-pairing-code",
+    "start:reply": "bun src/index.ts --do-reply",
+    "start:node": "node src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "baileys": "^7.0.0-rc14",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^7.0.2"
+  }
+}
