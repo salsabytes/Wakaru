@@ -5,9 +5,9 @@ say()  { echo -e "\n\033[1;36m==> $*\033[0m"; }
 done_m() { echo -e "\033[1;32m==> $*\033[0m"; }
 
 say "Installing Termux prerequisites..."
-pkg update && pkg upgrade -y
-pkg install -y git curl clang make glibc-repo python
-pkg install -y glibc-runner
+apt update && apt upgrade -y
+apt install -y git curl clang make glibc-repo python
+apt install -y glibc-runner
 # yt-dlp powers the ytmp3 downloader command — part of the bot, not optional
 python -m pip install -U yt-dlp
 
@@ -30,7 +30,7 @@ cd wakaru
 bun install
 
 say "Building the native sticker engine (Rust, a few minutes on first run)..."
-pkg install -y rust
+apt install -y rust
 cd native/sticker
 if cargo build --release; then
   cd ../..
