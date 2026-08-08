@@ -20,14 +20,12 @@ cd wakaru
 npm install
 
 say "Building the native sticker engine (Rust, a few minutes on first run)..."
-if apt install -y rust && (cd native/sticker && cargo build --release); then
-  cd ../..
+if apt install -y rust && (cd native/sticker && cargo build --release) && [ -f native/sticker/target/release/wakaru-sticker ]; then
   mkdir -p bin
   cp native/sticker/target/release/wakaru-sticker bin/sticker
   chmod +x bin/sticker
   done_m "Sticker engine built"
 else
-  cd ../..
   echo "sticker engine build skipped (bot still works)" >&2
 fi
 
