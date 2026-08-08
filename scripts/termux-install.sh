@@ -6,14 +6,23 @@ done_m() { echo -e "\033[1;32m==> $*\033[0m"; }
 
 say "Installing Termux prerequisites..."
 apt update && apt upgrade -y
-apt install -y git curl clang make python pacman
+apt install -y git curl clang make python pacman patchelf
 if ! command -v grun >/dev/null 2>&1; then
   say "Setting up glibc + glibc-runner via pacman (needed by bun-termux)..."
   pacman-key --init 2>/dev/null || true
   pacman-key --populate 2>/dev/null || true
   pacman-db-upgrade 2>/dev/null || true
-  pacman -Sy --needed --noconfirm --assume-installed bash,patchelf,resolv-conf glibc glibc-runner ||
-    { echo "glibc setup gagal - coba manual: pacman-db-upgrade && pacman -Sy --needed --noconfirm --assume-installed bash,patchelf,resolv-conf glibc glibc-runner" >&2; exit 1; }
+  pacman-key --keyserver keyserver.ubuntu.com --recv-keys 998DE27318E867EA976BA877389CEED64573DFCA 2>/dev/null ||
+    pacman-key --keyserver hkp://keyserver.ubuntu.com:11371 --recv-keys 998DE27318E867EA976BA877389CEED64573DFCA 2>/dev/null || true
+  cat > "${TMPDIR:-$HOME}/wakaru-gpkg.conf" <<'EOF'
+[options]
+Architecture = auto
+SigLevel = Required
+[gpkg]
+Server = https://service.termux-pacman.dev/gpkg/$arch
+EOF
+  pacman --config "${TMPDIR:-$HOME}/wakaru-gpkg.conf" -Sy --needed --noconfirm --assume-installed bash,patchelf,resolv-conf glibc glibc-runner ||
+    { echo "glibc setup gagal - kalau masih error, ganti bootstrap ke pacman: wiki.termux.com/wiki/Switching_package_manager" >&2; exit 1; }
 fi
 python -m pip install -U yt-dlp
 
