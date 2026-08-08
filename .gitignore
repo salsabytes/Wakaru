@@ -4,6 +4,6 @@ logs/
 *.log
 native/sticker/target/
 bin/
-config.json
 
-skills.json
+config.json
+.agents

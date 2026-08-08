@@ -34,7 +34,7 @@ bun run start:pairing    # or use a pairing code
 
 **Phone / Termux:**
 
-Easiest — one-liner installs Bun + Wakaru + deps:
+Easiest — one-liner installs Node + Wakaru + deps:
 
 ```bash
 pkg install -y curl && \
@@ -55,7 +55,7 @@ Node ≥ 23.6 runs the TypeScript files directly — no `tsx`, no build step.
 
 ### Can Bun run on Termux?
 
-Officially no: Bun ships no Android binaries. Community builds exist — the maintained one is [Happ1ness-dev/bun-termux](https://github.com/Happ1ness-dev/bun-termux), a native glibc-runner wrapper with no root/proot. It's unofficial and can break on Bun updates; Node is the boring, safe path on phones.
+Officially no: Bun ships no Android binaries. Community builds exist — the maintained one is [Happ1ness-dev/bun-termux](https://github.com/Happ1ness-dev/bun-termux), a native glibc-runner wrapper with no root/proot. It's unofficial, needs kernel ≥ 5.1 on newer Bun versions, and can break on Bun updates. `scripts/termux-install.sh` therefore installs Node — the boring, safe path that works on every device. Want Bun anyway? Install it manually and run `bun install && bun run start`.
 
 ### Why `npm install` doesn't pull in `sharp`
 
