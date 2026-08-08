@@ -1,6 +1,7 @@
 {
   "name": "wakaru",
   "version": "1.0.0",
+  "description": "WhatsApp bot with an agentic AI — download audio/video, make stickers, run commands. Built on Baileys + TypeScript.",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +9,7 @@
     "start:pairing": "bun src/index.ts --use-pairing-code",
     "start:reply": "bun src/index.ts --do-reply",
     "start:node": "node src/index.ts",
+    "build:sticker": "cd native/sticker && cargo build --release && mkdir -p ../../bin && cp target/release/wakaru-sticker.exe ../../bin/sticker.exe || cp target/release/wakaru-sticker ../../bin/sticker",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

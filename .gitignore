@@ -2,3 +2,8 @@ node_modules/
 sessions/
 logs/
 *.log
+native/sticker/target/
+bin/
+config.json
+
+skills.json

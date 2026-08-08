@@ -1,0 +1,14 @@
+[package]
+name = "wakaru-sticker"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif"] }
+webp = "0.3"
+mp4 = "0.14"
+openh264 = { version = "0.9", features = ["source"] }
+webp-animation = "0.10"
+
+[profile.release]
+strip = true

@@ -13,10 +13,10 @@ import {
   type GroupMetadata,
   type WASocket,
 } from 'baileys'
-import { getMessage } from './store.ts'
+import { getMessage } from './lib/store.ts'
 import { handleMessagesUpsert } from './handlers/messages.ts'
 import { loadCommands } from './commands/index.ts'
-import { logger } from './logger.ts'
+import { logger } from './lib/logger.ts'
 
 const SESSION_DIR = process.env.SESSION_DIR ?? 'sessions'
 const usePairingCode = process.argv.includes('--use-pairing-code') || !!process.env.PAIRING_CODE

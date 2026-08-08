@@ -1,6 +1,10 @@
 # Wakaru ✨
 
-A tiny, friendly WhatsApp bot built on [Baileys](https://github.com/whiskeysockets/Baileys) and TypeScript.
+*分かる* — "to understand".
+
+A tiny WhatsApp bot with an **agentic AI** that understands you: chat normally, or let it
+run commands for you — download audio/video, make stickers. Built on
+[Baileys](https://github.com/whiskeysockets/Baileys) and TypeScript.
 One codebase, two runtimes — run it on your desktop with **Bun**, or right from your phone with **Node**. 🫶
 
 > 🚧 **Status:** still growing (work in progress). It connects, authenticates, auto-reconnects, runs a command system, and logs prettily. More replies come as we play together.
@@ -11,6 +15,8 @@ One codebase, two runtimes — run it on your desktop with **Bun**, or right fro
 
 - 🔐 Authenticate via QR code or pairing code
 - 🔁 Auto-reconnect with exponential backoff
+- 🤖 Agentic AI (`.ai`): chat normally, or have it run any command with `@run:` — with per-chat memory
+- ⬇️ Downloader commands: `.ytmp3` (audio), `.ytmp4` (video) via yt-dlp
 - 🧩 Command system: drop a file in `src/commands/<category>/` and it's live — no registry to edit
 - ✨ `.menu` command that lists every registered command
 - 🎨 Pretty charmbracelet-style console logger (clock-only timestamp)
@@ -53,13 +59,29 @@ Officially no: Bun ships no Android binaries. Community builds exist — the mai
 
 ### Why `npm install` doesn't pull in `sharp`
 
-`sharp` (an image library, a peer of baileys) has no Android prebuilt — npm would try to compile libvips from source on Termux and fail the whole install. The repo's `.npmrc` sets `omit=peer`, so the install goes through. Trade-off: no media thumbnails yet (the bot is text-only; when media lands, baileys' pure-JS `jimp` fallback covers Termux without native builds).
+`sharp` (an image library, a peer of baileys) has no Android prebuilt — npm would try to compile libvips from source on Termux and fail the whole install. The repo's `.npmrc` sets `omit=peer`, so the install goes through. Trade-off: baileys' own link-preview thumbnails don't work; media features (stickers) use the repo's own Rust sidecar instead, which cross-compiles cleanly for Android.
 
 ## Commands
 
 ```
-.menu  — list all available commands
+.ai      — chat or run any command (owner only, e.g. ".ai make a sticker from the last image")
+.menu    — list all available commands
+.ytmp3   — download audio (mp3) from a video link
+.ytmp4   — download video (mp4) from a video link
+.sticker — make a sticker from a quoted photo or video
 ```
+
+`.ytmp3`/`.ytmp4` need `yt-dlp` on PATH (+ `ffmpeg` for mp3 extraction): `winget install yt-dlp.yt-dlp ffmpeg` on Windows, `apt install yt-dlp ffmpeg` on Linux, `pkg install yt-dlp ffmpeg` on Termux.
+
+### Native sticker engine
+
+`.sticker` shells out to a small Rust sidecar (`native/sticker/`) that turns media into 512×512 webp stickers — fast and low-RAM. Photos become still stickers; videos become animated ones (H.264 mp4, first 8 seconds, auto-compressed to stay under WhatsApp's 100KB limit). All codecs are compiled in — no ffmpeg needed. Build it once per platform:
+
+```bash
+bun run build:sticker          # desktop: puts the binary in bin/
+```
+
+On Termux, `scripts/termux-install.sh` builds it for you on-device (installs `rust`, compiles once — takes a few minutes). The binary is gitignored either way.
 
 ## Configuration
 
@@ -70,13 +92,28 @@ Officially no: Bun ships no Android binaries. Community builds exist — the mai
 
 Or pass the flag: `--use-pairing-code`.
 
+Owner commands (`.ai`): edit `config.json` (gitignored) at the project root and list
+phone numbers in `"owners"` — bare number (`628123...`) or full JID. Empty list =
+owner commands disabled.
+
+```json
+{
+  "owners": ["6281234567890"]
+}
+```
+
 ## Project structure
 
 ```
 src/
 ├── index.ts             # socket config, connect, connection handler, shutdown
-├── logger.ts            # charmbracelet-style console logger (no deps)
-├── store.ts             # in-memory message store (getMessage for baileys)
+├── lib/                 # shared helpers (no deps beyond stdlib)
+│   ├── logger.ts        # charmbracelet-style console logger
+│   ├── store.ts         # in-memory message store (getMessage for baileys)
+│   ├── config.ts        # owner list from config.json
+│   ├── llm.ts           # free chateverywhere backend client for .ai
+│   ├── simple.ts        # WAMessage -> flat SerializedMessage
+│   └── downloader.ts    # yt-dlp wrapper (mp3/mp4)
 ├── commands/
 │   ├── index.ts         # command loader + types + PREFIX
 │   └── <category>/      # one file per command, auto-scanned
@@ -93,7 +130,6 @@ src/
 
 ## Roadmap
 
-- [ ] AI agent that writes its own commands
 - [ ] More commands
-- [ ] Sending media (needs `jimp` for thumbnails on Termux)
+- [ ] GIF → animated sticker (reuses the video engine's animated webp path)
 - [ ] Poll updates and chat status handling

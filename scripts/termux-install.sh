@@ -8,6 +8,8 @@ say "Installing Termux prerequisites..."
 pkg update -y
 pkg install -y git curl clang make glibc-repo python
 pkg install -y glibc-runner
+# yt-dlp powers the ytmp3 downloader command — part of the bot, not optional
+python -m pip install -U yt-dlp
 
 if ! command -v bun >/dev/null 2>&1; then
   say "Installing Bun for Termux (bun-termux-manager)..."
@@ -26,6 +28,20 @@ fi
 say "Installing dependencies..."
 cd wakaru
 bun install
+
+say "Building the native sticker engine (Rust, a few minutes on first run)..."
+pkg install -y rust
+cd native/sticker
+if cargo build --release; then
+  cd ../..
+  mkdir -p bin
+  cp native/sticker/target/release/wakaru-sticker bin/sticker
+  chmod +x bin/sticker
+  done_m "Sticker engine built"
+else
+  cd ../..
+  echo "sticker engine build skipped (bot still works)" >&2
+fi
 
 done_m "All set! Start the bot:"
 echo "   cd wakaru"
