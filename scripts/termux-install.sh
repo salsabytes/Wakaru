@@ -12,8 +12,13 @@ if ! command -v grun >/dev/null 2>&1; then
   pacman-key --init 2>/dev/null || true
   pacman-key --populate 2>/dev/null || true
   pacman-db-upgrade 2>/dev/null || true
-  pacman-key --keyserver keyserver.ubuntu.com --recv-keys 998DE27318E867EA976BA877389CEED64573DFCA 2>/dev/null ||
-    pacman-key --keyserver hkp://keyserver.ubuntu.com:11371 --recv-keys 998DE27318E867EA976BA877389CEED64573DFCA 2>/dev/null || true
+  # org signing key is not in a reachable keyserver; pull it straight from the repo
+  if ! pacman-key --list-keys 998DE27318E867EA976BA877389CEED64573DFCA >/dev/null 2>&1; then
+    curl -fsSL --max-time 30 "https://raw.githubusercontent.com/termux-pacman/termux-packages/master/packages/termux-keyring/termux-pacman.gpg" -o "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
+    pacman-key --import "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
+    pacman-key --lsign-key 998DE27318E867EA976BA877389CEED64573DFCA
+    rm -f "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
+  fi
   cat > "${TMPDIR:-$HOME}/wakaru-gpkg.conf" <<'EOF'
 [options]
 Architecture = auto
