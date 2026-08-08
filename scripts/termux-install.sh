@@ -11,6 +11,8 @@ if ! command -v grun >/dev/null 2>&1; then
   say "Setting up glibc + glibc-runner via pacman (needed by bun-termux)..."
   apt install -y termux-keyring
   pacman-key --init 2>/dev/null || true
+  # silence the "unsafe permissions on homedir" gpg warning
+  chmod 700 "$PREFIX/etc/pacman.d/gnupg" 2>/dev/null || true
   pacman-key --populate 2>/dev/null || true
   pacman-db-upgrade 2>/dev/null || true
   # pacman-key --add/--import only take keyring dirs; if the org key is still
@@ -26,7 +28,11 @@ if ! command -v grun >/dev/null 2>&1; then
 Architecture = auto
 SigLevel = Required
 [gpkg]
+# pacman tries these in order and falls back on failure (the primary server
+# has been returning 403 under load, so the mirrors below keep glibc installs working)
 Server = https://service.termux-pacman.dev/gpkg/$arch
+Server = https://ftp.agdsn.de/termux-pacman/gpkg/$arch
+Server = https://mirror.clarkson.edu/termux-pacman/gpkg/$arch
 EOF
   pacman --config "${TMPDIR:-$HOME}/wakaru-gpkg.conf" -Sy --needed --noconfirm --assume-installed bash,patchelf,resolv-conf glibc glibc-runner ||
     { echo "glibc setup gagal - kalau masih error, ganti bootstrap ke pacman: wiki.termux.com/wiki/Switching_package_manager" >&2; exit 1; }
