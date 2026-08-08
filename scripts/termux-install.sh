@@ -15,7 +15,7 @@ if ! command -v grun >/dev/null 2>&1; then
   # org signing key is not in a reachable keyserver; pull it straight from the repo
   if ! pacman-key --list-keys 998DE27318E867EA976BA877389CEED64573DFCA >/dev/null 2>&1; then
     curl -fsSL --max-time 30 "https://raw.githubusercontent.com/termux-pacman/termux-packages/master/packages/termux-keyring/termux-pacman.gpg" -o "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
-    pacman-key --import "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
+    pacman-key --add "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
     pacman-key --lsign-key 998DE27318E867EA976BA877389CEED64573DFCA
     rm -f "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
   fi
