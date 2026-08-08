@@ -9,14 +9,16 @@ apt update && apt upgrade -y
 apt install -y git curl clang make python pacman patchelf
 if ! command -v grun >/dev/null 2>&1; then
   say "Setting up glibc + glibc-runner via pacman (needed by bun-termux)..."
+  apt install -y termux-keyring
   pacman-key --init 2>/dev/null || true
   pacman-key --populate 2>/dev/null || true
   pacman-db-upgrade 2>/dev/null || true
-  # org signing key is not in a reachable keyserver; pull it straight from the repo
+  # pacman-key --add/--import only take keyring dirs; if the org key is still
+  # missing, feed the pubkey straight into gpg
   if ! pacman-key --list-keys 998DE27318E867EA976BA877389CEED64573DFCA >/dev/null 2>&1; then
     curl -fsSL --max-time 30 "https://raw.githubusercontent.com/termux-pacman/termux-packages/master/packages/termux-keyring/termux-pacman.gpg" -o "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
-    pacman-key --add "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
-    pacman-key --lsign-key 998DE27318E867EA976BA877389CEED64573DFCA
+    gpg --homedir "$PREFIX/etc/pacman.d/gnupg" --batch --import "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
+    pacman-key --lsign-key 998DE27318E867EA976BA877389CEED64573DFCA 2>/dev/null || true
     rm -f "${TMPDIR:-$HOME}/wakaru-termux-pacman.gpg"
   fi
   cat > "${TMPDIR:-$HOME}/wakaru-gpkg.conf" <<'EOF'
