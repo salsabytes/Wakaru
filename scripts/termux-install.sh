@@ -7,22 +7,14 @@ done_m() { echo -e "\033[1;32m==> $*\033[0m"; }
 say "Installing Termux prerequisites..."
 apt update && apt upgrade -y
 apt install -y git curl clang make python pacman
-# glibc TIDAK ada di repo apt Termux: repo resmi cuma bionic (libc Android), dan
-# bootstrap apt `glibc-repo` dari termux-pacman udah discontinued. Sekarang glibc
-# cuma dirilis lewat pacman repo [gpkg] — makanya `apt install glibc-repo` selalu
-# "Unable to locate package", dan ganti pkg->apt gak ngaruh (source-nya sama).
-# bun-termux butuh glibc + glibc-runner (grun) di $PREFIX/glibc sebelum build Bun.
 if ! command -v grun >/dev/null 2>&1; then
   say "Setting up glibc + glibc-runner via pacman (needed by bun-termux)..."
   pacman-key --init 2>/dev/null || true
   pacman-key --populate 2>/dev/null || true
-  # apt-bundled pacman ships an old-format empty DB -> needs format upgrade before -S works
   pacman-db-upgrade 2>/dev/null || true
-  # ponytail: --assume-installed skips file conflicts with apt's bash/patchelf/resolv-conf
-  pacman -S --needed --noconfirm --assume-installed bash,patchelf,resolv-conf glibc glibc-runner ||
-    { echo "glibc setup gagal - coba manual: pacman-db-upgrade && pacman -S --needed --noconfirm --assume-installed bash,patchelf,resolv-conf glibc glibc-runner" >&2; exit 1; }
+  pacman -Sy --needed --noconfirm --assume-installed bash,patchelf,resolv-conf glibc glibc-runner ||
+    { echo "glibc setup gagal - coba manual: pacman-db-upgrade && pacman -Sy --needed --noconfirm --assume-installed bash,patchelf,resolv-conf glibc glibc-runner" >&2; exit 1; }
 fi
-# yt-dlp powers the ytmp3 downloader command — part of the bot, not optional
 python -m pip install -U yt-dlp
 
 if ! command -v bun >/dev/null 2>&1; then
