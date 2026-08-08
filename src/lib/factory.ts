@@ -1,4 +1,4 @@
-import { download, cleanup } from '../../lib/downloader.ts'
+import { download, cleanup } from './downloader.ts'
 
 export function makeDownloader(o: {
   name: string

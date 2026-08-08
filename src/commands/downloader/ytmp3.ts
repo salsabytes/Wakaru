@@ -1,4 +1,4 @@
-import { makeDownloader } from './factory.ts'
+import { makeDownloader } from '../../lib/factory.ts'
 
 export default makeDownloader({
   name: 'ytmp3',
