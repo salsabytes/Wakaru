@@ -39,13 +39,29 @@ EOF
 fi
 python -m pip install -U yt-dlp
 
+BTM_URL="https://raw.githubusercontent.com/Happ1ness-dev/bun-termux/main/helper_scripts/bun-termux-manager"
 if ! command -v bun >/dev/null 2>&1; then
   say "Installing Bun for Termux (bun-termux-manager)..."
-  curl -fsSL "https://raw.githubusercontent.com/Happ1ness-dev/bun-termux/main/helper_scripts/bun-termux-manager" | bash -s install
+  # bun >= 1.3 requires kernel >= 5.1; on older kernels (most Android < 12)
+  # it SIGABRTs via seccomp (pidfd_open), so try a pre-1.3 build first.
+  for v in 1.2.23 latest; do
+    if curl -fsSL "$BTM_URL" | bash -s install --bun-version "$v"; then
+      break
+    fi
+    echo "  bun $v tidak bisa jalan di perangkat ini..." >&2
+  done
 fi
 export PATH="$HOME/.bun/bin:$PATH"
-command -v bun >/dev/null 2>&1 || { echo "bun not found after install" >&2; exit 1; }
-done_m "Bun: $(bun --version)"
+if command -v bun >/dev/null 2>&1; then
+  done_m "Bun: $(bun --version)"
+  RUN_START="bun run start"
+  RUN_PAIR="bun run start:pairing"
+else
+  say "Bun tidak kompatibel dengan perangkat ini - pakai Node (jalur resmi di HP)..."
+  apt install -y nodejs-lts
+  RUN_START="node src/index.ts"
+  RUN_PAIR="node src/index.ts --use-pairing-code"
+fi
 
 REPO="https://github.com/salsabytes/Wakaru.git"
 if [ ! -d wakaru ]; then
@@ -55,7 +71,11 @@ fi
 
 say "Installing dependencies..."
 cd wakaru
-bun install
+if command -v bun >/dev/null 2>&1; then
+  bun install
+else
+  npm install
+fi
 
 say "Building the native sticker engine (Rust, a few minutes on first run)..."
 apt install -y rust
@@ -73,5 +93,5 @@ fi
 
 done_m "All set! Start the bot:"
 echo "   cd wakaru"
-echo "   bun run start            # scan QR"
-echo "   bun run start:pairing    # or use a pairing code"
+echo "   $RUN_START          # scan QR"
+echo "   $RUN_PAIR   # or use a pairing code"
