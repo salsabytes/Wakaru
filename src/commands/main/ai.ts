@@ -35,6 +35,80 @@ async function buildContext(ctx: CommandContext): Promise<string> {
   return lines.join('\n')
 }
 
+const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
+  const context = await buildContext(ctx)
+  return {
+    role: 'system',
+    content: [
+      'You are Wakaru\'s agent, a WhatsApp bot. Reply in the same language the user writes (Indonesian slang is fine). Be concise.',
+      '',
+      'YOU CAN DO THINGS: run any command below by emitting marker lines, ONE per command:',
+      '@run:<command> <args>',
+      'Match the user\'s request to a command (e.g. "sticker" -> @run:sticker, "kick budi" -> @run:kick <budis-jid-from-context>).',
+      'You may emit MULTIPLE markers at once; the bot executes them and sends back the results, then you summarize in ONE short message.',
+      'NEVER invent results — report exactly what came back; if a command errored, tell the user the real error.',
+      'If you lack info a command needs (a jid, a link, a name), ask the user — do NOT guess or fabricate.',
+      'If no command fits, just answer directly.',
+      '',
+      'CONTEXT:',
+      context,
+      '',
+      'AVAILABLE COMMANDS (name — description):',
+      listCommands()
+        .filter((c) => c.name !== 'ai')
+        .map((c) => `- ${c.name}${c.desc ? ' — ' + c.desc : ''}`)
+        .join('\n'),
+    ].join('\n'),
+  }
+}
+
+const runTool = async (r: { name: string; args: string }, ctx: CommandContext): Promise<string> => {
+  if (r.name === 'ai') return '[ai] denied — no self-recursion'
+  const cmd = getCommand(r.name)
+  if (!cmd) return `[${r.name}] no such command`
+  if (cmd.ownerOnly && !isOwner(ctx.sender)) return `[${r.name}] denied — owner only`
+  try {
+    const captured: string[] = []
+    const sub: CommandContext = {
+      ...ctx,
+      text: r.args,
+      args: r.args ? r.args.split(/\s+/) : [],
+      reply: async (t) => { captured.push(t) },
+    }
+    await cmd.run(sub)
+    return `[${r.name}]${captured.length ? ' ' + captured.join(' | ') : ' (ok)'}`
+  } catch (err) {
+    return `[${r.name}] errored: ${(err as Error).message}`
+  }
+}
+
+const runExchange = async (msgs: ChatMsg[], ctx: CommandContext): Promise<string> => {
+  for (let round = 0; round < 2; round++) {
+    let reply: string
+    try {
+      reply = (await askLLM(msgs, 0.5)).trim()
+    } catch (err) {
+      if (round === 0) reply = (await askLLM(msgs, 0.5)).trim()
+      else throw err
+    }
+    const runs = parseRuns(reply)
+    if (!runs.length) return reply
+    const results: string[] = []
+    for (const r of runs) results.push(await runTool(r, ctx))
+    msgs.push({ role: 'assistant', content: reply })
+    msgs.push({ role: 'user', content: `tool results:\n${results.join('\n')}\nReply to the user in ONE short message.` })
+    if (round === 1) return results.join('\n')
+  }
+  return ''
+}
+
+const saveHistory = (chat: string, query: string, finalText: string): void => {
+  let next = [...(history.get(chat) ?? []), { role: 'user', content: query }, { role: 'assistant', content: finalText }]
+  next = next.slice(-HISTORY_MAX)
+  while (next.reduce((n, m) => n + m.content.length, 0) > HISTORY_CHAR_MAX && next.length > 4) next = next.slice(2)
+  history.set(chat, next)
+}
+
 export default {
   name: 'ai',
   desc: 'chat or DO things: .ai <msg> — can run any command, remembers the chat',
@@ -45,90 +119,14 @@ export default {
 
     let finalText = ''
     try {
-      const context = await buildContext(ctx)
-
-      const system: ChatMsg = {
-        role: 'system',
-        content: [
-          'You are Wakaru\'s agent, a WhatsApp bot. Reply in the same language the user writes (Indonesian slang is fine). Be concise.',
-          '',
-          'YOU CAN DO THINGS: run any command below by emitting marker lines, ONE per command:',
-          '@run:<command> <args>',
-          'Match the user\'s request to a command (e.g. "sticker" -> @run:sticker, "kick budi" -> @run:kick <budis-jid-from-context>).',
-          'You may emit MULTIPLE markers at once; the bot executes them and sends back the results, then you summarize in ONE short message.',
-          'NEVER invent results — report exactly what came back; if a command errored, tell the user the real error.',
-          'If you lack info a command needs (a jid, a link, a name), ask the user — do NOT guess or fabricate.',
-          'If no command fits, just answer directly.',
-          '',
-          'CONTEXT:',
-          context,
-          '',
-          'AVAILABLE COMMANDS (name — description):',
-          listCommands()
-            .filter((c) => c.name !== 'ai')
-            .map((c) => `- ${c.name}${c.desc ? ' — ' + c.desc : ''}`)
-            .join('\n'),
-        ].join('\n'),
-      }
-
-      const h = history.get(ctx.chat) ?? []
-      const msgs: ChatMsg[] = [system, ...h, { role: 'user', content: query }]
-
-      for (let round = 0; round < 2; round++) {
-        let reply: string
-        try {
-          reply = (await askLLM(msgs, 0.5)).trim()
-        } catch (err) {
-
-          if (round === 0) reply = (await askLLM(msgs, 0.5)).trim()
-          else throw err
-        }
-        const runs = parseRuns(reply)
-        if (!runs.length) {
-          finalText = reply
-          break
-        }
-        const results: string[] = []
-        for (const r of runs) {
-          if (r.name === 'ai') {
-            results.push('[ai] denied — no self-recursion')
-            continue
-          }
-          const cmd = getCommand(r.name)
-          if (!cmd) {
-            results.push(`[${r.name}] no such command`)
-            continue
-          }
-          if (cmd.ownerOnly && !isOwner(ctx.sender)) {
-            results.push(`[${r.name}] denied — owner only`)
-            continue
-          }
-          try {
-            const captured: string[] = []
-            const sub: CommandContext = {
-              ...ctx,
-              text: r.args,
-              args: r.args ? r.args.split(/\s+/) : [],
-              reply: async (t) => { captured.push(t) },
-            }
-            await cmd.run(sub)
-            results.push(`[${r.name}]${captured.length ? ' ' + captured.join(' | ') : ' (ok)'}`)
-          } catch (err) {
-            results.push(`[${r.name}] errored: ${(err as Error).message}`)
-          }
-        }
-        msgs.push({ role: 'assistant', content: reply })
-        msgs.push({ role: 'user', content: `tool results:\n${results.join('\n')}\nReply to the user in ONE short message.` })
-        if (round === 1) finalText = results.join('\n')
-      }
+      const system = await buildSystem(ctx)
+      const msgs: ChatMsg[] = [system, ...(history.get(ctx.chat) ?? []), { role: 'user', content: query }]
+      finalText = await runExchange(msgs, ctx)
     } catch (err) {
       finalText = `❌ ${(err as Error).message}`
     }
 
-    let next = [...(history.get(ctx.chat) ?? []), { role: 'user', content: query }, { role: 'assistant', content: finalText }]
-    next = next.slice(-HISTORY_MAX)
-    while (next.reduce((n, m) => n + m.content.length, 0) > HISTORY_CHAR_MAX && next.length > 4) next = next.slice(2)
-    history.set(ctx.chat, next)
+    saveHistory(ctx.chat, query, finalText)
     await ctx.reply(finalText)
   },
 }
