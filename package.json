@@ -9,7 +9,6 @@
     "start:pairing": "bun src/index.ts --use-pairing-code",
     "start:node": "node src/index.ts",
     "build:sticker": "cd native/sticker && cargo build --release && mkdir -p ../../bin && cp target/release/wakaru-sticker.exe ../../bin/sticker.exe || cp target/release/wakaru-sticker ../../bin/sticker",
-    "build:audio": "cd native/audio && cargo build --release && mkdir -p ../../bin && cp target/release/wakaru-audio.exe ../../bin/audio2mp3.exe || cp target/release/wakaru-audio ../../bin/audio2mp3",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

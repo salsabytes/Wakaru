@@ -1,4 +1,4 @@
-import { download, cleanup } from './downloader.ts'
+import { download, cleanup } from './scraper.ts'
 
 export function makeDownloader(o: {
   name: string

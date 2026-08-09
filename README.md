@@ -35,9 +35,9 @@ curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh
 cd wakaru && bun run start
 ```
 
-It installs the runtime (Bun on desktop, Node on Termux), dependencies, `yt-dlp`,
-and builds the native engines (sticker, audio→mp3) — no manual steps. Re-running
-also updates Bun to the latest canary automatically (Termux runs Node instead).
+It installs the runtime (Bun on desktop, Node on Termux), dependencies, and builds
+the native sticker engine — no manual steps. Re-running also updates Bun to the
+latest canary automatically (Termux runs Node instead).
 
 Node ≥ 23.6 runs the TypeScript files directly — no `tsx`, no build step.
 
@@ -55,7 +55,7 @@ The bot maintains its own command list — send **`.menu`** in WhatsApp and it s
 command it can run, generated fresh from `src/commands/`. Drop a new file there and it
 shows up in `.menu` automatically, so this README never needs updating for new commands.
 
-The downloader commands need `yt-dlp` on PATH: `winget install yt-dlp.yt-dlp` on Windows, `apt install yt-dlp` on Linux, `pkg install yt-dlp` on Termux. The `.ytmp3` mp3 conversion runs through the Rust audio engine (`native/audio/`) — no ffmpeg needed anywhere.
+Downloads resolve through the pure-TS scraper — no yt-dlp, no ffmpeg, no Python, no self-host. Both `.ytmp3` (audio) and `.ytmp4` (video) go through the free ytmp3.mobi converter: paste a YouTube link, get the file. Audio comes back as mp3, video as mp4.
 
 ### Native engines
 
@@ -65,7 +65,7 @@ The downloader commands need `yt-dlp` on PATH: `winget install yt-dlp.yt-dlp` on
 bun run build:sticker          # desktop: puts the binary in bin/
 ```
 
-`.ytmp3` uses a sibling sidecar (`native/audio/`) to turn the downloaded m4a into mp3 — same pure-Rust story, so no ffmpeg is needed on any platform (`bun run build:audio`). Both are pure-Rust with zero system deps; `install.sh` builds them for you (installs Rust once, compiles on first run — a few minutes). The binaries are gitignored either way.
+It's pure-Rust with zero system deps; `install.sh` builds it for you (installs Rust once, compiles on first run — a few minutes). The binary is gitignored.
 
 ## Configuration
 
@@ -97,7 +97,7 @@ src/
 │   ├── config.ts        # owner list from config.json
 │   ├── llm.ts           # free chateverywhere backend client for .ai
 │   ├── simple.ts        # WAMessage -> flat SerializedMessage
-│   └── downloader.ts    # yt-dlp wrapper (mp3/mp4)
+│   └── scraper.ts       # pure-TS downloader (ytmp3.mobi scrape — mp3/mp4)
 ├── commands/
 │   ├── index.ts         # command loader + types + PREFIX
 │   └── <category>/      # one file per command, auto-scanned

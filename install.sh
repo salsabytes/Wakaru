@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
-# Wakaru — one-shot installer.
-# Termux (Android), Linux, macOS, and Windows (Git Bash / WSL).
-# Re-runnable: skips whatever is already there. Works both as
-#   curl -fsSL <url> | bash     (installs into ./wakaru)
-#   ./install.sh                (already inside the repo — installs in place)
+# Wakaru — one-shot installer for Termux, Linux, macOS, and Windows (Git Bash/WSL).
+# Works as `curl -fsSL <url> | bash` (installs into ./wakaru) or `./install.sh` (in place).
 set -euo pipefail
 
 REPO="https://github.com/salsabytes/Wakaru.git"
 IS_TERMUX=0
 [ -d /data/data/com.termux/files/usr ] && IS_TERMUX=1
 
-# --- charmbracelet-ish palette ---
 R='\033[0m'; B='\033[1m'; M='\033[2m'
 PINK='\033[1;38;5;213m'; PURPLE='\033[1;38;5;141m'
 GREEN='\033[1;38;5;114m'; YELLOW='\033[1;38;5;228m'; RED='\033[1;38;5;203m'
@@ -34,7 +30,21 @@ printf "${PURPLE}${B}  ✨ Wakaru — one-shot installer${R}\n"
 mute "  Termux · Linux · macOS · Windows (Git Bash/WSL)"
 line
 
-# --- runtime: bun if present, else node >= 23.6, else install one ---
+step "Prerequisites"
+prereq() {
+  local bin="$1"
+  if has "$bin"; then ok "$bin found"; return 0; fi
+  mute "installing $bin..."
+  if [ "$IS_TERMUX" = 1 ]; then pkg install -y "$bin" || true
+  elif has winget && [ "$bin" = git ]; then winget_install Git.Git || true
+  elif has brew; then brew install "$bin" || true
+  elif has apt-get; then (sudo apt-get install -y "$bin" || apt-get install -y "$bin") 2>/dev/null || true
+  fi
+  if has "$bin"; then ok "$bin installed"; else skip "$bin install failed — install it manually"; fi
+}
+prereq git
+prereq curl
+
 step "Runtime"
 use_bun=0
 if has bun; then
@@ -57,36 +67,24 @@ else
   if has bun; then use_bun=1; ok "Bun installed"; else ok "runtime ready"; fi
 fi
 
-# --- keep bun on the latest canary (Termux runs Node, so skipped there) ---
 if [ "$use_bun" = 1 ]; then
   step "Bun upgrade"
   mute "running bun upgrade --canary..."
   bun upgrade --canary
 fi
 
-# --- yt-dlp (soft-fail: bot still works without it) ---
-step "Tools"
-install_pkg() { # $1 = binary, $2 = winget id, $3 = brew formula
-  if has "$1"; then ok "$1 already installed"; return 0; fi
-  mute "installing $1..."
-  if [ "$IS_TERMUX" = 1 ]; then pkg install -y "$1" || true
-  elif has winget; then winget_install "$2" || true
-  elif has brew; then brew install "$3" || true
-  elif has apt-get; then (sudo apt-get install -y "$1" || apt-get install -y "$1") 2>/dev/null || true
-  elif [ "$1" = yt-dlp ]; then python3 -m pip install -U yt-dlp || true
-  else skip "$1 skipped — no package manager found"; return 0
-  fi
-  if has "$1"; then ok "$1 installed"; else skip "$1 install failed — bot still works without it"; fi
-}
-install_pkg yt-dlp yt-dlp.yt-dlp yt-dlp
 
-# --- clone or install in place ---
+
 step "Wakaru"
 if [ -f src/index.ts ]; then
   DIR=.
   ok "inside the repo — installing in place"
 else
   if [ ! -d wakaru ]; then
+    if ! has git; then
+      skip "git is missing — install git, then re-run"
+      exit 1
+    fi
     mute "cloning..."
     git clone "$REPO" wakaru
   else
@@ -96,16 +94,15 @@ else
   cd wakaru
 fi
 
-# --- dependencies ---
 step "Dependencies"
 if [ "$use_bun" = 1 ]; then bun install; else npm install; fi
 ok "dependencies installed"
 
-# --- native engines (soft-fail: bot still works without them) ---
-step "Engines (sticker · audio)"
-build_engine() { # $1 = crate dir, $2 = cargo binary, $3 = bin/ name
-  if [ -x "bin/$3" ] || [ -x "bin/$3.exe" ]; then
-    ok "already built (bin/$3)"
+step "Engines (sticker)"
+build_engine() {
+  local crate="$1" binary="$2" out="$3"
+  if [ -x "bin/$out" ] || [ -x "bin/$out.exe" ]; then
+    ok "already built (bin/$out)"
     return 0
   fi
   if ! has cargo; then
@@ -116,22 +113,20 @@ build_engine() { # $1 = crate dir, $2 = cargo binary, $3 = bin/ name
     fi
   fi
   mute "building (a few minutes on first run)..."
-  if (cd "$1" && cargo build --release); then
+  if (cd "$crate" && cargo build --release); then
     mkdir -p bin
-    if [ -f "$1/target/release/$2.exe" ]; then
-      cp "$1/target/release/$2.exe" "bin/$3.exe"
+    if [ -f "$crate/target/release/$binary.exe" ]; then
+      cp "$crate/target/release/$binary.exe" "bin/$out.exe"
     else
-      cp "$1/target/release/$2" "bin/$3" && chmod +x "bin/$3"
+      cp "$crate/target/release/$binary" "bin/$out" && chmod +x "bin/$out"
     fi
-    ok "built (bin/$3)"
+    ok "built (bin/$out)"
   else
     skip "build failed — bot still works without it"
   fi
 }
 build_engine native/sticker wakaru-sticker sticker
-build_engine native/audio wakaru-audio audio2mp3
 
-# --- done ---
 line
 printf "  ${PURPLE}${B}✨ All set — Wakaru is ready!${R}\n"
 mute "  next:"
