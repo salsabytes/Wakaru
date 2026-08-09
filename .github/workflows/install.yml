@@ -17,19 +17,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Run installer from a temp dir (clone path)
+      - name: Run installer from a temp dir (clone path) + verify
         shell: bash
         run: |
+          # install happens in a temp dir, so install + verify must share one shell
           tmp="$(mktemp -d)"
           cp install.sh "$tmp/"
           cd "$tmp"
           bash install.sh
-      - name: Verify install + typecheck
-        shell: bash
-        run: |
-          export PATH="$HOME/.bun/bin:$PATH"
           cd wakaru
           test -d node_modules
+          export PATH="$HOME/.bun/bin:$PATH"
           if command -v bun >/dev/null 2>&1; then
             bun run typecheck
           else
