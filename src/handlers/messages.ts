@@ -42,13 +42,14 @@ async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promi
     queryText = text.slice(PREFIX.length + rawName.length).trim()
     args = rest
   } else {
-    // the AI also runs without a prefix: a reply to the bot, or a sender with an active AI chat, continues it
+    // prefix-less AI: bot replies or follow-up links from an active AI chat continue it
     const isReplyToBot =
       !!m.quoted?.sender &&
       !!waka.user?.id &&
       (await resolveJid(m.quoted.sender)).split(':')[0].split('@')[0] ===
         waka.user.id.split(':')[0].split('@')[0]
-    if (!isReplyToBot && !aiHasHistory(`${m.chat}:${sender}`)) return
+    const isLink = /(?:https?:\/\/|www\.)/i.test(text)
+    if (!isReplyToBot && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return
     if (!text.trim()) return
     cmd = getCommand('ai')
     queryText = text.trim()
