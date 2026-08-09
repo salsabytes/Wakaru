@@ -38,7 +38,7 @@ export default {
       await exec(BIN, [input, output], { timeout: 30_000 })
       await ctx.sendSticker(await readFile(output))
     } catch (err) {
-      logger.error({ err }, 'sticker error:')
+      logger.error('sticker error:', err)
       await ctx.reply('sticker failed 😢')
     } finally {
       await rm(dir, { recursive: true, force: true })

@@ -62,7 +62,7 @@ async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promi
     }
     await cmd.run(ctx)
   } catch (err) {
-    logger.error({ err }, `Command "${cmd.name}" error:`)
+    logger.error(`Command "${cmd.name}" error:`, err)
     await ctx.reply(`❌ ${cmd.name} failed: ${(err as Error).message.slice(0, 300)}`)
   }
 }
