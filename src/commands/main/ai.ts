@@ -34,7 +34,6 @@ async function buildContext(ctx: CommandContext): Promise<string> {
 
     }
   }
-  // the real WhatsApp messages of this chat — this is what "baca chat sebelumnya" means
   const recent = recentByChat(ctx.chat, 15)
   if (recent.length) {
     const chatLines = recent.map((m) => {
@@ -141,7 +140,7 @@ export default {
     ctx.sock.sendPresenceUpdate('composing', ctx.chat).catch(() => {})
 
     let finalText = ''
-    // per-sender history — a persona set by one group member must never leak to others
+    // per-sender history — one member's persona must never leak to others
     const histKey = `${ctx.chat}:${ctx.sender}`
     try {
       const system = await buildSystem(ctx)

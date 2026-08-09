@@ -13,7 +13,6 @@ const videoIdOf = (rawUrl: string): string | undefined => {
   return (m && (m[1] ?? m[2] ?? m[3] ?? m[4])) || undefined
 }
 
-// the site rate-limits and may serve block pages — keep errors clear
 const getJson = async (url: string, headers: Record<string, string>): Promise<any> => {
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) })
   try {
@@ -23,7 +22,6 @@ const getJson = async (url: string, headers: Record<string, string>): Promise<an
   }
 }
 
-// the sig token and API endpoints live in the site's JS and can change — re-extract them if conversions break
 async function ytmp3Mobi(rawUrl: string, format: 'mp3' | 'mp4'): Promise<Resolved> {
   const vid = videoIdOf(rawUrl)
   if (!vid) throw new Error('ytmp3: not a YouTube link')
@@ -59,7 +57,6 @@ export async function download(url: string, mode: 'audio' | 'video') {
   const got = await ytmp3Mobi(url, mode === 'audio' ? 'mp3' : 'mp4')
   const res = await fetch(got.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
   if (!res.ok) throw new Error(`download http ${res.status}`)
-  // whole file stays in RAM because sendMessage needs the buffer — no size cap
   return { buf: Buffer.from(await res.arrayBuffer()), title: got.title } as const
 }
 
@@ -76,14 +73,13 @@ export async function downloadTikTok(rawUrl: string) {
   if (!j?.success || !j.video_nowm) throw new Error(`tiktok: ${j?.message ?? 'request failed'}`)
   const dl = await fetch(j.video_nowm, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
   if (!dl.ok) throw new Error(`tiktok download http ${dl.status}`)
-  // whole file stays in RAM because sendMessage needs the buffer — no size cap
   return { buf: Buffer.from(await dl.arrayBuffer()), title: j.title || rawUrl }
 }
 
 const shortcodeOf = (rawUrl: string): string | undefined =>
   rawUrl.match(/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/)?.[1]
 
-// IG only serves this API to browser-like requests — needs a fresh csrftoken session + full headers
+// IG serves this API only to browser-like requests
 const IG_HEADERS = {
   'User-Agent': UA,
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -93,7 +89,6 @@ const IG_HEADERS = {
   'Sec-Fetch-Site': 'none',
 }
 
-// csrftoken sessions last hours — cache one session, refresh only when IG rejects it
 let igSessionCached: { cookies: string; csrf: string } | null = null
 
 async function igSession(force = false): Promise<{ cookies: string; csrf: string }> {
@@ -107,7 +102,6 @@ async function igSession(force = false): Promise<{ cookies: string; csrf: string
 }
 
 async function igMediaItem(shortcode: string, session: { cookies: string; csrf: string }) {
-  // ponytail: doc_id is IG's internal web_info query — if it stops returning data, re-extract it from any ig downloader site
   const variables = JSON.stringify({
     shortcode,
     __relay_internal__pv__PolarisAIGMMediaWebLabelEnabledrelayprovider: false,
@@ -123,7 +117,7 @@ async function igMediaItem(shortcode: string, session: { cookies: string; csrf: 
   return { item: j?.data?.xdt_api__v1__media__shortcode__web_info?.items?.[0], message: j?.message }
 }
 
-// media_type 1 = photo, 2 = video; carousels (8) list every item in carousel_media
+// media_type: 1 = photo, 2 = video; carousels list items in carousel_media
 const igBestOf = (m: any): { type: 'video' | 'image'; url: string } | undefined => {
   const url = m.media_type === 2
     ? m.video_versions?.sort((a: any, b: any) => b.width - a.width)[0]?.url
@@ -132,12 +126,10 @@ const igBestOf = (m: any): { type: 'video' | 'image'; url: string } | undefined 
 }
 
 async function igDownload(refs: { type: 'video' | 'image'; url: string }[], title: string) {
-  // one flaky CDN link shouldn't sink the whole set — keep what downloaded
   const results = await Promise.allSettled(
     refs.map(async ({ type, url }) => {
       const dl = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
       if (!dl.ok) throw new Error(`instagram download http ${dl.status}`)
-      // whole files stay in RAM because sendMessage needs the buffers — no size cap
       return { type, buf: Buffer.from(await dl.arrayBuffer()) }
     }),
   )
@@ -148,8 +140,6 @@ async function igDownload(refs: { type: 'video' | 'image'; url: string }[], titl
   return { title, media }
 }
 
-// snapsave.app runs a plain-HTTP download engine (no session, no captcha) — the packed JS response only
-// decodes to the real links; the packer is ported below so no remote code ever executes in this process
 const SNAPSAVE_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/'
 
 let snapsaveCookies = ''
@@ -161,7 +151,7 @@ async function snapsaveHome(force = false): Promise<string> {
   return snapsaveCookies
 }
 
-// port of snapsave's eval-packer: eval(function(h,u,n,t,e,r){...}(ENC,u,n,t,e,f))
+// port of snapsave's eval-packer — decodes without executing remote code
 function snapsaveUnpack(code: string): string {
   const m = code.match(
     /\(function\([^)]*\)\{[\s\S]*?\}\(([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)\)\)\s*;?\s*$/,
@@ -198,11 +188,9 @@ function snapsaveUnpack(code: string): string {
     r += String.fromCharCode(Number(unpackNum(s, e)) - t)
     i++
   }
-  // same round-trip the packer does to surface UTF-8 payload text
   return decodeURIComponent((globalThis as any).escape(r))
 }
 
-// zero-session story path — the download links hide behind snapsave's CDN token, which carries the media type
 async function snapsaveAction(rawUrl: string, forceCookies = false): Promise<{ ok: boolean; status: number; text: string }> {
   const cookies = await snapsaveHome(forceCookies)
   const res = await fetch('https://snapsave.app/action.php?lang=en', {
@@ -221,7 +209,7 @@ async function snapsaveAction(rawUrl: string, forceCookies = false): Promise<{ o
 
 async function downloadInstagramStoryViaSnapsave(username: string, rawUrl: string) {
   let got = await snapsaveAction(rawUrl)
-  // CF rotates its cookie jar — one retry on a fresh jar covers stale-cookie blocks and challenge pages
+  // CF rotates cookies — retry once on a fresh jar
   if (!got.ok || !got.text.includes('(function(')) got = await snapsaveAction(rawUrl, true)
   if (!got.ok || !got.text.includes('(function(')) throw new Error(`snapsave: action ${got.ok ? 'blocked' : `http ${got.status}`}`)
   const payload = snapsaveUnpack(got.text)
@@ -239,12 +227,10 @@ async function downloadInstagramStoryViaSnapsave(username: string, rawUrl: strin
   return igDownload(refs, `@${username} · story`)
 }
 
-// fallback for when snapsave is down — needs IG_SESSIONID (a burner account's session cookie)
 async function downloadInstagramStory(username: string, storyId: string) {
   const sessionid = process.env.IG_SESSIONID
   if (!sessionid) throw new Error("instagram: stories need IG_SESSIONID (a logged-in IG session) — see README")
   const session = await igSession()
-  // user lookup works anonymously — keep the session off it so a bad session errors at the story fetch instead
   const prof = await fetch(
     `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
     {
@@ -255,7 +241,7 @@ async function downloadInstagramStory(username: string, storyId: string) {
   const pj: any = await prof.json().catch(() => null)
   const userId = pj?.data?.user?.id
   if (!userId) throw new Error('instagram: user not found')
-  // sessionid starts with the user id (url-encoded colon) — IG expects ds_user_id alongside it
+  // sessionid starts with the user id — IG expects ds_user_id alongside it
   const dsUserId = sessionid.split('%3A')[0] || sessionid.split(':')[0]
   const rm = await fetch(`https://i.instagram.com/api/v1/feed/reels_media/?reel_ids=${userId}`, {
     headers: {
@@ -282,7 +268,6 @@ export async function downloadInstagram(rawUrl: string) {
     try {
       return await downloadInstagramStoryViaSnapsave(story[1], rawUrl)
     } catch (err) {
-      // zero-session snapsave path first — the logged-in path is the fallback when IG_SESSIONID is set
       if (process.env.IG_SESSIONID) return downloadInstagramStory(story[1], story[2])
       throw err
     }

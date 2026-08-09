@@ -13,7 +13,6 @@ export const messageStore = {
   },
 }
 
-// most recent stored messages of a chat, oldest → newest (feeds the AI's "what did we talk about" context)
 const recentByChat = (chat: string, limit = 15): WAMessage[] => {
   const out: WAMessage[] = []
   for (const msg of store.values()) if (msg.key?.remoteJid === chat) out.push(msg)

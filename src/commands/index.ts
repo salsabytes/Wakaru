@@ -14,7 +14,7 @@ const commands = new Map<string, Registered>()
 const resolve = new Map<string, string>()
 let ready = false
 
-// lazy: ai.ts and menu.ts import this module, so the registry must not read their exports during module init
+// lazy: ai.ts/menu.ts import this module — don't read their exports at module init (cycle)
 function ensure(): void {
   if (ready) return
   ready = true

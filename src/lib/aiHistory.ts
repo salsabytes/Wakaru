@@ -1,6 +1,5 @@
 import type { ChatMsg } from './llm.ts'
 
-// ponytail: history map grows unbounded per sender — prune with a TTL if the bot runs for months
 const HISTORY_MAX = 20
 const HISTORY_CHAR_MAX = 8000
 const history = new Map<string, ChatMsg[]>()
