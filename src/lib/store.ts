@@ -1,6 +1,6 @@
 import type { WAMessage, WAMessageContent, WAMessageKey } from 'baileys'
 
-const MAX = 200
+const MAX = 500
 const store = new Map<string, WAMessage>()
 
 export const messageStore = {
@@ -12,6 +12,15 @@ export const messageStore = {
     return store.get(id)
   },
 }
+
+// most recent stored messages of a chat, oldest → newest (feeds the AI's "what did we talk about" context)
+const recentByChat = (chat: string, limit = 15): WAMessage[] => {
+  const out: WAMessage[] = []
+  for (const msg of store.values()) if (msg.key?.remoteJid === chat) out.push(msg)
+  return out.slice(-limit)
+}
+
+export { recentByChat }
 
 export async function getMessage(key: WAMessageKey): Promise<WAMessageContent | undefined> {
   return messageStore.get(key.id!)?.message ?? undefined

@@ -4,6 +4,8 @@ import { askLLM, type ChatMsg } from '../../lib/llm.ts'
 import { getCommand, listCommands } from '../index.ts'
 import { isOwner } from '../../lib/config.ts'
 import { getAiHistory, saveAiHistory } from '../../lib/aiHistory.ts'
+import { recentByChat } from '../../lib/store.ts'
+import { textOfMessage } from '../../lib/simple.ts'
 
 const PARTICIPANT_MAX = 40
 
@@ -31,6 +33,15 @@ async function buildContext(ctx: CommandContext): Promise<string> {
     } catch {
 
     }
+  }
+  // the real WhatsApp messages of this chat — this is what "baca chat sebelumnya" means
+  const recent = recentByChat(ctx.chat, 15)
+  if (recent.length) {
+    const chatLines = recent.map((m) => {
+      const sender = (m.key?.participant ?? m.key?.remoteJid ?? '?').split('@')[0]
+      return `${sender}: ${textOfMessage(m).slice(0, 150)}`
+    })
+    lines.push(`recent messages in this chat (oldest → newest — answer "what did we talk about" from these):\n${chatLines.join('\n')}`)
   }
   return lines.join('\n')
 }
@@ -63,6 +74,7 @@ const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       'NEVER invent results — report exactly what came back; if a command errored, tell the user the real error.',
       'If you lack info a command needs (a jid, a link, a name), ask the user — do NOT guess or fabricate.',
       'If no command fits, just answer directly.',
+      'You CAN see recent messages of this chat under CONTEXT — when asked about earlier messages, use them; never say you can\'t read the chat.',
       'If the user sends a link or extra info in a SEPARATE message (especially as a reply), it completes your previous request — use it, do NOT ask again.',
       'When the user gives you a link for a downloader (youtube, tiktok, instagram), ALWAYS emit the matching @run marker — never say you can\'t or refuse.',
       '',
