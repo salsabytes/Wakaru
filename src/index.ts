@@ -16,7 +16,6 @@ import {
 } from 'baileys'
 import { getMessage } from './lib/store.ts'
 import { handleMessagesUpsert } from './handlers/messages.ts'
-import { loadCommands } from './commands/index.ts'
 import { logger } from './lib/logger.ts'
 
 const SESSION_DIR = process.env.SESSION_DIR ?? 'sessions'
@@ -136,9 +135,7 @@ process.on('unhandledRejection', (err) => {
   logger.error('Unhandled rejection:', err)
 })
 
-loadCommands()
-  .then(connectToWhatsApp)
-  .catch((err) => {
-    logger.error('Failed to start bot:', err)
-    process.exit(1)
-  })
+connectToWhatsApp().catch((err) => {
+  logger.error('Failed to start bot:', err)
+  process.exit(1)
+})

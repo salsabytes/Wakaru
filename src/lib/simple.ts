@@ -42,6 +42,19 @@ export const makeSender = (sock: WASocket, chat: string, quoted?: WAMessage) => 
   }
 }
 
+// shared opener for link-based commands: replies usage when empty, reacts ⏳ when it has a link
+const requireUrl = async (ctx: CommandContext, name: string, usage: string): Promise<string | undefined> => {
+  const url = ctx.text.trim()
+  if (!url) {
+    await ctx.reply(`usage: ${ctx.prefix}${name} ${usage}`)
+    return undefined
+  }
+  await ctx.react('⏳')
+  return url
+}
+
+export { requireUrl }
+
 export function serializeMessage(msg: WAMessage): SerializedMessage {
   const chat = msg.key?.remoteJid ?? ''
   const sender = msg.key?.participant || chat

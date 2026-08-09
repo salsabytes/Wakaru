@@ -3,16 +3,9 @@
 import { askLLM, type ChatMsg } from '../../lib/llm.ts'
 import { getCommand, listCommands } from '../index.ts'
 import { isOwner } from '../../lib/config.ts'
+import { getAiHistory, saveAiHistory } from '../../lib/aiHistory.ts'
 
-const HISTORY_MAX = 20
-
-const HISTORY_CHAR_MAX = 8000
 const PARTICIPANT_MAX = 40
-const history = new Map<string, ChatMsg[]>()
-
-// lets the message handler route follow-up messages (e.g. a link sent right after ".ai ...") to this chat
-const aiHasHistory = (chat: string, sender: string): boolean => history.has(`${chat}:${sender}`)
-export { aiHasHistory }
 
 const parseRuns = (text: string) =>
   [...text.matchAll(/@run:([a-z][a-z0-9_-]*)(?:\s+([^\n]*))?/gi)].map((m) => ({
@@ -125,13 +118,7 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext): Promise<string
   return ''
 }
 
-// ponytail: history map grows unbounded per sender — prune with a TTL if the bot runs for months
-const saveHistory = (key: string, query: string, finalText: string): void => {
-  let next = [...(history.get(key) ?? []), { role: 'user', content: query }, { role: 'assistant', content: finalText }]
-  next = next.slice(-HISTORY_MAX)
-  while (next.reduce((n, m) => n + m.content.length, 0) > HISTORY_CHAR_MAX && next.length > 4) next = next.slice(2)
-  history.set(key, next)
-}
+
 
 export default {
   name: 'ai',
@@ -146,13 +133,13 @@ export default {
     const histKey = `${ctx.chat}:${ctx.sender}`
     try {
       const system = await buildSystem(ctx)
-      const msgs: ChatMsg[] = [system, ...(history.get(histKey) ?? []), { role: 'user', content: query }]
+      const msgs: ChatMsg[] = [system, ...getAiHistory(histKey), { role: 'user', content: query }]
       finalText = await runExchange(msgs, ctx)
     } catch (err) {
       finalText = `❌ ${(err as Error).message}`
     }
 
-    saveHistory(histKey, query, finalText)
+    saveAiHistory(histKey, query, finalText)
     await ctx.reply(finalText)
   },
 }

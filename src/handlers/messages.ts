@@ -1,11 +1,11 @@
 import type { BaileysEventMap, WAMessage } from 'baileys'
 import { waka } from '../index.ts'
 import { messageStore } from '../lib/store.ts'
-import { getCommand, PREFIX, listCommands } from '../commands/index.ts'
+import { getCommand, PREFIX } from '../commands/index.ts'
 import { makeSender, serializeMessage, textOfMessage } from '../lib/simple.ts'
 import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
-import { aiHasHistory } from '../commands/main/ai.ts'
+import { aiHasHistory } from '../lib/aiHistory.ts'
 
 const resolveJid = async (sender: string) => {
   if (!sender.endsWith('@lid') && !sender.endsWith('@hosted.lid')) return sender
@@ -48,7 +48,7 @@ async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promi
       !!waka.user?.id &&
       (await resolveJid(m.quoted.sender)).split(':')[0].split('@')[0] ===
         waka.user.id.split(':')[0].split('@')[0]
-    if (!isReplyToBot && !aiHasHistory(m.chat, sender)) return
+    if (!isReplyToBot && !aiHasHistory(`${m.chat}:${sender}`)) return
     if (!text.trim()) return
     cmd = getCommand('ai')
     queryText = text.trim()

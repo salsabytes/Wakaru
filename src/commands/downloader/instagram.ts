@@ -1,13 +1,13 @@
 import { downloadInstagram } from '../../lib/scraper.ts'
+import { requireUrl } from '../../lib/simple.ts'
 
 export default {
   name: 'instagram',
   desc: 'download an Instagram video, reels, photo or carousel without watermark',
   aliases: ['ig', 'igdl'],
   run: async (ctx: CommandContext) => {
-    const url = ctx.text.trim()
-    if (!url) return ctx.reply(`usage: ${ctx.prefix}instagram <instagram link>`)
-    await ctx.react('⏳')
+    const url = await requireUrl(ctx, 'instagram', '<instagram link>')
+    if (!url) return
     const r = await downloadInstagram(url)
     for (const [i, m] of r.media.entries()) {
       const caption = i === 0 ? r.title : undefined

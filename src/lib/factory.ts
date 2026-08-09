@@ -1,4 +1,5 @@
 import { download } from './scraper.ts'
+import { requireUrl } from './simple.ts'
 
 export function makeDownloader(o: {
   name: string
@@ -12,9 +13,8 @@ export function makeDownloader(o: {
     desc: o.desc,
     aliases: o.aliases,
     run: async (ctx: CommandContext) => {
-      const url = ctx.text.trim()
-      if (!url) return ctx.reply(`usage: ${ctx.prefix}${o.name} ${o.usage}`)
-      await ctx.react('⏳')
+      const url = await requireUrl(ctx, o.name, o.usage)
+      if (!url) return
       const r = await download(url, o.mode)
       if (o.mode === 'audio') await ctx.sendAudio(r.buf)
       else await ctx.sendVideo(r.buf, r.title)
