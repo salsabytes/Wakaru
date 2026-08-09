@@ -18,6 +18,7 @@ declare global {
     text: string
     chat: string
     sender: string
+    pushName?: string
     isGroup: boolean
     mtype: string
     download: () => Promise<Buffer>

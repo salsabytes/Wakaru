@@ -5,6 +5,7 @@ import { getCommand, PREFIX, listCommands } from '../commands/index.ts'
 import { makeSender, serializeMessage, textOfMessage } from '../lib/simple.ts'
 import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
+import { aiHasHistory } from '../commands/main/ai.ts'
 
 const resolveJid = async (sender: string) => {
   if (!sender.endsWith('@lid') && !sender.endsWith('@hosted.lid')) return sender
@@ -28,20 +29,42 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
 }
 
 async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promise<void> {
-  if (!text.startsWith(PREFIX)) return
-  const [rawName, ...args] = text.slice(PREFIX.length).trim().split(/\s+/)
-  const cmd = getCommand(rawName.toLowerCase())
+  const m = serializeMessage(msg)
+  const sender = await resolveJid(m.sender)
+
+  let cmd: ReturnType<typeof getCommand> | undefined
+  let queryText = text
+  let args: string[] = []
+
+  if (text.startsWith(PREFIX)) {
+    const [rawName, ...rest] = text.slice(PREFIX.length).trim().split(/\s+/)
+    cmd = getCommand(rawName.toLowerCase())
+    queryText = text.slice(PREFIX.length + rawName.length).trim()
+    args = rest
+  } else {
+    // the AI also runs without a prefix: a reply to the bot, or a sender with an active AI chat, continues it
+    const isReplyToBot =
+      !!m.quoted?.sender &&
+      !!waka.user?.id &&
+      (await resolveJid(m.quoted.sender)).split(':')[0].split('@')[0] ===
+        waka.user.id.split(':')[0].split('@')[0]
+    if (!isReplyToBot && !aiHasHistory(m.chat, sender)) return
+    if (!text.trim()) return
+    cmd = getCommand('ai')
+    queryText = text.trim()
+    args = queryText.split(/\s+/)
+  }
   if (!cmd) return
 
-  const m = serializeMessage(msg)
   const send = makeSender(waka, jid, msg)
   const ctx: CommandContext = {
     sock: waka,
     prefix: PREFIX,
     args,
-    text: text.slice(PREFIX.length + rawName.length).trim(),
+    text: queryText,
     chat: m.chat,
-    sender: await resolveJid(m.sender),
+    sender,
+    pushName: msg.pushName ?? undefined,
     isGroup: m.isGroup,
     mtype: m.mtype,
     download: m.download,

@@ -10,6 +10,10 @@ const HISTORY_CHAR_MAX = 8000
 const PARTICIPANT_MAX = 40
 const history = new Map<string, ChatMsg[]>()
 
+// lets the message handler route follow-up messages (e.g. a link sent right after ".ai ...") to this chat
+const aiHasHistory = (chat: string, sender: string): boolean => history.has(`${chat}:${sender}`)
+export { aiHasHistory }
+
 const parseRuns = (text: string) =>
   [...text.matchAll(/@run:([a-z][a-z0-9_-]*)(?:\s+([^\n]*))?/gi)].map((m) => ({
     name: m[1].toLowerCase(),
@@ -18,11 +22,14 @@ const parseRuns = (text: string) =>
 
 async function buildContext(ctx: CommandContext): Promise<string> {
   const lines = [`chat: ${ctx.chat}`, `sender: ${ctx.sender}`, ctx.isGroup ? 'chat type: group' : 'chat type: private']
+  if (ctx.pushName) lines.push(`sender's WhatsApp profile name (pushname): ${ctx.pushName}`)
   if (ctx.mtype !== 'conversation') lines.push(`user's message has media (${ctx.mtype}) — media commands like sticker can use it`)
   if (ctx.quoted?.text) lines.push(`user is replying to: "${ctx.quoted.text.slice(0, 200)}"`)
   if (ctx.isGroup) {
     try {
       const meta = await ctx.sock.groupMetadata(ctx.chat)
+      const me = meta.participants.find((p) => p.id.split(':')[0] === ctx.sender.split(':')[0])
+      if (me?.notify) lines.push(`current sender's name in this group: ${me.notify}`)
       const members = meta.participants
         .slice(0, PARTICIPANT_MAX)
         .map((p) => `${p.notify || p.id.split('@')[0]} -> ${p.id}`)
@@ -63,6 +70,8 @@ const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       'NEVER invent results — report exactly what came back; if a command errored, tell the user the real error.',
       'If you lack info a command needs (a jid, a link, a name), ask the user — do NOT guess or fabricate.',
       'If no command fits, just answer directly.',
+      'If the user sends a link or extra info in a SEPARATE message (especially as a reply), it completes your previous request — use it, do NOT ask again.',
+      'When the user gives you a link for a downloader (youtube, tiktok, instagram), ALWAYS emit the matching @run marker — never say you can\'t or refuse.',
       '',
       'CONTEXT:',
       context,
