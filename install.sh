@@ -54,6 +54,23 @@ else
   if has bun; then use_bun=1; ok "Bun installed"; else ok "runtime ready"; fi
 fi
 
+# --- optional bun upgrade (opt-in: WAKARU_BUN_UPGRADE=canary|stable|latest) ---
+if [ "$use_bun" = 1 ] && [ -n "${WAKARU_BUN_UPGRADE:-}" ]; then
+  case "$WAKARU_BUN_UPGRADE" in
+    canary|stable)
+      step "Bun upgrade"
+      mute "running bun upgrade --${WAKARU_BUN_UPGRADE}..."
+      bun upgrade "--${WAKARU_BUN_UPGRADE}"
+      ;;
+    latest)
+      step "Bun upgrade"
+      mute "running bun upgrade..."
+      bun upgrade
+      ;;
+    *) skip "WAKARU_BUN_UPGRADE must be canary|stable|latest — skipped" ;;
+  esac
+fi
+
 # --- yt-dlp + ffmpeg (soft-fail: bot still works without them) ---
 step "Tools"
 install_pkg() { # $1 = binary, $2 = winget id, $3 = brew formula
@@ -128,3 +145,4 @@ mute "  next:"
 printf "    ${B}cd ${DIR}${R}\n"
 printf "    ${B}bun run start${R}          ${M}# or: node src/index.ts${R}\n"
 printf "    ${B}bun run start:pairing${R}  ${M}# pairing code instead of QR${R}\n"
+mute "  tip: keep bun fresh — WAKARU_BUN_UPGRADE=canary ./install.sh (desktop only)"

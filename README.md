@@ -1,26 +1,22 @@
 # Wakaru ✨
 
-*分かる* — "to understand".
+*分かる — "to understand."*
 
-A tiny WhatsApp bot with an **agentic AI** that understands you: chat normally, or let it
-run commands for you — download audio/video, make stickers. Built on
-[Baileys](https://github.com/whiskeysockets/Baileys) and TypeScript.
-One codebase, two runtimes — run it on your desktop with **Bun**, or right from your phone with **Node**. 🫶
-
-> 🚧 **Status:** still growing (work in progress). It connects, authenticates, auto-reconnects, runs a command system, and logs prettily. More replies come as we play together.
+A small WhatsApp bot with an agentic brain: talk to it and it talks back —
+or let it do things for you. It pulls songs, saves videos, and turns your
+photos into stickers. Built on [Baileys](https://github.com/whiskeysockets/Baileys)
+and TypeScript. One codebase, two runtimes — **Bun** on desktop, **Node** on your phone. 🫶
 
 ---
 
 ## Features
 
-- 🔐 Authenticate via QR code or pairing code
-- 🔁 Auto-reconnect with exponential backoff
-- 🤖 Agentic AI (`.ai`): chat normally, or have it run any command with `@run:` — with per-chat memory
-- ⬇️ Downloader commands: `.ytmp3` (audio), `.ytmp4` (video) via yt-dlp
-- 🧩 Command system: drop a file in `src/commands/<category>/` and it's live — no registry to edit
-- ✨ `.menu` command that lists every registered command
-- 🎨 Pretty charmbracelet-style console logger (clock-only timestamp)
-- 📱 One codebase runs on **Bun** (desktop) and **Node ≥ 23.6** (phone)
+- 🧠 **It gets you** — `.ai` chats naturally, and can run commands on its own with `@run:`, remembering each chat
+- 🎬 **Plays with media** — pulls audio from a link, saves videos, makes stickers from photos & videos
+- 🧩 **Extensible** — drop a file in `src/commands/<category>/` and it's live; no registry to edit
+- 🔁 **Never leaves you hanging** — auto-reconnects with exponential backoff
+- 🔐 **Easy in** — log in with a QR code or a pairing code
+- 🎨 **Prettily logged** — charmbracelet-style console output, clock-only timestamp
 
 ## Quick start
 
@@ -32,30 +28,23 @@ bun run start            # scan QR
 bun run start:pairing    # or use a pairing code
 ```
 
-**Phone / Termux:**
-
-Easiest — one-liner installs Node + Wakaru + deps:
+**Any platform — one-liner (Termux, Linux, macOS, Windows Git Bash/WSL):**
 
 ```bash
-pkg install -y curl && \
-curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/scripts/termux-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
+cd wakaru && bun run start
 ```
 
-Or the plain Node path:
-
-```bash
-pkg update && pkg install nodejs-lts
-git clone https://github.com/salsabytes/Wakaru.git && cd wakaru
-npm install
-node src/index.ts                 # scan QR
-node src/index.ts --use-pairing-code
-```
+It installs the runtime (Bun on desktop, Node on Termux), dependencies, `yt-dlp` +
+`ffmpeg`, and builds the sticker engine — no manual steps. Re-run with
+`WAKARU_BUN_UPGRADE=canary` to also update Bun to the latest canary (desktop only —
+Termux runs Node).
 
 Node ≥ 23.6 runs the TypeScript files directly — no `tsx`, no build step.
 
 ### Can Bun run on Termux?
 
-Officially no: Bun ships no Android binaries. Community builds exist — the maintained one is [Happ1ness-dev/bun-termux](https://github.com/Happ1ness-dev/bun-termux), a native glibc-runner wrapper with no root/proot. It's unofficial, needs kernel ≥ 5.1 on newer Bun versions, and can break on Bun updates. `scripts/termux-install.sh` therefore installs Node — the boring, safe path that works on every device. Want Bun anyway? Install it manually and run `bun install && bun run start`.
+Officially no: Bun ships no Android binaries. Community builds exist — the maintained one is [Happ1ness-dev/bun-termux](https://github.com/Happ1ness-dev/bun-termux), a native glibc-runner wrapper with no root/proot. It's unofficial, needs kernel ≥ 5.1 on newer Bun versions, and can break on Bun updates. `install.sh` therefore installs Node — the boring, safe path that works on every device. Want Bun anyway? Install it manually and run `bun install && bun run start`.
 
 ### Why `npm install` doesn't pull in `sharp`
 
@@ -63,15 +52,11 @@ Officially no: Bun ships no Android binaries. Community builds exist — the mai
 
 ## Commands
 
-```
-.ai      — chat or run any command (owner only, e.g. ".ai make a sticker from the last image")
-.menu    — list all available commands
-.ytmp3   — download audio (mp3) from a video link
-.ytmp4   — download video (mp4) from a video link
-.sticker — make a sticker from a quoted photo or video
-```
+The bot maintains its own command list — send **`.menu`** in WhatsApp and it shows every
+command it can run, generated fresh from `src/commands/`. Drop a new file there and it
+shows up in `.menu` automatically, so this README never needs updating for new commands.
 
-`.ytmp3`/`.ytmp4` need `yt-dlp` on PATH (+ `ffmpeg` for mp3 extraction): `winget install yt-dlp.yt-dlp ffmpeg` on Windows, `apt install yt-dlp ffmpeg` on Linux, `pkg install yt-dlp ffmpeg` on Termux.
+The downloader commands need `yt-dlp` on PATH (+ `ffmpeg` for mp3 extraction): `winget install yt-dlp.yt-dlp ffmpeg` on Windows, `apt install yt-dlp ffmpeg` on Linux, `pkg install yt-dlp ffmpeg` on Termux.
 
 ### Native sticker engine
 
@@ -81,7 +66,7 @@ Officially no: Bun ships no Android binaries. Community builds exist — the mai
 bun run build:sticker          # desktop: puts the binary in bin/
 ```
 
-On Termux, `scripts/termux-install.sh` builds it for you on-device (installs `rust`, compiles once — takes a few minutes). The binary is gitignored either way.
+On any platform, `install.sh` builds it for you (installs Rust once, compiles on first run — a few minutes). The binary is gitignored either way.
 
 ## Configuration
 

@@ -1,0 +1,78 @@
+name: install
+
+on:
+  push:
+    paths:
+      - install.sh
+      - .github/workflows/install.yml
+  workflow_dispatch:
+
+jobs:
+  # Real installs on real OS runners (clone path, like `curl | bash`)
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run installer from a temp dir (clone path)
+        shell: bash
+        run: |
+          tmp="$(mktemp -d)"
+          cp install.sh "$tmp/"
+          cd "$tmp"
+          bash install.sh
+      - name: Verify install + typecheck
+        shell: bash
+        run: |
+          export PATH="$HOME/.bun/bin:$PATH"
+          cd wakaru
+          test -d node_modules
+          if command -v bun >/dev/null 2>&1; then
+            bun run typecheck
+          else
+            npx tsc --noEmit
+          fi
+
+  # In-place path: run ./install.sh inside the repo
+  inplace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run installer in place
+        shell: bash
+        run: ./install.sh
+      - name: Verify deps installed
+        shell: bash
+        run: |
+          test -d node_modules
+          echo INPLACE_OK
+
+  # Termux has no GitHub runner — simulate the Termux branch with a mocked `pkg`
+  termux-sim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fake the Termux environment
+        shell: bash
+        run: |
+          sudo mkdir -p /data/data/com.termux/files/usr/bin
+          cat > /data/data/com.termux/files/usr/bin/pkg <<'EOF'
+          #!/bin/bash
+          echo "pkg $* (simulated)" >> "$HOME/pkg.log"
+          exit 0
+          EOF
+          chmod +x /data/data/com.termux/files/usr/bin/pkg
+      - name: Run installer under simulated Termux
+        shell: bash
+        run: |
+          tmp="$(mktemp -d)"
+          cp install.sh "$tmp/"
+          cd "$tmp"
+          PATH="/data/data/com.termux/files/usr/bin:$PATH" bash install.sh
+      - name: Verify the Termux branch reached pkg
+        shell: bash
+        run: |
+          test -s "$HOME/pkg.log" && echo TERMUX_SIM_OK || { echo "pkg was never called"; exit 1; }
