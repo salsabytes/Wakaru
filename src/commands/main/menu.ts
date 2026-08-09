@@ -1,4 +1,4 @@
-import { getCommand, listCommands } from '../index.ts'
+import { listCommands } from '../index.ts'
 
 export default {
   name: 'menu',
@@ -6,8 +6,7 @@ export default {
   aliases: ['help'],
   run: async (ctx: CommandContext) => {
     const byCategory = new Map<string, string[]>()
-    for (const { name, category } of listCommands()) {
-      const desc = getCommand(name)?.desc
+    for (const { name, category, desc } of listCommands()) {
       const line = `   ✧ ${ctx.prefix}${name}${desc ? ` — ${desc}` : ''}`
       const items = byCategory.get(category) ?? []
       items.push(line)

@@ -69,16 +69,16 @@ step "Tools"
 install_pkg() { # $1 = binary, $2 = winget id, $3 = brew formula
   if has "$1"; then ok "$1 already installed"; return 0; fi
   mute "installing $1..."
-  if [ "$IS_TERMUX" = 1 ]; then pkg install -y "$1"
-  elif has winget; then winget_install "$2"
-  elif has brew; then brew install "$3"
-  elif has apt-get; then (sudo apt-get install -y "$1" || apt-get install -y "$1") 2>/dev/null
-  elif [ "$1" = yt-dlp ]; then python3 -m pip install -U yt-dlp
+  if [ "$IS_TERMUX" = 1 ]; then pkg install -y "$1" || true
+  elif has winget; then winget_install "$2" || true
+  elif has brew; then brew install "$3" || true
+  elif has apt-get; then (sudo apt-get install -y "$1" || apt-get install -y "$1") 2>/dev/null || true
+  elif [ "$1" = yt-dlp ]; then python3 -m pip install -U yt-dlp || true
   else skip "$1 skipped — no package manager found"; return 0
   fi
   if has "$1"; then ok "$1 installed"; else skip "$1 install failed — bot still works without it"; fi
 }
-install_pkg yt-dlp yt-dlp.yt-dlp yt-dlp || true
+install_pkg yt-dlp yt-dlp.yt-dlp yt-dlp
 
 # --- clone or install in place ---
 step "Wakaru"

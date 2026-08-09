@@ -24,7 +24,6 @@ export async function loadCommands(): Promise<void> {
         if (!cmd?.name || typeof cmd.run !== 'function') continue
         const canonical = cmd.name.toLowerCase()
         commands.set(canonical, { ...cmd, name: canonical, category: category.name })
-        resolve.set(canonical, canonical)
         for (const alias of cmd.aliases ?? []) resolve.set(alias.toLowerCase(), canonical)
       } catch (err) {
 
@@ -35,8 +34,8 @@ export async function loadCommands(): Promise<void> {
 }
 
 export function getCommand(name: string): Registered | undefined {
-  const canonical = resolve.get(name.toLowerCase())
-  return canonical ? commands.get(canonical) : undefined
+  const canonical = resolve.get(name.toLowerCase()) ?? name.toLowerCase()
+  return commands.get(canonical)
 }
 
 export function listCommands(): { name: string; category: string; desc?: string }[] {
