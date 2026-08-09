@@ -58,20 +58,22 @@ jobs:
       - name: Fake the Termux environment
         shell: bash
         run: |
-          sudo mkdir -p /data/data/com.termux/files/usr/bin
-          cat > /data/data/com.termux/files/usr/bin/pkg <<'EOF'
+          # /data is mounted noexec on runners — detection dir there, mock pkg in $HOME
+          sudo mkdir -p /data/data/com.termux/files/usr
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/pkg" <<'EOF'
           #!/bin/bash
           echo "pkg $* (simulated)" >> "$HOME/pkg.log"
           exit 0
           EOF
-          chmod +x /data/data/com.termux/files/usr/bin/pkg
+          chmod +x "$HOME/.local/bin/pkg"
       - name: Run installer under simulated Termux
         shell: bash
         run: |
           tmp="$(mktemp -d)"
           cp install.sh "$tmp/"
           cd "$tmp"
-          PATH="/data/data/com.termux/files/usr/bin:$PATH" bash install.sh
+          PATH="$HOME/.local/bin:$PATH" bash install.sh
       - name: Verify the Termux branch reached pkg
         shell: bash
         run: |
