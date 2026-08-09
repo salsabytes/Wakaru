@@ -23,6 +23,9 @@ skip() { printf "  ${YELLOW}⚠${R} %s\n" "$*"; }
 
 has() { command -v "$1" >/dev/null 2>&1; }
 
+# winget prompts for source/package agreements on first use — accept silently (CI-safe)
+winget_install() { winget install -e --accept-source-agreements --accept-package-agreements --id "$1"; }
+
 node_ok() {
   has node && node -e "const [m,p]=process.versions.node.split('.').map(Number); process.exit(m>23||(m===23&&p>=6)?0:1)" 2>/dev/null
 }
@@ -44,7 +47,7 @@ else
   if [ "$IS_TERMUX" = 1 ]; then
     pkg update -y && pkg install -y nodejs-lts
   elif has winget; then
-    winget install -e --id Oven-sh.Bun
+    winget_install Oven-sh.Bun
   elif has brew; then
     brew install oven-sh/bun/bun
   else
@@ -77,7 +80,7 @@ install_pkg() { # $1 = binary, $2 = winget id, $3 = brew formula
   if has "$1"; then ok "$1 already installed"; return 0; fi
   mute "installing $1..."
   if [ "$IS_TERMUX" = 1 ]; then pkg install -y "$1"
-  elif has winget; then winget install -e --id "$2"
+  elif has winget; then winget_install "$2"
   elif has brew; then brew install "$3"
   elif has apt-get; then (sudo apt-get install -y "$1" || apt-get install -y "$1") 2>/dev/null
   elif [ "$1" = yt-dlp ]; then python3 -m pip install -U yt-dlp
@@ -118,7 +121,7 @@ build_sticker() {
   fi
   if ! has cargo; then
     if [ "$IS_TERMUX" = 1 ]; then mute "installing rust..."; pkg install -y rust
-    elif has winget; then mute "installing rust..."; winget install -e --id Rustlang.Rustup
+    elif has winget; then mute "installing rust..."; winget_install Rustlang.Rustup
     elif has brew; then mute "installing rust..."; brew install rust
     else skip "no Rust found — skipped (bot still works)"; return 0
     fi
