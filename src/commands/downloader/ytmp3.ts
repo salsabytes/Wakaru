@@ -6,5 +6,4 @@ export default makeDownloader({
   aliases: ['ytm', 'music'],
   mode: 'audio',
   usage: '<video/song url>',
-  waiting: true,
 })

@@ -21,12 +21,18 @@ export interface SerializedMessage {
   quoted?: MediaMeta
 }
 
+export const textOfMessage = (msg: WAMessage): string => {
+  const mtype = msg.message ? Object.keys(msg.message)[0] : ''
+  const content = (msg.message as any)?.[mtype] ?? {}
+  return content.text || content.caption || msg.message?.conversation || ''
+}
+
 export function serializeMessage(sock: WASocket, msg: WAMessage): SerializedMessage {
   const chat = msg.key?.remoteJid ?? ''
   const sender = msg.key?.participant || chat
   const mtype = msg.message ? Object.keys(msg.message)[0] : ''
   const content = (msg.message as any)?.[mtype] ?? {}
-  const text = content.text || content.caption || msg.message?.conversation || ''
+  const text = textOfMessage(msg)
 
 
   const download = () => downloadMediaMessage(msg, 'buffer', {}) as unknown as Promise<Buffer>

@@ -6,7 +6,6 @@ export function makeDownloader(o: {
   mode: 'audio' | 'video'
   aliases?: string[]
   usage: string
-  waiting?: boolean
 }) {
   return {
     name: o.name,
@@ -15,7 +14,7 @@ export function makeDownloader(o: {
     run: async (ctx: CommandContext) => {
       const url = ctx.text.trim()
       if (!url) return ctx.reply(`usage: ${ctx.prefix}${o.name} ${o.usage}`)
-      if (o.waiting) await ctx.react('⏳')
+      await ctx.react('⏳')
       const r = await download(url, o.mode)
       try {
         const media =

@@ -2,19 +2,13 @@ import type { BaileysEventMap, WAMessage } from 'baileys'
 import { waka } from '../index.ts'
 import { messageStore } from '../lib/store.ts'
 import { getCommand, PREFIX, listCommands } from '../commands/index.ts'
-import { serializeMessage } from '../lib/simple.ts'
+import { serializeMessage, textOfMessage } from '../lib/simple.ts'
 import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
 
 const resolveJid = async (sender: string) => {
   if (!sender.endsWith('@lid') && !sender.endsWith('@hosted.lid')) return sender
   return (await waka.signalRepository.lidMapping.getPNForLID(sender)) ?? sender
-}
-
-const textOf = (msg: WAMessage) => {
-  const mtype = msg.message ? Object.keys(msg.message)[0] : ''
-  const content = (msg.message as any)?.[mtype] ?? {}
-  return content.text || content.caption || msg.message?.conversation || ''
 }
 
 export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.upsert']): Promise<void> {
@@ -25,10 +19,10 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
   if (upsert.type !== 'notify') return
 
   for (const msg of upsert.messages) {
-    const text = textOf(msg)
+    const text = textOfMessage(msg)
     const jid = msg.key?.remoteJid
     if (!text || !jid || msg.key?.fromMe) continue
-    logger.info(`${msg.key.fromMe ? '📤' : '📥'} ${jid}: ${text}`)
+    logger.info(`📥 ${jid}: ${text}`)
     await maybeRunCommand(msg, text, jid)
   }
 }

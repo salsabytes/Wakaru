@@ -6,5 +6,4 @@ export default makeDownloader({
   aliases: ['ytv', 'video'],
   mode: 'video',
   usage: '<video url>',
-  waiting: true,
 })

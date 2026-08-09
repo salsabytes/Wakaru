@@ -1,6 +1,7 @@
 import readline from 'readline'
 import NodeCache from '@cacheable/node-cache'
 import qrcode from 'qrcode-terminal'
+import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import {
   Browsers,
@@ -21,17 +22,7 @@ import { logger } from './lib/logger.ts'
 const SESSION_DIR = process.env.SESSION_DIR ?? 'sessions'
 const usePairingCode = process.argv.includes('--use-pairing-code') || !!process.env.PAIRING_CODE
 
-const silentLog = {
-  level: 'silent',
-  child: () => silentLog,
-  trace: () => {},
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  fatal: () => {},
-  silent: () => {},
-}
+const silentLog = pino({ level: 'silent' })
 
 const msgRetryCounterCache = new NodeCache({ stdTTL: 60 * 60 * 24 }) as CacheStore
 const callOfferCache = new NodeCache({ stdTTL: 5 * 60 }) as CacheStore

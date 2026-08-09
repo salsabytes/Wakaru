@@ -1,14 +1,13 @@
 import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const exec = promisify(execFile)
 import { mkdtemp, readFile, rm, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const run = (args: string[]) =>
-  new Promise<string>((resolve, reject) =>
-    execFile('yt-dlp', args, { timeout: 300_000 }, (err, stdout) =>
-      err ? reject(err) : resolve(stdout),
-    ),
-  )
+const run = (args: string[]): Promise<string> =>
+  exec('yt-dlp', args, { timeout: 300_000 }).then((r) => r.stdout.toString())
 
 export async function download(url: string, mode: 'audio' | 'video') {
   const dir = await mkdtemp(join(tmpdir(), 'wakaru-dl-'))

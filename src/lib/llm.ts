@@ -1,7 +1,7 @@
 export type ChatMsg = { role: string; content: string }
 
 const API_URL = 'https://chateverywhere.app/api/chat/'
-export const UA =
+const UA =
   'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
 
 export async function askLLM(messages: ChatMsg[], temperature = 0.2): Promise<string> {

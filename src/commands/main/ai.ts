@@ -1,7 +1,5 @@
 
 
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { askLLM, type ChatMsg } from '../../lib/llm.ts'
 import { getCommand, listCommands } from '../index.ts'
 import { isOwner } from '../../lib/config.ts'
@@ -11,15 +9,6 @@ const HISTORY_MAX = 20
 const HISTORY_CHAR_MAX = 8000
 const PARTICIPANT_MAX = 40
 const history = new Map<string, ChatMsg[]>()
-
-const ROOT = join(import.meta.dirname, '..', '..', '..')
-const loadSkills = (): Record<string, string> => {
-  try {
-    return JSON.parse(readFileSync(join(ROOT, 'skills.json'), 'utf8')) as Record<string, string>
-  } catch {
-    return {}
-  }
-}
 
 const parseRuns = (text: string) =>
   [...text.matchAll(/@run:([a-z][a-z0-9_-]*)(?:\s+([^\n]*))?/gi)].map((m) => ({
@@ -57,9 +46,6 @@ export default {
     let finalText = ''
     try {
       const context = await buildContext(ctx)
-      const skills = Object.entries(loadSkills())
-        .map(([n, s]) => `- ${n}: ${s}`)
-        .join('\n')
 
       const system: ChatMsg = {
         role: 'system',
@@ -82,8 +68,6 @@ export default {
             .filter((c) => c.name !== 'ai')
             .map((c) => `- ${c.name}${c.desc ? ' — ' + c.desc : ''}`)
             .join('\n'),
-          '',
-          skills ? `SKILLS:\n${skills}` : '(no skills loaded)',
         ].join('\n'),
       }
 

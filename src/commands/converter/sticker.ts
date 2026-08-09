@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const exec = promisify(execFile)
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -32,11 +35,7 @@ export default {
       const output = join(dir, 'sticker.webp')
       const buf = await media.download()
       await writeFile(input, buf)
-      await new Promise<void>((resolve, reject) => {
-        execFile(BIN, [input, output], { timeout: 30_000 }, (err) =>
-          err ? reject(err) : resolve(),
-        )
-      })
+      await exec(BIN, [input, output], { timeout: 30_000 })
       await ctx.sendSticker(await readFile(output))
     } catch (err) {
       logger.error('sticker error:', err)
