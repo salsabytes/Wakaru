@@ -1,7 +1,7 @@
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 const YTMP3_HOME = 'https://id.ytmp3.mobi/'
 const YTMP3_HOST = 'a.ymcdn.org'
-const SNAPTIK_HOME = 'https://snaptiktt.com/'
+const TIKTIK_API = 'https://tiktokdownloaderr.id/api/downloader.php'
 
 interface Resolved {
   url: string
@@ -64,36 +64,18 @@ export async function download(url: string, mode: 'audio' | 'video') {
 }
 
 export async function downloadTikTok(rawUrl: string) {
-  const home = await fetch(SNAPTIK_HOME, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15_000) })
-  const cookies = (home.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
-  const csrf = (await home.text()).match(/name="dl_csrf" value="([^"]+)"/)?.[1]
-  if (!csrf) throw new Error('snaptik: no csrf token')
-  const h: Record<string, string> = {
-    'User-Agent': UA,
-    Referer: SNAPTIK_HOME,
-    'Content-Type': 'application/x-www-form-urlencoded',
-  }
-  if (cookies) h.Cookie = cookies
-  const res = await fetch(SNAPTIK_HOME, {
+  const form = new FormData()
+  form.append('url', rawUrl)
+  const res = await fetch(TIKTIK_API, {
     method: 'POST',
-    headers: h,
-    body: new URLSearchParams({ td_url: rawUrl, dl_csrf: csrf }),
-    signal: AbortSignal.timeout(30_000),
+    headers: { 'User-Agent': UA, Referer: 'https://tiktokdownloaderr.id/' },
+    body: form,
+    signal: AbortSignal.timeout(60_000),
   })
-  const nwm = (await res.text()).match(/href="(https:\/\/snaptiktt\.com\/download\/nwm\/[^"]+)"/)?.[1]
-  if (!nwm) throw new Error('snaptik: no download link — check the link')
-  // the site 502s right after conversion — retry the download a couple of times
-  let dl: Response
-  for (let attempt = 0; ; attempt++) {
-    dl = await fetch(nwm, {
-      headers: { 'User-Agent': UA, Referer: SNAPTIK_HOME, Cookie: cookies },
-      signal: AbortSignal.timeout(300_000),
-    })
-    if (dl.ok || attempt >= 2) break
-    await new Promise((r) => setTimeout(r, 1500))
-  }
-  if (!dl.ok) throw new Error(`snaptik download http ${dl.status}`)
-  const author = rawUrl.match(/@([a-zA-Z0-9_.]{1,24})/)?.[1]
+  const j: any = await res.json().catch(() => null)
+  if (!j?.success || !j.video_nowm) throw new Error(`tiktok: ${j?.message ?? 'request failed'}`)
+  const dl = await fetch(j.video_nowm, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
+  if (!dl.ok) throw new Error(`tiktok download http ${dl.status}`)
   // whole file stays in RAM because sendMessage needs the buffer — no size cap
-  return { buf: Buffer.from(await dl.arrayBuffer()), title: author ? `TikTok @${author}` : rawUrl }
+  return { buf: Buffer.from(await dl.arrayBuffer()), title: j.title || rawUrl }
 }
