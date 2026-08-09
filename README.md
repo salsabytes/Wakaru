@@ -35,10 +35,9 @@ curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh
 cd wakaru && bun run start
 ```
 
-It installs the runtime (Bun on desktop, Node on Termux), dependencies, `yt-dlp` +
-`ffmpeg`, and builds the sticker engine — no manual steps. Re-run with
-`WAKARU_BUN_UPGRADE=canary` to also update Bun to the latest canary (desktop only —
-Termux runs Node).
+It installs the runtime (Bun on desktop, Node on Termux), dependencies, `yt-dlp`,
+and builds the native engines (sticker, audio→mp3) — no manual steps. Re-running
+also updates Bun to the latest canary automatically (Termux runs Node instead).
 
 Node ≥ 23.6 runs the TypeScript files directly — no `tsx`, no build step.
 
@@ -56,9 +55,9 @@ The bot maintains its own command list — send **`.menu`** in WhatsApp and it s
 command it can run, generated fresh from `src/commands/`. Drop a new file there and it
 shows up in `.menu` automatically, so this README never needs updating for new commands.
 
-The downloader commands need `yt-dlp` on PATH (+ `ffmpeg` for mp3 extraction): `winget install yt-dlp.yt-dlp ffmpeg` on Windows, `apt install yt-dlp ffmpeg` on Linux, `pkg install yt-dlp ffmpeg` on Termux.
+The downloader commands need `yt-dlp` on PATH: `winget install yt-dlp.yt-dlp` on Windows, `apt install yt-dlp` on Linux, `pkg install yt-dlp` on Termux. The `.ytmp3` mp3 conversion runs through the Rust audio engine (`native/audio/`) — no ffmpeg needed anywhere.
 
-### Native sticker engine
+### Native engines
 
 `.sticker` shells out to a small Rust sidecar (`native/sticker/`) that turns media into 512×512 webp stickers — fast and low-RAM. Photos become still stickers; videos become animated ones (H.264 mp4, first 8 seconds, auto-compressed to stay under WhatsApp's 100KB limit). All codecs are compiled in — no ffmpeg needed. Build it once per platform:
 
@@ -66,7 +65,7 @@ The downloader commands need `yt-dlp` on PATH (+ `ffmpeg` for mp3 extraction): `
 bun run build:sticker          # desktop: puts the binary in bin/
 ```
 
-On any platform, `install.sh` builds it for you (installs Rust once, compiles on first run — a few minutes). The binary is gitignored either way.
+`.ytmp3` uses a sibling sidecar (`native/audio/`) to turn the downloaded m4a into mp3 — same pure-Rust story, so no ffmpeg is needed on any platform (`bun run build:audio`). Both are pure-Rust with zero system deps; `install.sh` builds them for you (installs Rust once, compiles on first run — a few minutes). The binaries are gitignored either way.
 
 ## Configuration
 

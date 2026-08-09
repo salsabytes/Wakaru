@@ -2,7 +2,7 @@ node_modules/
 sessions/
 logs/
 *.log
-native/sticker/target/
+native/*/target/
 bin/
 
 config.json

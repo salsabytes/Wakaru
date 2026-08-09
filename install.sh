@@ -57,24 +57,14 @@ else
   if has bun; then use_bun=1; ok "Bun installed"; else ok "runtime ready"; fi
 fi
 
-# --- optional bun upgrade (opt-in: WAKARU_BUN_UPGRADE=canary|stable|latest) ---
-if [ "$use_bun" = 1 ] && [ -n "${WAKARU_BUN_UPGRADE:-}" ]; then
-  case "$WAKARU_BUN_UPGRADE" in
-    canary|stable)
-      step "Bun upgrade"
-      mute "running bun upgrade --${WAKARU_BUN_UPGRADE}..."
-      bun upgrade "--${WAKARU_BUN_UPGRADE}"
-      ;;
-    latest)
-      step "Bun upgrade"
-      mute "running bun upgrade..."
-      bun upgrade
-      ;;
-    *) skip "WAKARU_BUN_UPGRADE must be canary|stable|latest — skipped" ;;
-  esac
+# --- keep bun on the latest canary (Termux runs Node, so skipped there) ---
+if [ "$use_bun" = 1 ]; then
+  step "Bun upgrade"
+  mute "running bun upgrade --canary..."
+  bun upgrade --canary
 fi
 
-# --- yt-dlp + ffmpeg (soft-fail: bot still works without them) ---
+# --- yt-dlp (soft-fail: bot still works without it) ---
 step "Tools"
 install_pkg() { # $1 = binary, $2 = winget id, $3 = brew formula
   if has "$1"; then ok "$1 already installed"; return 0; fi
@@ -89,7 +79,6 @@ install_pkg() { # $1 = binary, $2 = winget id, $3 = brew formula
   if has "$1"; then ok "$1 installed"; else skip "$1 install failed — bot still works without it"; fi
 }
 install_pkg yt-dlp yt-dlp.yt-dlp yt-dlp || true
-install_pkg ffmpeg Gyan.FFmpeg ffmpeg || true
 
 # --- clone or install in place ---
 step "Wakaru"
@@ -112,11 +101,11 @@ step "Dependencies"
 if [ "$use_bun" = 1 ]; then bun install; else npm install; fi
 ok "dependencies installed"
 
-# --- sticker engine (soft-fail: bot still works without it) ---
-step "Sticker engine"
-build_sticker() {
-  if [ -x bin/sticker ] || [ -x bin/sticker.exe ]; then
-    ok "already built (bin/sticker)"
+# --- native engines (soft-fail: bot still works without them) ---
+step "Engines (sticker · audio)"
+build_engine() { # $1 = crate dir, $2 = cargo binary, $3 = bin/ name
+  if [ -x "bin/$3" ] || [ -x "bin/$3.exe" ]; then
+    ok "already built (bin/$3)"
     return 0
   fi
   if ! has cargo; then
@@ -127,19 +116,20 @@ build_sticker() {
     fi
   fi
   mute "building (a few minutes on first run)..."
-  if (cd native/sticker && cargo build --release); then
+  if (cd "$1" && cargo build --release); then
     mkdir -p bin
-    if [ -f native/sticker/target/release/wakaru-sticker.exe ]; then
-      cp native/sticker/target/release/wakaru-sticker.exe bin/sticker.exe
+    if [ -f "$1/target/release/$2.exe" ]; then
+      cp "$1/target/release/$2.exe" "bin/$3.exe"
     else
-      cp native/sticker/target/release/wakaru-sticker bin/sticker && chmod +x bin/sticker
+      cp "$1/target/release/$2" "bin/$3" && chmod +x "bin/$3"
     fi
-    ok "built (bin/sticker)"
+    ok "built (bin/$3)"
   else
     skip "build failed — bot still works without it"
   fi
 }
-build_sticker
+build_engine native/sticker wakaru-sticker sticker
+build_engine native/audio wakaru-audio audio2mp3
 
 # --- done ---
 line
@@ -148,4 +138,4 @@ mute "  next:"
 printf "    ${B}cd ${DIR}${R}\n"
 printf "    ${B}bun run start${R}          ${M}# or: node src/index.ts${R}\n"
 printf "    ${B}bun run start:pairing${R}  ${M}# pairing code instead of QR${R}\n"
-mute "  tip: keep bun fresh — WAKARU_BUN_UPGRADE=canary ./install.sh (desktop only)"
+mute "  tip: bun is kept on the latest canary automatically (Termux runs Node)"
