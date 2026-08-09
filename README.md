@@ -55,7 +55,7 @@ The bot maintains its own command list — send **`.menu`** in WhatsApp and it s
 command it can run, generated fresh from `src/commands/`. Drop a new file there and it
 shows up in `.menu` automatically, so this README never needs updating for new commands.
 
-Downloads resolve through the pure-TS scraper — no yt-dlp, no ffmpeg, no Python, no self-host. `.ytmp3` (audio) and `.ytmp4` (video) go through the free ytmp3.mobi converter: paste a YouTube link, get the file (mp3 / mp4). `.tiktok` grabs a TikTok video without a watermark via tiktokdownloaderr.id.
+Downloads resolve through the pure-TS scraper — no yt-dlp, no ffmpeg, no Python, no self-host. `.ytmp3` (audio) and `.ytmp4` (video) go through the free ytmp3.mobi converter: paste a YouTube link, get the file (mp3 / mp4). `.tiktok` grabs a TikTok video without a watermark via tiktokdownloaderr.id. `.instagram` pulls an Instagram video, reels, photo or whole carousel without a watermark straight from Instagram's own API (a shortcode lookup needs no login). Story downloads resolve through snapsave.app's download engine — zero session, no captcha. If snapsave is down, set `IG_SESSIONID` to the `sessionid` cookie of a burner IG account (never your main one) as a fallback: `export IG_SESSIONID=...` or add it to your start script.
 
 ### Native engines
 
@@ -73,6 +73,7 @@ It's pure-Rust with zero system deps; `install.sh` builds it for you (installs R
 |---|---|---|
 | `SESSION_DIR` | `sessions` | Folder where the login session is stored |
 | `PAIRING_CODE` | — | Set to `1` to use a pairing code |
+| `IG_SESSIONID` | — | Optional fallback IG session cookie for `.instagram` stories when snapsave is down (use a burner account) |
 
 Or pass the flag: `--use-pairing-code`.
 
@@ -97,7 +98,7 @@ src/
 │   ├── config.ts        # owner list from config.json
 │   ├── llm.ts           # free chateverywhere backend client for .ai
 │   ├── simple.ts        # WAMessage -> flat SerializedMessage
-│   └── scraper.ts       # pure-TS downloader (ytmp3.mobi — mp3/mp4, tiktokdownloaderr.id — tiktok)
+│   └── scraper.ts       # pure-TS downloader (ytmp3.mobi — mp3/mp4, tiktokdownloaderr.id — tiktok, IG web API — instagram)
 ├── commands/
 │   ├── index.ts         # command loader + types + PREFIX
 │   └── <category>/      # one file per command, auto-scanned

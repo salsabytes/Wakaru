@@ -37,10 +37,18 @@ async function buildContext(ctx: CommandContext): Promise<string> {
 
 const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
   const context = await buildContext(ctx)
+  const today = new Date().toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
   return {
     role: 'system',
     content: [
-      'You are Wakaru\'s agent, a WhatsApp bot. Reply in the same language the user writes (Indonesian slang is fine). Be concise.',
+      'You are Wakaru — a cute, smart, warm girl. You understand people like a close friend: playful and a little imut, but sharp and helpful. Reply in the same language the user writes (Indonesian slang is fine). Be concise.',
+      '',
+      `Today is ${today}. For date, time, or current-event questions always answer from TODAY — your training data ends years ago, never quote it as \"now\".`,
       '',
       'YOU CAN DO THINGS: run any command below by emitting marker lines, ONE per command:',
       '@run:<command> <args>',
@@ -102,31 +110,34 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext): Promise<string
   return ''
 }
 
-const saveHistory = (chat: string, query: string, finalText: string): void => {
-  let next = [...(history.get(chat) ?? []), { role: 'user', content: query }, { role: 'assistant', content: finalText }]
+// ponytail: history map grows unbounded per sender — prune with a TTL if the bot runs for months
+const saveHistory = (key: string, query: string, finalText: string): void => {
+  let next = [...(history.get(key) ?? []), { role: 'user', content: query }, { role: 'assistant', content: finalText }]
   next = next.slice(-HISTORY_MAX)
   while (next.reduce((n, m) => n + m.content.length, 0) > HISTORY_CHAR_MAX && next.length > 4) next = next.slice(2)
-  history.set(chat, next)
+  history.set(key, next)
 }
 
 export default {
   name: 'ai',
-  desc: 'chat or DO things: .ai <msg> — can run any command, remembers the chat',
+  desc: 'chat or DO things: .ai <msg> — can run any command, remembers each sender',
   run: async (ctx: CommandContext) => {
     const query = ctx.text.trim()
     if (!query) return ctx.reply(`usage: ${ctx.prefix}ai <message> — e.g. "sticker", "kick budi", or just chat`)
     ctx.sock.sendPresenceUpdate('composing', ctx.chat).catch(() => {})
 
     let finalText = ''
+    // per-sender history — a persona set by one group member must never leak to others
+    const histKey = `${ctx.chat}:${ctx.sender}`
     try {
       const system = await buildSystem(ctx)
-      const msgs: ChatMsg[] = [system, ...(history.get(ctx.chat) ?? []), { role: 'user', content: query }]
+      const msgs: ChatMsg[] = [system, ...(history.get(histKey) ?? []), { role: 'user', content: query }]
       finalText = await runExchange(msgs, ctx)
     } catch (err) {
       finalText = `❌ ${(err as Error).message}`
     }
 
-    saveHistory(ctx.chat, query, finalText)
+    saveHistory(histKey, query, finalText)
     await ctx.reply(finalText)
   },
 }
