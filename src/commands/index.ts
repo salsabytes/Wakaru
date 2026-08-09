@@ -27,7 +27,7 @@ export async function loadCommands(): Promise<void> {
         for (const alias of cmd.aliases ?? []) resolve.set(alias.toLowerCase(), canonical)
       } catch (err) {
 
-        logger.error(`failed to load command ${file}:`, err)
+        logger.error({ err }, `failed to load command ${file}:`)
       }
     }
   }

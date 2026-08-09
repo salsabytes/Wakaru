@@ -4,7 +4,7 @@ const API_URL = 'https://chateverywhere.app/api/chat/'
 const UA =
   'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
 
-export async function askLLM(messages: ChatMsg[], temperature = 0.2): Promise<string> {
+export async function askLLM(messages: ChatMsg[]): Promise<string> {
   const prompt = messages[messages.length - 1].content
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -25,7 +25,7 @@ export async function askLLM(messages: ChatMsg[], temperature = 0.2): Promise<st
       },
       messages,
       prompt,
-      temperature,
+      temperature: 0.5,
     }),
     signal: AbortSignal.timeout(90_000),
   })

@@ -1,4 +1,4 @@
-import { download, cleanup } from './scraper.ts'
+import { download } from './scraper.ts'
 
 export function makeDownloader(o: {
   name: string
@@ -16,15 +16,8 @@ export function makeDownloader(o: {
       if (!url) return ctx.reply(`usage: ${ctx.prefix}${o.name} ${o.usage}`)
       await ctx.react('⏳')
       const r = await download(url, o.mode)
-      try {
-        const media =
-          o.mode === 'audio'
-            ? { audio: r.buf, mimetype: 'audio/mpeg' as const }
-            : { video: r.buf, caption: r.title }
-        await ctx.sock.sendMessage(ctx.chat, media)
-      } finally {
-        await cleanup(r.dir)
-      }
+      if (o.mode === 'audio') await ctx.sendAudio(r.buf)
+      else await ctx.sendVideo(r.buf, r.title)
     },
   }
 }

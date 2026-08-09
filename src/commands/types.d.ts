@@ -19,7 +19,6 @@ declare global {
     chat: string
     sender: string
     isGroup: boolean
-    fromMe: boolean
     mtype: string
     download: () => Promise<Buffer>
     quoted?: MediaMeta
@@ -28,7 +27,7 @@ declare global {
     sendSticker: (buffer: Buffer) => Promise<void>
     sendImage: (buffer: Buffer, caption?: string) => Promise<void>
     sendVideo: (buffer: Buffer, caption?: string) => Promise<void>
-    listCommands: () => { name: string; category: string; desc?: string }[]
+    sendAudio: (buffer: Buffer) => Promise<void>
   }
 }
 

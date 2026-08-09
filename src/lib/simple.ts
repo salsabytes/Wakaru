@@ -1,11 +1,10 @@
-import type { WAMessage, WASocket } from 'baileys'
+import type { WAMessage, WAMessageKey, WASocket } from 'baileys'
 import { downloadMediaMessage } from 'baileys'
 
 export interface MediaMeta {
   mtype: string
   chat: string
   sender: string
-  fromMe: boolean
   text: string
   download: () => Promise<Buffer>
 }
@@ -14,7 +13,6 @@ export interface SerializedMessage {
   chat: string
   sender: string
   isGroup: boolean
-  fromMe: boolean
   mtype: string
   text: string
   download: () => Promise<Buffer>
@@ -31,7 +29,20 @@ export const textOfMessage = (msg: WAMessage): string => {
   return content.text || content.caption || msg.message?.conversation || ''
 }
 
-export function serializeMessage(sock: WASocket, msg: WAMessage): SerializedMessage {
+export const makeSender = (sock: WASocket, chat: string, quoted?: WAMessage) => {
+  const opts = quoted ? { quoted } : undefined
+  const send = (content: Parameters<typeof sock.sendMessage>[1]) => sock.sendMessage(chat, content, opts)
+  return {
+    text: async (text: string) => { await send({ text }) },
+    react: async (emoji: string, key?: WAMessageKey) => { await sock.sendMessage(chat, { react: { text: emoji, key } }) },
+    sticker: async (buffer: Buffer) => { await send({ sticker: buffer }) },
+    image: async (buffer: Buffer, caption?: string) => { await send({ image: buffer, caption }) },
+    video: async (buffer: Buffer, caption?: string) => { await send({ video: buffer, caption }) },
+    audio: async (buffer: Buffer) => { await send({ audio: buffer, mimetype: 'audio/mpeg' }) },
+  }
+}
+
+export function serializeMessage(msg: WAMessage): SerializedMessage {
   const chat = msg.key?.remoteJid ?? ''
   const sender = msg.key?.participant || chat
   const [mtype, content] = bodyOf(msg)
@@ -44,7 +55,6 @@ export function serializeMessage(sock: WASocket, msg: WAMessage): SerializedMess
     chat,
     sender,
     isGroup: chat.endsWith('@g.us'),
-    fromMe: !!msg.key?.fromMe,
     mtype,
     text,
     download,
@@ -59,7 +69,6 @@ export function serializeMessage(sock: WASocket, msg: WAMessage): SerializedMess
       mtype: qtype,
       chat: ctxt.remoteJid ?? chat,
       sender: ctxt.participant ?? '',
-      fromMe: ctxt.participant === sock.user?.id,
       text: qc.text || qc.caption || '',
       download: () =>
         downloadMediaMessage(

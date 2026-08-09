@@ -2,7 +2,7 @@ import type { BaileysEventMap, WAMessage } from 'baileys'
 import { waka } from '../index.ts'
 import { messageStore } from '../lib/store.ts'
 import { getCommand, PREFIX, listCommands } from '../commands/index.ts'
-import { serializeMessage, textOfMessage } from '../lib/simple.ts'
+import { makeSender, serializeMessage, textOfMessage } from '../lib/simple.ts'
 import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
 
@@ -33,7 +33,8 @@ async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promi
   const cmd = getCommand(rawName.toLowerCase())
   if (!cmd) return
 
-  const m = serializeMessage(waka, msg)
+  const m = serializeMessage(msg)
+  const send = makeSender(waka, jid, msg)
   const ctx: CommandContext = {
     sock: waka,
     prefix: PREFIX,
@@ -42,26 +43,15 @@ async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promi
     chat: m.chat,
     sender: await resolveJid(m.sender),
     isGroup: m.isGroup,
-    fromMe: m.fromMe,
     mtype: m.mtype,
     download: m.download,
     quoted: m.quoted,
-    reply: async (replyText) => {
-      await waka.sendMessage(jid, { text: replyText })
-    },
-    react: async (emoji) => {
-      await waka.sendMessage(jid, { react: { text: emoji, key: msg.key } })
-    },
-    sendSticker: async (buffer) => {
-      await waka.sendMessage(jid, { sticker: buffer })
-    },
-    sendImage: async (buffer, caption) => {
-      await waka.sendMessage(jid, { image: buffer, caption })
-    },
-    sendVideo: async (buffer, caption) => {
-      await waka.sendMessage(jid, { video: buffer, caption })
-    },
-    listCommands,
+    reply: send.text,
+    react: (emoji) => send.react(emoji, msg.key),
+    sendSticker: send.sticker,
+    sendImage: send.image,
+    sendVideo: send.video,
+    sendAudio: send.audio,
   }
 
   try {
@@ -72,7 +62,7 @@ async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promi
     }
     await cmd.run(ctx)
   } catch (err) {
-    logger.error(`Command "${cmd.name}" error:`, err)
+    logger.error({ err }, `Command "${cmd.name}" error:`)
     await ctx.reply(`❌ ${cmd.name} failed: ${(err as Error).message.slice(0, 300)}`)
   }
 }

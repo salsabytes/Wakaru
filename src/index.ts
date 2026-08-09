@@ -124,7 +124,7 @@ async function shutdown(signal: string): Promise<void> {
   try {
     await waka?.end(new Error('Bot stopped manually'))
   } catch (err) {
-    logger.error('Failed to close connection:', err)
+    logger.error({ err }, 'Failed to close connection:')
   }
   rl.close()
   process.exit(0)
@@ -132,13 +132,12 @@ async function shutdown(signal: string): Promise<void> {
 
 process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
-process.on('unhandledRejection', (err) => {
-  logger.error('Unhandled rejection:', err)
+process.on('unhandledRejection', (err) => {    logger.error({ err }, 'Unhandled rejection:')
 })
 
 loadCommands()
   .then(connectToWhatsApp)
   .catch((err) => {
-    logger.error('Failed to start bot:', err)
+    logger.error({ err }, 'Failed to start bot:')
     process.exit(1)
   })

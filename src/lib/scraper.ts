@@ -1,7 +1,3 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 const YTMP3_HOME = 'https://id.ytmp3.mobi/'
 const YTMP3_HOST = 'a.ymcdn.org'
@@ -59,23 +55,9 @@ async function ytmp3Mobi(rawUrl: string, format: 'mp3' | 'mp4'): Promise<Resolve
 }
 
 export async function download(url: string, mode: 'audio' | 'video') {
-  const dir = await mkdtemp(join(tmpdir(), 'wakaru-dl-'))
-  try {
-    const got = await ytmp3Mobi(url, mode === 'audio' ? 'mp3' : 'mp4')
-    const ext = mode === 'audio' ? 'mp3' : 'mp4'
-    const path = join(dir, `out.${ext}`)
-    const res = await fetch(got.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
-    if (!res.ok) throw new Error(`download http ${res.status}`)
-    // whole file stays in RAM because sendMessage needs the buffer — no size cap
-    const buf = Buffer.from(await res.arrayBuffer())
-    await writeFile(path, buf)
-    return { dir, path, buf, title: got.title, media: mode } as const
-  } catch (err) {
-    await rm(dir, { recursive: true, force: true }).catch(() => {})
-    throw err
-  }
-}
-
-export async function cleanup(dir: string): Promise<void> {
-  await rm(dir, { recursive: true, force: true }).catch(() => {})
+  const got = await ytmp3Mobi(url, mode === 'audio' ? 'mp3' : 'mp4')
+  const res = await fetch(got.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
+  if (!res.ok) throw new Error(`download http ${res.status}`)
+  // whole file stays in RAM because sendMessage needs the buffer — no size cap
+  return { buf: Buffer.from(await res.arrayBuffer()), title: got.title } as const
 }

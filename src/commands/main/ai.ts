@@ -86,9 +86,9 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext): Promise<string
   for (let round = 0; round < 2; round++) {
     let reply: string
     try {
-      reply = (await askLLM(msgs, 0.5)).trim()
+      reply = (await askLLM(msgs)).trim()
     } catch (err) {
-      if (round === 0) reply = (await askLLM(msgs, 0.5)).trim()
+      if (round === 0) reply = (await askLLM(msgs)).trim()
       else throw err
     }
     const runs = parseRuns(reply)
