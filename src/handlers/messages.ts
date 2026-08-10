@@ -2,7 +2,7 @@ import type { BaileysEventMap, WAMessage } from 'baileys'
 import { waka } from '../index.ts'
 import { messageStore } from '../lib/store.ts'
 import { getCommand, PREFIX } from '../commands/index.ts'
-import { makeSender, serializeMessage, textOfMessage } from '../lib/simple.ts'
+import { makeSender, serializeMessage, type SerializedMessage } from '../lib/simple.ts'
 import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
@@ -56,17 +56,18 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
   if (upsert.type !== 'notify') return
 
   for (const msg of upsert.messages) {
-    const text = textOfMessage(msg)
     const jid = msg.key?.remoteJid
-    if (!text || !jid || msg.key?.fromMe) continue
-    logger.info(`📥 ${jid}: ${text}`)
-    enqueueChat(jid, () => maybeRunCommand(msg, text, jid))
+    if (!jid || msg.key?.fromMe) continue
+    const m = serializeMessage(msg)
+    if (!m.text) continue
+    logger.info(`📥 ${jid}: ${m.text}`)
+    enqueueChat(jid, () => maybeRunCommand(msg, m, jid))
   }
 }
 
-async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promise<void> {
-  const m = serializeMessage(msg)
+async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string): Promise<void> {
   const sender = await resolveJid(m.sender)
+  const text = m.text
 
   let cmd: ReturnType<typeof getCommand> | undefined
   let queryText = text

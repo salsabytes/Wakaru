@@ -3,9 +3,22 @@ const YTMP3_HOME = 'https://id.ytmp3.mobi/'
 const YTMP3_HOST = 'a.ymcdn.org'
 const TIKTIK_API = 'https://tiktokdownloaderr.id/api/downloader.php'
 
+// ytmp3 session cookies are stable for a while — reuse them instead of hitting the home page per download
+const YTMP3_COOKIE_TTL = 5 * 60 * 1000
+let ytmp3Cookies: { jar: string; at: number } | null = null
+
 interface Resolved {
   url: string
   title: string
+}
+
+const ytmp3Jar = async (): Promise<string> => {
+  const cached = ytmp3Cookies && Date.now() - ytmp3Cookies.at < YTMP3_COOKIE_TTL
+  if (cached) return ytmp3Cookies!.jar
+  const home = await fetch(YTMP3_HOME, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15_000) })
+  const jar = (home.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+  ytmp3Cookies = { jar, at: Date.now() }
+  return jar
 }
 
 const videoIdOf = (rawUrl: string): string | undefined => {
@@ -25,11 +38,17 @@ const getJson = async (url: string, headers: Record<string, string>): Promise<an
 async function ytmp3Mobi(rawUrl: string, format: 'mp3' | 'mp4'): Promise<Resolved> {
   const vid = videoIdOf(rawUrl)
   if (!vid) throw new Error('ytmp3: not a YouTube link')
-  const home = await fetch(YTMP3_HOME, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15_000) })
-  const cookies = (home.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+  let cookies = await ytmp3Jar()
   const h: Record<string, string> = { 'User-Agent': UA, Referer: YTMP3_HOME }
   if (cookies) h.Cookie = cookies
-  const init = await getJson(`https://${YTMP3_HOST}/api/v1/init?p=y&23=1llum1n471&_=${Math.random()}`, h)
+  let init = await getJson(`https://${YTMP3_HOST}/api/v1/init?p=y&23=1llum1n471&_=${Math.random()}`, h)
+  if (init.error > 0 && cookies) {
+    // cached cookie jar went stale — refresh once and retry before giving up
+    ytmp3Cookies = null
+    cookies = await ytmp3Jar()
+    if (cookies) h.Cookie = cookies
+    init = await getJson(`https://${YTMP3_HOST}/api/v1/init?p=y&23=1llum1n471&_=${Math.random()}`, h)
+  }
   if (init.error > 0 || !init.convertURL) throw new Error('ytmp3: init failed')
   let convertURL: string = init.convertURL
   for (let hop = 0; hop < 3; hop++) {
@@ -61,6 +80,7 @@ export async function download(url: string, mode: 'audio' | 'video') {
 }
 
 export async function downloadTikTok(rawUrl: string) {
+  if (!/tiktok\.com\//i.test(rawUrl)) throw new Error('tiktok: not a TikTok link')
   const form = new FormData()
   form.append('url', rawUrl)
   const res = await fetch(TIKTIK_API, {

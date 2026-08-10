@@ -7,7 +7,7 @@ import { getAiHistory, saveAiHistory } from '../../lib/aiHistory.ts'
 import { recentByChat } from '../../lib/store.ts'
 import { textOfMessage } from '../../lib/simple.ts'
 
-const PARTICIPANT_MAX = 40
+const PARTICIPANT_MAX = 20
 
 const parseRuns = (text: string) =>
   [...text.matchAll(/@run:([a-z][a-z0-9_-]*)(?:\s+([^\n]*))?/gi)].map((m) => ({
@@ -34,7 +34,7 @@ async function buildContext(ctx: CommandContext): Promise<string> {
 
     }
   }
-  const recent = recentByChat(ctx.chat, 15)
+  const recent = recentByChat(ctx.chat, 8)
   if (recent.length) {
     const chatLines = recent.map((m) => {
       const sender = (m.key?.participant ?? m.key?.remoteJid ?? '?').split('@')[0]
@@ -115,8 +115,12 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext): Promise<string
     try {
       reply = (await askLLM(msgs)).trim()
     } catch (err) {
-      if (round === 0) reply = (await askLLM(msgs)).trim()
-      else throw err
+      if (round === 0) {
+        // transient backend hiccup — wait a beat, then one retry
+        // ponytail: no error-type classification; a 1.5s settle gap covers rate-limits/checkpoints
+        await new Promise((r) => setTimeout(r, 1500))
+        reply = (await askLLM(msgs)).trim()
+      } else throw err
     }
     const runs = parseRuns(reply)
     if (!runs.length) return reply
