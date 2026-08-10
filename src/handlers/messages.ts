@@ -29,18 +29,21 @@ function enqueueChat(chat: string, task: () => Promise<void>): void {
   })
 }
 
-// global concurrency cap — heavy commands (downloads) buffer MBs in RAM; 3 keeps a low-end phone safe
-// ponytail: lower to 2 if the device struggles, raise if downloads feel slow
-const MAX_ACTIVE = 3
-let active = 0
+// global concurrency caps — heavy commands (media downloads) buffer whole files in RAM;
+// 3 light (chat, menu, sticker) or 2 heavy at once keeps a low-end phone safe
+// ponytail: two independent pools (max 5 total); tighten light to 2 if the device struggles
+const SLOT_LIMITS = { light: 3, heavy: 2 } as const
+const running = { light: 0, heavy: 0 }
 const waiters: (() => void)[] = []
-async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (active >= MAX_ACTIVE) await new Promise<void>((r) => waiters.push(r))
-  active++
+async function withSlot(weight: 'light' | 'heavy', fn: () => Promise<void>): Promise<void> {
+  while (running[weight] >= SLOT_LIMITS[weight]) {
+    await new Promise<void>((r) => waiters.push(r))
+  }
+  running[weight]++
   try {
-    return await fn()
+    await fn()
   } finally {
-    active--
+    running[weight]--
     waiters.shift()?.()
   }
 }
@@ -57,7 +60,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
     const jid = msg.key?.remoteJid
     if (!text || !jid || msg.key?.fromMe) continue
     logger.info(`📥 ${jid}: ${text}`)
-    enqueueChat(jid, () => withSlot(() => maybeRunCommand(msg, text, jid)))
+    enqueueChat(jid, () => maybeRunCommand(msg, text, jid))
   }
 }
 
@@ -112,12 +115,13 @@ async function maybeRunCommand(msg: WAMessage, text: string, jid: string): Promi
   }
 
   try {
-
-    if (cmd.ownerOnly && !isOwner(ctx.sender)) {
-      await ctx.reply(!OWNERS.length ? 'no owners in config.json — owner commands disabled 🔒' : `owner only 🔒 (detected: ${ctx.sender.split(/[@:]/)[0]})`)
-      return
-    }
-    await cmd.run(ctx)
+    await withSlot(cmd.heavy ? 'heavy' : 'light', async () => {
+      if (cmd.ownerOnly && !isOwner(ctx.sender)) {
+        await ctx.reply(!OWNERS.length ? 'no owners in config.json — owner commands disabled 🔒' : `owner only 🔒 (detected: ${ctx.sender.split(/[@:]/)[0]})`)
+        return
+      }
+      await cmd.run(ctx)
+    })
   } catch (err) {
     logger.error(`Command "${cmd.name}" error:`, err)
     await ctx.reply(`❌ ${cmd.name} failed: ${(err as Error).message.slice(0, 300)}`)

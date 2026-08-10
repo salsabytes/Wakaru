@@ -7,6 +7,8 @@ declare global {
     desc?: string
     aliases?: string[]
     ownerOnly?: boolean
+    /** buffers whole media files in RAM — run under a tighter concurrency cap */
+    heavy?: boolean
     run: (ctx: CommandContext) => Promise<void> | void
   }
 

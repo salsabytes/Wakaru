@@ -5,6 +5,7 @@ export default {
   name: 'tiktok',
   desc: 'download a TikTok video without watermark',
   aliases: ['tt', 'ttdl'],
+  heavy: true,
   run: async (ctx: CommandContext) => {
     const url = await requireUrl(ctx, 'tiktok', '<tiktok link>')
     if (!url) return
