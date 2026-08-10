@@ -7,3 +7,5 @@ bin/
 
 config.json
 .agents
+.hermes/
+.codegraph.json
