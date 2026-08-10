@@ -66,15 +66,16 @@ pub fn convert_video(data: &[u8], output: &str) -> Result<(), Box<dyn std::error
     avc_to_annex_b(&sample.bytes, length_size, &sps, &pps, &mut buffer);
     match decoder.decode(&buffer) {
       Ok(Some(img)) => {
+        // skip strided frames BEFORE converting YUV->RGB (decode is mandatory, conversion is not)
+        if ((i - 1) as usize) % stride != 0 {
+          continue;
+        }
         let (fw, fh) = img.dimensions();
         let mut rgb_buf = match fw.checked_mul(fh).and_then(|n| n.checked_mul(3)) {
           Some(n) => vec![0u8; n],
           None => continue,
         };
         img.write_rgb8(&mut rgb_buf);
-        if ((i - 1) as usize) % stride != 0 {
-          continue;
-        }
         let Some(canvas) = frame_to_512(&rgb_buf, fw as u32, fh as u32) else {
           continue;
         };
