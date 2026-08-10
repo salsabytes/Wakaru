@@ -7,9 +7,42 @@ import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 
+// LID → PN mapping barely changes within a session; cache it (misses are not cached, retried next msg)
+const lidCache = new Map<string, string>()
 const resolveJid = async (sender: string) => {
   if (!sender.endsWith('@lid') && !sender.endsWith('@hosted.lid')) return sender
-  return (await waka.signalRepository.lidMapping.getPNForLID(sender)) ?? sender
+  const cached = lidCache.get(sender)
+  if (cached) return cached
+  const pn = await waka.signalRepository.lidMapping.getPNForLID(sender)
+  if (pn) lidCache.set(sender, pn)
+  return pn ?? sender
+}
+
+// per-chat serial queue: preserves reply order within a chat, chats run in parallel
+const chatQueues = new Map<string, Promise<void>>()
+function enqueueChat(chat: string, task: () => Promise<void>): void {
+  const prev = chatQueues.get(chat) ?? Promise.resolve()
+  const next = prev.then(task).catch((err) => logger.error('queue task error:', err))
+  chatQueues.set(chat, next)
+  void next.finally(() => {
+    if (chatQueues.get(chat) === next) chatQueues.delete(chat)
+  })
+}
+
+// global concurrency cap — heavy commands (downloads) buffer MBs in RAM; 3 keeps a low-end phone safe
+// ponytail: lower to 2 if the device struggles, raise if downloads feel slow
+const MAX_ACTIVE = 3
+let active = 0
+const waiters: (() => void)[] = []
+async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (active >= MAX_ACTIVE) await new Promise<void>((r) => waiters.push(r))
+  active++
+  try {
+    return await fn()
+  } finally {
+    active--
+    waiters.shift()?.()
+  }
 }
 
 export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.upsert']): Promise<void> {
@@ -24,7 +57,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
     const jid = msg.key?.remoteJid
     if (!text || !jid || msg.key?.fromMe) continue
     logger.info(`📥 ${jid}: ${text}`)
-    await maybeRunCommand(msg, text, jid)
+    enqueueChat(jid, () => withSlot(() => maybeRunCommand(msg, text, jid)))
   }
 }
 
