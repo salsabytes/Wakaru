@@ -9,3 +9,4 @@ config.json
 .agents
 .hermes/
 .codegraph.json
+AGENTS.md
