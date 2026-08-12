@@ -12,7 +12,7 @@ Tiny WhatsApp bot on Baileys + TypeScript: `.ai` agent chat, media downloaders (
 ## Build & test
 
 - `bun run typecheck` — the only gate. Run before claiming anything works.
-- No test framework. The one test: `AI_SELFTEST=1 bun src/commands/main/ai.ts` (parseRuns self-check, wired into CI).
+- No test framework. The one test: `AI_SELFTEST=1 bun src/commands/main/ai/index.ts` (parseRuns self-check, wired into CI).
 - `bun run start` — live bot, scan QR. `bun run start:pairing` — pairing code instead.
 - `bun run build:sticker` — cargo build --release, copies binary to `bin/sticker[.exe]` (takes minutes on first run).
 - Config: `config.json` at root (gitignored) — `{"owners": ["628..."]}` bare numbers or JIDs. Empty list disables owner-only commands.

@@ -5,7 +5,7 @@ on:
     paths:
       - install.sh
       - .github/workflows/install.yml
-      - src/commands/main/ai.ts
+      - src/commands/main/ai/**
   workflow_dispatch:
 
 jobs:
@@ -31,10 +31,10 @@ jobs:
           export PATH="$HOME/.bun/bin:$PATH"
           if command -v bun >/dev/null 2>&1; then
             bun run typecheck
-            AI_SELFTEST=1 bun src/commands/main/ai.ts
+            AI_SELFTEST=1 bun src/commands/main/ai/index.ts
           else
             npx tsc --noEmit
-            AI_SELFTEST=1 node src/commands/main/ai.ts
+            AI_SELFTEST=1 node src/commands/main/ai/index.ts
           fi
 
   # In-place path: run ./install.sh inside the repo
