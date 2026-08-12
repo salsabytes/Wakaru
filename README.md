@@ -1,85 +1,130 @@
-# Wakaru ✨
+<div align="center">
 
-*分かる — "to understand."*
+# ✨ Wakaru
 
-A small WhatsApp bot with an agentic brain: talk to it and it talks back —
-or let it do things for you. It pulls songs, saves videos, and turns your
-photos into stickers. Built on [Baileys](https://github.com/whiskeysockets/Baileys)
-and TypeScript. One codebase, two runtimes — **Bun** on desktop, **Node** on your phone. 🫶
+**分かる — *"to understand."***
+
+A tiny WhatsApp bot with an agentic brain. It talks back, pulls songs,
+saves videos, and turns your photos into stickers — all through one
+command list you can grow yourself.
+
+[![Version](https://img.shields.io/github/package-json/v/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
+[![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7DD3FC?style=for-the-badge&logo=typescript&logoColor=0F172A)](https://www.typescriptlang.org/)
+[![Bun](https://img.shields.io/badge/Bun-1E293B?style=for-the-badge&logo=bun&logoColor=FDE68A)](https://bun.sh/)
+[![Rust](https://img.shields.io/badge/Rust%20sidecar-D97706?style=for-the-badge&logo=rust&logoColor=white)](native/sticker)
+[![CodeFactor](https://img.shields.io/codefactor/grade/github/salsabytes/wakaru/master?style=for-the-badge&logo=codefactor&logoColor=white&label=CodeFactor)](https://www.codefactor.io/repository/github/salsabytes/wakaru)
+
+</div>
 
 ---
 
-## Features
+## 🧠 What is Wakaru?
 
-- 🧠 **It gets you** — `.ai` chats naturally, and can run commands on its own with `@run:`, remembering each chat
-- 🎬 **Plays with media** — pulls audio from a link, saves videos, makes stickers from photos & videos
-- 🧩 **Extensible** — drop a file in `src/commands/<category>/` and it's live; no registry to edit
+Wakaru is a **self-hosted WhatsApp bot** built on
+[Baileys](https://github.com/whiskeysockets/Baileys) and TypeScript — no
+yt-dlp, no ffmpeg, no Python, no self-hosted servers. Everything resolves
+through pure-TS scrapers and one tiny Rust sidecar.
+
+One codebase, three runtimes: **Bun** on desktop, **Bun or Node ≥ 23.6** on
+Termux, and a one-line installer for every platform. Chat with it, or let
+it *do* things for you.
+
+<div align="center">
+
+<img src="assets/wakaru-banner.gif" alt="Wakaru — anime banner" width="820" />
+
+</div>
+
+---
+
+## ✨ Features
+
+- 🧠 **It gets you** — `.ai` chats naturally, can run any command on its own with `@run:`, and remembers each conversation
+- 🎬 **Plays with media** — pulls audio and video from links, searches YouTube by query, and makes stickers from photos & videos
+- 🧩 **Extensible** — register a command in `src/commands/index.ts` and it shows up in `.menu` automatically
 - 🔁 **Never leaves you hanging** — auto-reconnects with exponential backoff
 - 🔐 **Easy in** — log in with a QR code or a pairing code
-- 🎨 **Prettily logged** — charmbracelet-style console output, clock-only timestamp
+- 📱 **Runs on your phone** — first-class Termux support, no root needed
+- 🎨 **Prettily logged** — charmbracelet-style console output, clock-only timestamps
+- ⚡ **Fast & cheap** — per-chat parallel processing, global concurrency caps, zero external services
 
-## Quick start
+---
 
-**Desktop (Bun):**
+## 📜 Commands
 
-```bash
-bun install
-bun run start            # scan QR
-bun run start:pairing    # or use a pairing code
-```
+Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 
-**Any platform — one-liner (Termux, Linux, macOS, Windows Git Bash/WSL):**
+| Command | Aliases | What it does |
+|---|---|---|
+| `.ai <msg>` | — | Agentic chat; can run commands via `@run:`, remembers each sender |
+| `.menu` | `.help` | List every command |
+| `.sticker` | `.st` | Quoted photo/video → 512×512 webp sticker |
+| `.ytmp3 <url>` | `.ytm`, `.music` | Any video link → mp3 audio |
+| `.ytmp4 <url>` | `.ytv`, `.video` | Any video link → mp4 video |
+| `.play <query>` | `.yt`, `.song` | Search YouTube → tap a result → pick mp3/mp4 |
+| `.tiktok <url>` | `.tt`, `.ttdl` | TikTok video, no watermark |
+| `.instagram <url>` | `.ig`, `.igdl` | IG reels, videos, photos & carousels, no watermark |
+| `.facebook <url>` | `.fb`, `.fbdl` | Facebook video in HD |
+| `.pinterest <url\|query>` | `.pin`, `.pins` | Images from a pin link, or a search query |
+
+Multi-file results (IG carousels, Pinterest searches) are delivered to your
+**private chat** so groups stay tidy.
+
+---
+
+## 🚀 Quick start
+
+### One-liner (any platform)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
 cd wakaru && bun run start
 ```
 
-It installs the runtime (Bun on desktop, Node on Termux), dependencies, and builds
-the native sticker engine — no manual steps. Re-running also updates Bun to the
-latest canary automatically (Termux runs Node instead).
+The installer detects your platform, installs the runtime, dependencies,
+and builds the native sticker engine. Re-running it **keeps Bun on the
+latest canary automatically** (`bun upgrade --canary`).
 
-Node ≥ 23.6 runs the TypeScript files directly — no `tsx`, no build step.
+### Manual (Bun)
 
-### Can Bun run on Termux?
-
-Officially no: Bun ships no Android binaries. Community builds exist — the maintained one is [Happ1ness-dev/bun-termux](https://github.com/Happ1ness-dev/bun-termux), a native glibc-runner wrapper with no root/proot. It's unofficial, needs kernel ≥ 5.1 on newer Bun versions, and can break on Bun updates. `install.sh` therefore installs Node — the boring, safe path that works on every device. Want Bun anyway? Install it manually and run `bun install && bun run start`.
-
-### Why `npm install` doesn't pull in `sharp`
-
-`sharp` (an image library, a peer of baileys) has no Android prebuilt — npm would try to compile libvips from source on Termux and fail the whole install. The repo's `.npmrc` sets `omit=peer`, so the install goes through. Trade-off: baileys' own link-preview thumbnails don't work; media features (stickers) use the repo's own Rust sidecar instead, which cross-compiles cleanly for Android.
-
-## Commands
-
-The bot maintains its own command list — send **`.menu`** in WhatsApp and it shows every
-command it can run, generated fresh from `src/commands/`. Drop a new file there and it
-shows up in `.menu` automatically, so this README never needs updating for new commands.
-
-Downloads resolve through the pure-TS scraper — no yt-dlp, no ffmpeg, no Python, no self-host. `.ytmp3` (audio) and `.ytmp4` (video) go through the free ytmp3.mobi converter: paste a YouTube link, get the file (mp3 / mp4). `.tiktok` grabs a TikTok video without a watermark via tiktokdownloaderr.id. `.instagram` pulls an Instagram video, reels, photo or whole carousel without a watermark straight from Instagram's own API (a shortcode lookup needs no login). Story downloads resolve through snapsave.app's download engine — zero session, no captcha. If snapsave is down, set `IG_SESSIONID` to the `sessionid` cookie of a burner IG account (never your main one) as a fallback: `export IG_SESSIONID=...` or add it to your start script.
-
-### Native engines
-
-`.sticker` shells out to a small Rust sidecar (`native/sticker/`) that turns media into 512×512 webp stickers — fast and low-RAM. Photos become still stickers; videos become animated ones (H.264 mp4, first 8 seconds, auto-compressed to stay under WhatsApp's 100KB limit). All codecs are compiled in — no ffmpeg needed. Build it once per platform:
+<details>
+<summary>Show manual setup</summary>
 
 ```bash
-bun run build:sticker          # desktop: puts the binary in bin/
+git clone https://github.com/salsabytes/Wakaru.git
+cd Wakaru
+bun install
+bun run build:sticker   # one-time: compile the Rust sticker engine
+
+bun run start            # scan the QR with your phone
+bun run start:pairing    # or use a pairing code
 ```
 
-It's pure-Rust with zero system deps; `install.sh` builds it for you (installs Rust once, compiles on first run — a few minutes). The binary is gitignored.
+</details>
 
-## Configuration
+### Logging in
+
+1. Run the bot — a **QR code** appears in the terminal
+2. Open WhatsApp → *Settings → Linked devices → Link a device*
+3. Scan. Session is saved to `sessions/` and reused on restart
+
+Prefer a code? Run with `--use-pairing-code` or set `PAIRING_CODE=1`.
+
+---
+
+## ⚙️ Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `SESSION_DIR` | `sessions` | Folder where the login session is stored |
-| `PAIRING_CODE` | — | Set to `1` to use a pairing code |
+| `PAIRING_CODE` | — | Set to `1` to log in with a pairing code |
 | `IG_SESSIONID` | — | Optional fallback IG session cookie for `.instagram` stories when snapsave is down (use a burner account) |
 
-Or pass the flag: `--use-pairing-code`.
-
-Owner commands (`.ai`): edit `config.json` (gitignored) at the project root and list
-phone numbers in `"owners"` — bare number (`628123...`) or full JID. Empty list =
-owner commands disabled.
+**Owner commands (`.ai`):** create `config.json` (gitignored) at the project
+root and list phone numbers in `"owners"` — bare number (`628123...`) or
+full JID. An empty list disables owner commands.
 
 ```json
 {
@@ -87,34 +132,146 @@ owner commands disabled.
 }
 ```
 
-## Project structure
+---
+
+## 🧰 Tech stack
+
+<div align="center">
+
+[![Skills](https://skillicons.dev/icons?i=ts,bun,nodejs,rust,githubactions)](https://skillicons.dev)
+
+</div>
+
+| Layer | Choice | Why |
+|---|---|---|
+| Runtime | **Bun** (canary) · Node ≥ 23.6 fallback | TypeScript runs directly — no build step, no `tsx` |
+| WhatsApp protocol | **Baileys** | The battle-tested Web API client |
+| Sticker engine | **Rust sidecar** | 512×512 webp, animated support, all codecs compiled in |
+| Scrapers | **Pure TypeScript** | No yt-dlp / ffmpeg / Python — nothing to maintain |
+| Logging | **pino** | Fast, structured, prettified |
+| CI | **GitHub Actions** | Real installs tested on Ubuntu, macOS, Windows + simulated Termux |
+
+---
+
+## 📁 Project structure
+
+<details>
+<summary>Show source layout</summary>
 
 ```
 src/
-├── index.ts             # socket config, connect, connection handler, shutdown
-├── lib/                 # shared helpers (no deps beyond stdlib)
-│   ├── logger.ts        # charmbracelet-style console logger
-│   ├── store.ts         # in-memory message store (getMessage for baileys)
-│   ├── config.ts        # owner list from config.json
-│   ├── llm.ts           # free chateverywhere backend client for .ai
-│   ├── simple.ts        # WAMessage -> flat SerializedMessage
-│   └── scraper.ts       # pure-TS downloader (ytmp3.mobi — mp3/mp4, tiktokdownloaderr.id — tiktok, IG web API — instagram)
+├── index.ts                 # entry: boot + signal handling
+├── socket.ts                # Baileys connection lifecycle (reconnect, QR, pairing)
+├── handlers/
+│   └── messages.ts          # upsert → drop rules → dispatch
 ├── commands/
-│   ├── index.ts         # command loader + types + PREFIX
-│   └── <category>/      # one file per command, auto-scanned
-└── handlers/
-    └── messages.ts      # messages.upsert handler (log + dispatch)
+│   ├── index.ts             # static command registry + types
+│   ├── main/                # ai/ (prompt, tools, exchange), menu.ts
+│   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook, pinterest
+│   └── converter/sticker.ts
+└── lib/
+    ├── scrapers/            # one module per platform + shared http helpers
+    ├── queue.ts             # per-chat queue + global concurrency slots
+    ├── serialize.ts         # WAMessage → flat SerializedMessage (incl. tap parsing)
+    ├── sender.ts            # reply/audio/video/sticker/react/list/buttons
+    ├── media.ts             # requireUrl, sendMedia (multi-file routing)
+    └── store · config · llm · logger · aiHistory · factory · buttons
 ```
 
-## Notes
+</details>
 
-- Never run two instances sharing the same `sessions/` folder — they'll kick each other (status `440`, `connectionReplaced`).
-- Logged out? Delete `sessions/` and scan again.
-- `sessions/` is gitignored — credentials never reach the repo.
-- Keep the phone awake with `termux-wake-lock` when hosting on Termux.
+---
 
-## Roadmap
+## 🤝 Contributing
 
-- [ ] More commands
-- [ ] GIF → animated sticker (reuses the video engine's animated webp path)
-- [ ] Poll updates and chat status handling
+PRs are welcome! This is a small, lazy codebase — keep it that way.
+
+- Found a bug? [Open an issue](https://github.com/salsabytes/Wakaru/issues)
+- Want a feature? Same place
+- Respect the [Code of Conduct](CODE_OF_CONDUCT.md)
+
+<div align="center">
+
+[![Contributors](https://contrib.rocks/image?repo=salsabytes/Wakaru)](https://github.com/salsabytes/Wakaru/graphs/contributors)
+
+</div>
+
+---
+
+## 📄 License
+
+[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes)
+
+---
+
+## ❓ FAQ
+
+<details>
+<summary>Can Bun run on Termux?</summary>
+
+**Yes.** Installers force Bun in via `npm install -g bun` (works on
+aarch64) and keep it on the latest canary. If that ever fails, the
+installer gracefully falls back to Node ≥ 23.6 — which also runs the
+TypeScript files directly.
+
+</details>
+
+<details>
+<summary>Why doesn't `npm install` pull in `sharp`?</summary>
+
+`sharp` (a peer of baileys) has no Android prebuilt — npm would try to
+compile libvips from source on Termux and fail the whole install. The
+repo's `.npmrc` sets `omit=peer`, so installs go through. Trade-off:
+baileys' link-preview thumbnails don't work; media features use the
+Rust sidecar instead.
+
+</details>
+
+<details>
+<summary>Can I run two instances?</summary>
+
+Never two instances sharing the same `sessions/` folder — they kick each
+other (`status 440`, `connectionReplaced`).
+
+</details>
+
+<details>
+<summary>I got logged out — what now?</summary>
+
+Delete `sessions/` and scan the QR again. Credentials never reach the
+repo — the folder is gitignored.
+
+</details>
+
+<details>
+<summary>Hosting on Termux — anything special?</summary>
+
+Keep the phone awake with `termux-wake-lock`. Note that `.facebook`
+relies on the system `curl` — it works on Windows/Bun; on Linux hosts
+the fdown challenge may block it.
+
+</details>
+
+---
+
+## 📦 Changelog
+
+<details>
+<summary>Recent changes</summary>
+
+**2026-08 — v1.0.0**
+- Deep modularization: `lib/scrapers/*`, `socket.ts`, `ai/`, `queue` + `serialize` + `sender` + `media`
+- `.play` two-stage pick: search → tap result → MP3/MP4 buttons (native-flow list)
+- New downloaders: `.facebook` (HD) and `.pinterest` (pin link or search query)
+- Multi-file results now land in your private chat, not the group
+- Tap/button parsing unified — all interactive message shapes handled
+- Termux installer: forced Bun via npm, automatic canary upgrade, simulated-Termux CI
+
+**Earlier**
+- Performance pass: per-chat parallel queues, global concurrency caps, LID→PN cache, AI history TTL, ytmp3 cookie caching
+- Full Instagram downloader (reels, carousels, stories) with snapsave fallback
+- TikTok downloader without watermark (real titles, one-shot POST)
+- Agentic `.ai` with tool execution (`@run:`) and per-sender memory
+- Rust sticker engine with animated webp support
+
+</details>
