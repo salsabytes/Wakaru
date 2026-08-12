@@ -1,4 +1,4 @@
-import { UA } from './http.ts'
+import { UA, fetchBuffer } from './http.ts'
 import { snapsaveHome, snapsaveAction, snapsaveUnpack } from './snapsave.ts'
 
 const shortcodeOf = (rawUrl: string): string | undefined =>
@@ -48,17 +48,21 @@ const igBestOf = (m: any): { type: 'video' | 'image'; url: string } | undefined 
   return url ? { type: m.media_type === 2 ? 'video' : 'image', url } : undefined
 }
 
+// HP low-end: download carousel batch 2 sekaligus, bukan semua paralel —
+// 10 item × 50MB = spike RAM di phone. Bounded concurrency, tetap allSettled.
+const CONCURRENCY = 2
+
 async function igDownload(refs: { type: 'video' | 'image'; url: string }[], title: string) {
-  const results = await Promise.allSettled(
-    refs.map(async ({ type, url }) => {
-      const dl = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
-      if (!dl.ok) throw new Error(`instagram download http ${dl.status}`)
-      return { type, buf: Buffer.from(await dl.arrayBuffer()) }
-    }),
-  )
-  const media = (
-    results.filter((r) => r.status === 'fulfilled') as PromiseFulfilledResult<{ type: 'video' | 'image'; buf: Buffer }>[]
-  ).map((r) => r.value)
+  const media: { type: 'video' | 'image'; buf: Buffer }[] = []
+  for (let i = 0; i < refs.length; i += CONCURRENCY) {
+    const batch = await Promise.allSettled(
+      refs.slice(i, i + CONCURRENCY).map(async ({ type, url }) => ({
+        type,
+        buf: await fetchBuffer(url, { headers: { 'User-Agent': UA } }),
+      })),
+    )
+    for (const r of batch) if (r.status === 'fulfilled') media.push(r.value)
+  }
   if (!media.length) throw new Error('instagram: download failed')
   return { title, media }
 }

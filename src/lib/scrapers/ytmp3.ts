@@ -1,4 +1,4 @@
-import { UA, getJson } from './http.ts'
+import { UA, getJson, fetchBuffer } from './http.ts'
 
 const YTMP3_HOME = 'https://id.ytmp3.mobi/'
 const YTMP3_HOST = 'a.ymcdn.org'
@@ -96,7 +96,6 @@ async function ytmp3Mobi(rawUrl: string, format: 'mp3' | 'mp4'): Promise<Resolve
 
 export async function download(url: string, mode: 'audio' | 'video') {
   const got = await ytmp3Mobi(url, mode === 'audio' ? 'mp3' : 'mp4')
-  const res = await fetch(got.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
-  if (!res.ok) throw new Error(`download http ${res.status}`)
-  return { buf: Buffer.from(await res.arrayBuffer()), title: got.title } as const
+  const buf = await fetchBuffer(got.url, { headers: { 'User-Agent': UA } })
+  return { buf, title: got.title } as const
 }

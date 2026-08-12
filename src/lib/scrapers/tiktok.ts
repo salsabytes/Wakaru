@@ -1,4 +1,4 @@
-import { UA } from './http.ts'
+import { UA, fetchBuffer } from './http.ts'
 
 const TIKTIK_API = 'https://tiktokdownloaderr.id/api/downloader.php'
 
@@ -14,7 +14,6 @@ export async function downloadTikTok(rawUrl: string) {
   })
   const j: any = await res.json().catch(() => null)
   if (!j?.success || !j.video_nowm) throw new Error(`tiktok: ${j?.message ?? 'request failed'}`)
-  const dl = await fetch(j.video_nowm, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(300_000) })
-  if (!dl.ok) throw new Error(`tiktok download http ${dl.status}`)
-  return { buf: Buffer.from(await dl.arrayBuffer()), title: j.title || rawUrl }
+  const buf = await fetchBuffer(j.video_nowm, { headers: { 'User-Agent': UA } })
+  return { buf, title: j.title || rawUrl }
 }

@@ -1,4 +1,4 @@
-import { UA } from './http.ts'
+import { UA, fetchBuffer } from './http.ts'
 
 const PINTEREST = 'https://www.pinterest.com/'
 
@@ -37,11 +37,9 @@ async function pinterestResource(endpoint: string, sourceUrl: string, options: a
   return j
 }
 
-const pinterestImage = async (url: string): Promise<{ buf: Buffer }> => {
-  const dl = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(120_000) })
-  if (!dl.ok) throw new Error(`pinterest download http ${dl.status}`)
-  return { buf: Buffer.from(await dl.arrayBuffer()) }
-}
+const pinterestImage = async (url: string): Promise<{ buf: Buffer }> => ({
+  buf: await fetchBuffer(url, { headers: { 'User-Agent': UA }, timeout: 120_000 }),
+})
 
 export type PinOut = { type: 'image' | 'video'; buf: Buffer; title?: string }
 
