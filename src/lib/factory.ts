@@ -1,5 +1,5 @@
-import { download } from './scraper.ts'
-import { requireUrl } from './simple.ts'
+import { download } from './scrapers/index.ts'
+import { requireUrl } from './media.ts'
 
 export function makeDownloader(o: {
   name: string

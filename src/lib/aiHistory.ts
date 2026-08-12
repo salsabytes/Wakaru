@@ -3,7 +3,7 @@ import type { ChatMsg } from './llm.ts'
 
 const HISTORY_MAX = 20
 const HISTORY_CHAR_MAX = 8000
-// TTL + cap so per-chat:sender history can't accumulate forever on a long-running session
+
 const history = new NodeCache({ stdTTL: 6 * 60 * 60, checkperiod: 600, maxKeys: 2000 }) as {
   get(k: string): ChatMsg[] | undefined
   set(k: string, v: ChatMsg[]): boolean

@@ -1,5 +1,5 @@
-import { downloadTikTok } from '../../lib/scraper.ts'
-import { requireUrl } from '../../lib/simple.ts'
+import { downloadTikTok } from '../../lib/scrapers/index.ts'
+import { requireUrl } from '../../lib/media.ts'
 
 export default {
   name: 'tiktok',

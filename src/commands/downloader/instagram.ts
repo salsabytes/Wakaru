@@ -1,5 +1,5 @@
-import { downloadInstagram } from '../../lib/scraper.ts'
-import { requireUrl } from '../../lib/simple.ts'
+import { downloadInstagram } from '../../lib/scrapers/index.ts'
+import { requireUrl, sendMedia } from '../../lib/media.ts'
 
 export default {
   name: 'instagram',
@@ -10,10 +10,9 @@ export default {
     const url = await requireUrl(ctx, 'instagram', '<instagram link>')
     if (!url) return
     const r = await downloadInstagram(url)
-    for (const [i, m] of r.media.entries()) {
-      const caption = i === 0 ? r.title : undefined
-      if (m.type === 'video') await ctx.sendVideo(m.buf, caption)
-      else await ctx.sendImage(m.buf, caption)
-    }
+    await sendMedia(
+      ctx,
+      r.media.map((m, i) => ({ type: m.type, buf: m.buf, caption: i === 0 ? r.title : undefined })),
+    )
   },
 } satisfies Command

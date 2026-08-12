@@ -1,13 +1,15 @@
 import type { BaileysEventMap, WAMessage } from 'baileys'
-import { waka } from '../index.ts'
+import { waka } from '../socket.ts'
 import { messageStore } from '../lib/store.ts'
 import { getCommand, PREFIX } from '../commands/index.ts'
-import { makeSender, serializeMessage, type SerializedMessage } from '../lib/simple.ts'
+import { serializeMessage, type SerializedMessage } from '../lib/serialize.ts'
+import { makeSender } from '../lib/sender.ts'
+import { enqueueChat, withSlot } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
+import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 
-// LID → PN mapping barely changes within a session; cache it (misses are not cached, retried next msg)
 const lidCache = new Map<string, string>()
 const resolveJid = async (sender: string) => {
   if (!sender.endsWith('@lid') && !sender.endsWith('@hosted.lid')) return sender
@@ -18,49 +20,31 @@ const resolveJid = async (sender: string) => {
   return pn ?? sender
 }
 
-// per-chat serial queue: preserves reply order within a chat, chats run in parallel
-const chatQueues = new Map<string, Promise<void>>()
-function enqueueChat(chat: string, task: () => Promise<void>): void {
-  const prev = chatQueues.get(chat) ?? Promise.resolve()
-  const next = prev.then(task).catch((err) => logger.error('queue task error:', err))
-  chatQueues.set(chat, next)
-  void next.finally(() => {
-    if (chatQueues.get(chat) === next) chatQueues.delete(chat)
-  })
-}
-
-// global concurrency caps — heavy commands (media downloads) buffer whole files in RAM;
-// 3 light (chat, menu, sticker) or 2 heavy at once keeps a low-end phone safe
-// ponytail: two independent pools (max 5 total); tighten light to 2 if the device struggles
-const SLOT_LIMITS = { light: 3, heavy: 2 } as const
-const running = { light: 0, heavy: 0 }
-const waiters: (() => void)[] = []
-async function withSlot(weight: 'light' | 'heavy', fn: () => Promise<void>): Promise<void> {
-  while (running[weight] >= SLOT_LIMITS[weight]) {
-    await new Promise<void>((r) => waiters.push(r))
-  }
-  running[weight]++
-  try {
-    await fn()
-  } finally {
-    running[weight]--
-    waiters.shift()?.()
-  }
-}
-
 export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.upsert']): Promise<void> {
   for (const msg of upsert.messages) {
     if (msg.key?.id) messageStore.set(msg.key.id, msg)
   }
 
-  if (upsert.type !== 'notify') return
+  if (upsert.type !== 'notify') {
+
+    for (const msg of upsert.messages) {
+      const jid = msg.key?.remoteJid
+      if (!jid || msg.key?.fromMe) continue
+      const m = serializeMessage(msg)
+      if (!m.button) continue
+      logger.info(`🔘 ${jid} [append]: ${m.button.text || m.button.id}`)
+      enqueueChat(jid, () => maybeRunCommand(msg, m, jid))
+    }
+    return
+  }
 
   for (const msg of upsert.messages) {
     const jid = msg.key?.remoteJid
     if (!jid || msg.key?.fromMe) continue
     const m = serializeMessage(msg)
-    if (!m.text) continue
-    logger.info(`📥 ${jid}: ${m.text}`)
+
+    if (!m.text && !m.button) continue
+    logger.info(m.button ? `🔘 ${jid}: ${m.button.text || m.button.id}` : `📥 ${jid}: ${m.text}`)
     enqueueChat(jid, () => maybeRunCommand(msg, m, jid))
   }
 }
@@ -68,6 +52,14 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
 async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string): Promise<void> {
   const sender = await resolveJid(m.sender)
   const text = m.text
+  const send = makeSender(waka, jid, msg)
+
+  const pick = !text.startsWith(PREFIX) ? pendingPlay(m.chat, sender) : undefined
+  if (pick) return handlePlayPick(msg, m, sender, send)
+
+  if (m.button?.id.startsWith('play:')) {
+    return send.text('pilihannya udah keburu basi 😅 ketik ulang `.play <judul>` dulu ya')
+  }
 
   let cmd: ReturnType<typeof getCommand> | undefined
   let queryText = text
@@ -79,7 +71,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     queryText = text.slice(PREFIX.length + rawName.length).trim()
     args = rest
   } else {
-    // prefix-less AI: bot replies or follow-up links from an active AI chat continue it
+
     const isReplyToBot =
       !!m.quoted?.sender &&
       !!waka.user?.id &&
@@ -94,7 +86,6 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   }
   if (!cmd) return
 
-  const send = makeSender(waka, jid, msg)
   const ctx: CommandContext = {
     sock: waka,
     prefix: PREFIX,
@@ -106,6 +97,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     isGroup: m.isGroup,
     mtype: m.mtype,
     download: m.download,
+    button: m.button,
     quoted: m.quoted,
     reply: send.text,
     react: (emoji) => send.react(emoji, msg.key),
@@ -113,6 +105,8 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     sendImage: send.image,
     sendVideo: send.video,
     sendAudio: send.audio,
+    sendButtons: (buttons, text, footer) => send.buttons(buttons, text, footer),
+    sendList: (o) => send.list(o),
   }
 
   try {
@@ -125,6 +119,6 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     })
   } catch (err) {
     logger.error(`Command "${cmd.name}" error:`, err)
-    await ctx.reply(`❌ ${cmd.name} failed: ${(err as Error).message.slice(0, 300)}`)
+    await ctx.reply(`❌ ${cmd.name} failed: ${String((err as Error)?.message ?? err).slice(0, 300)}`)
   }
 }

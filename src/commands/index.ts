@@ -1,9 +1,12 @@
 import sticker from './converter/sticker.ts'
 import ytmp3 from './downloader/ytmp3.ts'
 import ytmp4 from './downloader/ytmp4.ts'
+import play from './downloader/play.ts'
 import tiktok from './downloader/tiktok.ts'
 import instagram from './downloader/instagram.ts'
-import ai from './main/ai.ts'
+import facebook from './downloader/facebook.ts'
+import pinterest from './downloader/pinterest.ts'
+import ai from './main/ai/index.ts'
 import menu from './main/menu.ts'
 
 export const PREFIX = '.'
@@ -14,7 +17,6 @@ const commands = new Map<string, Registered>()
 const resolve = new Map<string, string>()
 let ready = false
 
-// lazy: ai.ts/menu.ts import this module — don't read their exports at module init (cycle)
 function ensure(): void {
   if (ready) return
   ready = true
@@ -22,8 +24,11 @@ function ensure(): void {
     { cmd: sticker, category: 'converter' },
     { cmd: ytmp3, category: 'downloader' },
     { cmd: ytmp4, category: 'downloader' },
+    { cmd: play, category: 'downloader' },
     { cmd: tiktok, category: 'downloader' },
     { cmd: instagram, category: 'downloader' },
+    { cmd: facebook, category: 'downloader' },
+    { cmd: pinterest, category: 'downloader' },
     { cmd: ai, category: 'main' },
     { cmd: menu, category: 'main' },
   ]

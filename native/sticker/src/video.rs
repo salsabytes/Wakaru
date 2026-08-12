@@ -64,8 +64,7 @@ pub fn convert_video(data: &[u8], output: &str) -> Result<(), Box<dyn std::error
       continue;
     };
     avc_to_annex_b(&sample.bytes, length_size, &sps, &pps, &mut buffer);
-    match decoder.decode(&buffer) {
-      Ok(Some(img)) => {
+    match decoder.decode(&buffer) {      Ok(Some(img)) => {
         // skip strided frames BEFORE converting YUV->RGB (decode is mandatory, conversion is not)
         if ((i - 1) as usize) % stride != 0 {
           continue;
