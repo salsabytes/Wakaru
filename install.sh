@@ -67,10 +67,18 @@ else
   if has bun; then use_bun=1; ok "Bun installed"; else ok "runtime ready"; fi
 fi
 
+# Termux: force bun in too (npm -g works on aarch64); skip keeps Node if it fails
+if [ "$IS_TERMUX" = 1 ] && ! has bun; then
+  mute "forcing Bun into Termux via npm..."
+  npm install -g bun || skip "bun install failed — using Node"
+  if has bun; then use_bun=1; ok "Bun installed"; fi
+fi
+
 if [ "$use_bun" = 1 ]; then
   step "Bun upgrade"
   mute "running bun upgrade --canary..."
-  bun upgrade --canary
+  # brew/winget/npm-managed installs can refuse (EROFS) — the installed bun still works, keep going
+  bun upgrade --canary || skip "bun upgrade failed — continuing with installed bun"
 fi
 
 
@@ -133,4 +141,4 @@ mute "  next:"
 printf "    ${B}cd ${DIR}${R}\n"
 printf "    ${B}bun run start${R}          ${M}# or: node src/index.ts${R}\n"
 printf "    ${B}bun run start:pairing${R}  ${M}# pairing code instead of QR${R}\n"
-mute "  tip: bun is kept on the latest canary automatically (Termux runs Node)"
+mute "  tip: bun is kept on the latest canary automatically (falls back to Node)"
