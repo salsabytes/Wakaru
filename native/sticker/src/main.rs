@@ -60,15 +60,10 @@ fn main() -> ExitCode {
   }
 }
 
-// WhatsApp reads a custom EXIF tag (0x5741, type UNDEFINED) whose payload names the
-// sticker pack/author. Format: 22-byte TIFF header + JSON payload (same bytes as
-// wa-sticker-formatter); byte 14 holds the payload length (LE).
+// WhatsApp reads a custom EXIF tag (0x5741) whose payload names the sticker pack/author.
+// Format: 22-byte TIFF header + payload; byte 14 holds the payload length (LE).
 fn build_exif(pack: &str, author: &str) -> Vec<u8> {
-  let payload = format!(
-    "{{\"sticker-pack-id\":\"wakaru\",\"sticker-pack-name\":\"{}\",\"sticker-pack-publisher\":\"{}\",\"emojis\":[]}}",
-    json_str(pack),
-    json_str(author)
-  );
+  let payload = format!("whatsappsticker:{pack};{author}");
   let mut exif = vec![
     0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x16, 0x00, 0x00, 0x00,
@@ -76,14 +71,6 @@ fn build_exif(pack: &str, author: &str) -> Vec<u8> {
   exif[14..18].copy_from_slice(&(payload.len() as u32).to_le_bytes());
   exif.extend_from_slice(payload.as_bytes());
   exif
-}
-
-fn json_str(s: &str) -> String {
-  s.replace('\\', "\\\\")
-    .replace('"', "\\\"")
-    .replace('\n', "\\n")
-    .replace('\r', "\\r")
-    .replace('\t', "\\t")
 }
 
 fn add_exif(path: &str, pack: &str, author: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -94,10 +81,8 @@ fn add_exif(path: &str, pack: &str, author: &str) -> Result<(), Box<dyn std::err
 }
 
 // WebP EXIF lives in its own RIFF chunk, which per spec requires a VP8X chunk with
-// the EXIF flag (0x08) set — and the EXIF chunk goes AFTER the image data
-// (VP8X → ICCP → ANIM → ANMF… → EXIF → XMP), matching node-webpmux/wa-sticker-formatter.
-// Video output already has VP8X (just set the flag); a plain VP8/VP8L image gets a
-// VP8X built from the known 512×512 canvas.
+// the EXIF flag (0x08) set. Video output already has VP8X (just set the flag); the
+// simple image output (VP8/VP8L) gets a VP8X built from the known 512×512 canvas.
 fn inject_exif(webp: &[u8], exif: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
   if webp.len() < 12 || &webp[0..4] != b"RIFF" || &webp[8..12] != b"WEBP" {
     return Err("not a webp".into());
@@ -123,28 +108,24 @@ fn inject_exif(webp: &[u8], exif: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::
   out.extend_from_slice(&[0u8; 4]); // size patched at the end
   out.extend_from_slice(b"WEBP");
 
-  let mut rest = chunks.into_iter();
-  if let Some((fourcc, mut data)) = rest.next() {
-    if fourcc == b"VP8X" {
-      if !data.is_empty() {
-        data[0] |= 0x08; // EXIF present
-      }
-      push_chunk(&mut out, &fourcc, &data);
-    } else {
-      let mut vp8x = vec![0u8; 10];
-      vp8x[0] = 0x08; // EXIF present
-      let d = (SIZE - 1).to_le_bytes();
-      vp8x[4..7].copy_from_slice(&d[..3]);
-      vp8x[7..10].copy_from_slice(&d[..3]);
-      push_chunk(&mut out, b"VP8X", &vp8x);
-      push_chunk(&mut out, &fourcc, &data);
+  if chunks[0].0 == b"VP8X" {
+    let (fourcc, mut data) = chunks.remove(0);
+    if !data.is_empty() {
+      data[0] |= 0x08; // EXIF present
     }
-  }
-  // image/data chunks keep their original order (ICCP, ANIM, ANMF, VP8, VP8L, ALPH…)
-  for (fourcc, data) in rest {
     push_chunk(&mut out, &fourcc, &data);
+  } else {
+    let mut vp8x = vec![0u8; 10];
+    vp8x[0] = 0x08; // EXIF present
+    let d = (SIZE - 1).to_le_bytes();
+    vp8x[4..7].copy_from_slice(&d[..3]);
+    vp8x[7..10].copy_from_slice(&d[..3]);
+    push_chunk(&mut out, b"VP8X", &vp8x);
   }
   push_chunk(&mut out, b"EXIF", exif);
+  for (fourcc, data) in chunks {
+    push_chunk(&mut out, &fourcc, &data);
+  }
 
   let size = (out.len() - 8) as u32;
   out[4..8].copy_from_slice(&size.to_le_bytes());
@@ -198,13 +179,10 @@ mod tests {
     assert_eq!(cs[0].0, b"VP8X");
     assert_eq!(cs[0].1[0] & 0x08, 0x08); // EXIF flag
     assert_eq!(cs[0].1[4..7], [0xff, 0x01, 0x00]); // 512 - 1
-    assert_eq!(cs[1].0, b"VP8 "); // image data first…
-    assert_eq!(cs[1].1, [1, 2, 3]);
-    assert_eq!(cs[2].0, b"EXIF"); // …EXIF after, per container spec
-    assert_eq!(
-      &cs[2].1[22..],
-      b"{\"sticker-pack-id\":\"wakaru\",\"sticker-pack-name\":\"rawr\",\"sticker-pack-publisher\":\"buatan gweh\",\"emojis\":[]}"
-    );
+    assert_eq!(cs[1].0, b"EXIF");
+    assert_eq!(&cs[1].1[22..], b"whatsappsticker:rawr;buatan gweh");
+    assert_eq!(cs[2].0, b"VP8 ");
+    assert_eq!(cs[2].1, [1, 2, 3]);
   }
 
   #[test]
@@ -218,8 +196,8 @@ mod tests {
     assert_eq!(cs.len(), 3);
     assert_eq!(cs[0].0, b"VP8X");
     assert_eq!(cs[0].1[0], 0x18); // 0x10 | EXIF
-    assert_eq!(cs[1].0, b"VP8 "); // image data first…
-    assert_eq!(cs[2].0, b"EXIF"); // …EXIF after
+    assert_eq!(cs[1].0, b"EXIF");
+    assert_eq!(cs[2].0, b"VP8 ");
   }
 }
 
@@ -230,10 +208,15 @@ fn is_mp4(data: &[u8]) -> bool {
 fn convert_image(data: &[u8], output: &str) -> Result<(), Box<dyn std::error::Error>> {
   let img = image::load_from_memory(data)?;
   let (w, h) = img.dimensions();
-  // always fill the longer side to SIZE (upscale small sources too); the leftover
-  // letterbox stays transparent instead of black
   let scale = SIZE as f32 / w.max(h) as f32;
-  let (nw, nh) = (((w as f32 * scale) as u32).max(1), ((h as f32 * scale) as u32).max(1));
+  let (nw, nh) = if scale < 1.0 {
+    (
+      ((w as f32 * scale) as u32).max(1),
+      ((h as f32 * scale) as u32).max(1),
+    )
+  } else {
+    (w, h)
+  };
   let resized = img.resize(nw, nh, FilterType::Lanczos3).to_rgba8();
   let mut canvas = image::RgbaImage::from_pixel(SIZE, SIZE, image::Rgba([0, 0, 0, 0]));
   image::imageops::overlay(
