@@ -211,4 +211,4 @@ PRs that skip the checklist aren't rejected — we'll just ask nicely. 😄
 - **Code of Conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - **Quick start:** the [README](README.md)
 
-Happy hacking, and thank you for contributing to Wakaru! ✨
+Thanks again for contributing to Wakaru — happy coding! ✨

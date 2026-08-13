@@ -1,0 +1,38 @@
+name: ✨ Feature Request
+description: Suggest an idea for Wakaru
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! ✨ Tell us what you'd love to see.
+  - type: textarea
+    id: want
+    attributes:
+      label: What do you want?
+      description: One or two sentences about the feature
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it useful?
+      description: Who benefits, and how?
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Suggested approach (optional)
+      description: Rough idea of how it could work — a code sketch is welcome
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Links, examples, screenshots…
+    validations:
+      required: false
