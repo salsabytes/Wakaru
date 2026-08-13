@@ -7,6 +7,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
+import { t } from '../../lib/lang.ts'
 
 const BIN = join(
   import.meta.dirname, '..', '..', '..', 'bin',
@@ -27,8 +28,8 @@ export default {
       : isImageOrVideo(ctx.quoted?.mtype)
         ? ctx.quoted
         : undefined
-    if (!media) return ctx.reply('reply to a photo/video, or send one directly with .sticker 🛸')
-    if (!existsSync(BIN)) return ctx.reply('sticker engine not built — run: bun run build:sticker 🔧')
+    if (!media) return ctx.reply(t('stickerUsage'))
+    if (!existsSync(BIN)) return ctx.reply(t('notBuilt'))
 
     const dir = await mkdtemp(join(tmpdir(), 'wakaru-sticker-'))
     try {
@@ -40,7 +41,7 @@ export default {
       await ctx.sendSticker(await readFile(output))
     } catch (err) {
       logger.error('sticker error:', err)
-      await ctx.reply('sticker failed 😢')
+      await ctx.reply(t('stickerFailed'))
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

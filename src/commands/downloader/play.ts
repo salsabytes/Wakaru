@@ -1,6 +1,7 @@
 import type { WAMessage } from 'baileys'
 import { download, searchYouTube, type YtResult } from '../../lib/scrapers/index.ts'
 import { withSlot, cooldownLeft } from '../../lib/queue.ts'
+import { t } from '../../lib/lang.ts'
 import { logger } from '../../lib/logger.ts'
 import type { SerializedMessage } from '../../lib/serialize.ts'
 import type { Sender } from '../../lib/sender.ts'
@@ -46,9 +47,9 @@ export async function handlePlayPick(
   const pick = pendingPlay(m.chat, sender)
   if (!pick) return
   const choice = parseButtonPick(m.button?.id ?? '') ?? parsePick(m.text)
-  if (!choice) return send.text('hmm, gak kebaca nih 😅 coba balas pake *nomor + format* (mis. *1 mp3*) atau ketuk tombolnya')
+  if (!choice) return send.text(t('badPick'))
   const hit = pick.results[choice.index]
-  if (!hit) return send.text('nomornya cuma 1–5 aja ya 😉')
+  if (!hit) return send.text(t('outOfRange'))
   const mode = choice.mode
   if (!mode) {
     pick.at = Date.now()
@@ -57,8 +58,8 @@ export async function handlePlayPick(
         { id: `play:${choice.index + 1}:mp3`, text: '🎵 MP3' },
         { id: `play:${choice.index + 1}:mp4`, text: '🎬 MP4' },
       ],
-      `pilih format buat *${hit.title.slice(0, 80)}*`,
-      '3 menit aja ya 😉',
+      t('pickFormat', { title: hit.title.slice(0, 80) }),
+      t('footer3min'),
     )
   }
   const left = cooldownLeft(`${sender}:play`, 5)
@@ -75,7 +76,7 @@ export async function handlePlayPick(
   } catch (err) {
     logger.error('play download error:', err)
     await send.react('❌', msg.key).catch(() => {})
-    await send.text(`❌ play failed: ${(err as Error).message.slice(0, 300)}`)
+    await send.text(t('playFailed', { msg: (err as Error).message.slice(0, 300) }))
   }
 }
 
@@ -85,16 +86,16 @@ export default {
   aliases: ['yt', 'song'],
   run: async (ctx: CommandContext) => {
     const query = ctx.text.trim()
-    if (!query) return ctx.reply(`usage: ${ctx.prefix}play <judul lagu/video> — nanti balas pake nomor + format, mis. *1 mp3* atau *1 mp4*`)
+    if (!query) return ctx.reply(t('playUsage', { prefix: ctx.prefix }))
 
     const results = await searchYouTube(query)
-    if (!results.length) return ctx.reply('❌ play: nggak nemu hasil buat query itu 😢')
+    if (!results.length) return ctx.reply(t('noResults'))
     pending.set(`${ctx.chat}:${ctx.sender}`, { results, at: Date.now() })
 
     await ctx.sendList({
-      text: `🎵 hasil cari *"${query.slice(0, 80)}"* — ketuk salah satu:`,
-      title: 'Pilih hasil 🎵',
-      footer: 'nanti pilih format mp3/mp4, atau langsung balas nomor + format (mis. 2 mp4). 3 menit aja ya 😉',
+      text: t('resultList', { query: query.slice(0, 80) }),
+      title: t('listTitle'),
+      footer: t('listFooter'),
       sections: [
         {
           rows: results.map((r, i) => ({ header: String(i + 1), title: r.title.slice(0, 60), id: `play:${i + 1}` })),

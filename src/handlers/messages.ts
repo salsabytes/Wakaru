@@ -6,6 +6,7 @@ import { serializeMessage, type SerializedMessage } from '../lib/serialize.ts'
 import { makeSender } from '../lib/sender.ts'
 import { withSlot, cooldownLeft } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
+import { t } from '../lib/lang.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
@@ -64,7 +65,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   if (pick) return handlePlayPick(msg, m, sender, send)
 
   if (m.button?.id.startsWith('play:')) {
-    return send.text('pilihannya udah keburu basi 😅 ketik ulang `.play <judul>` dulu ya')
+    return send.text(t('stalePlay'))
   }
 
   let cmd: ReturnType<typeof getCommand> | undefined
@@ -95,7 +96,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   if (cmd.cooldown && !isOwner(sender)) {
     const left = cooldownLeft(`${sender}:${cmd.name}`, cmd.cooldown)
     if (left) {
-      await send.text(`sabar dulu ${left} detik ya 😅`)
+      await send.text(t('cooldown', { s: left }))
       return
     }
   }
@@ -126,13 +127,13 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   try {
     await withSlot(async () => {
       if (cmd.ownerOnly && !isOwner(ctx.sender)) {
-        await ctx.reply(!OWNERS.length ? 'no owners in config.json — owner commands disabled 🔒' : `owner only 🔒 (detected: ${ctx.sender.split(/[@:]/)[0]})`)
+        await ctx.reply(t(!OWNERS.length ? 'noOwners' : 'ownerOnly', { who: ctx.sender.split(/[@:]/)[0] }))
         return
       }
       await cmd.run(ctx)
     })
   } catch (err) {
     logger.error(`Command "${cmd.name}" error:`, err)
-    await ctx.reply(`❌ ${cmd.name} failed: ${String((err as Error)?.message ?? err).slice(0, 300)}`)
+    await ctx.reply(t('cmdFailed', { name: cmd.name, msg: String((err as Error)?.message ?? err).slice(0, 300) }))
   }
 }

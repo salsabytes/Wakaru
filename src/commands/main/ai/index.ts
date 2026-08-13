@@ -1,4 +1,5 @@
 import { askLLM, type ChatMsg } from '../../../lib/llm.ts'
+import { t } from '../../../lib/lang.ts'
 import { getAiHistory, saveAiHistory } from '../../../lib/aiHistory.ts'
 import { buildSystem } from './prompt.ts'
 import { parseRuns, runTool } from './tools.ts'
@@ -31,7 +32,7 @@ export default {
   desc: 'chat or DO things: .ai <msg> — can run any command, remembers each sender',
   run: async (ctx: CommandContext) => {
     const query = ctx.text.trim()
-    if (!query) return ctx.reply(`usage: ${ctx.prefix}ai <message> — e.g. "sticker", "kick budi", or just chat`)
+    if (!query) return ctx.reply(t('aiUsage', { prefix: ctx.prefix }))
     ctx.sock.sendPresenceUpdate('composing', ctx.chat).catch(() => {})
 
     let finalText = ''

@@ -48,7 +48,7 @@ it *do* things for you.
 - 🔐 **Easy in** — log in with a QR code or a pairing code
 - 📱 **Runs on your phone** — first-class Termux support, no root needed
 - 🎨 **Prettily logged** — charmbracelet-style console output, clock-only timestamps
-- ⚡ **Fast & cheap** — per-chat parallel processing, global concurrency caps, zero external services
+- ⚡ **Fast & cheap** — every command runs in parallel (one global slot pool), per-user cooldown on heavy commands, 30 MB download cap, zero external services
 
 ---
 
@@ -68,6 +68,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.instagram <url>` | `.ig`, `.igdl` | IG reels, videos, photos & carousels, no watermark |
 | `.facebook <url>` | `.fb`, `.fbdl` | Facebook video in HD |
 | `.pinterest <url\|query>` | `.pin`, `.pins` | Images from a pin link, or a search query |
+| `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
 
 Multi-file results (IG carousels, Pinterest searches) are delivered to your
 **private chat** so groups stay tidy.
@@ -126,11 +127,18 @@ Prefer a code? Run with `--use-pairing-code` or set `PAIRING_CODE=1`.
 root and list phone numbers in `"owners"` — bare number (`628123...`) or
 full JID. An empty list disables owner commands.
 
+The bot's reply language lives in the same file:
+
 ```json
 {
-  "owners": ["6281234567890"]
+  "owners": ["6281234567890"],
+  "language": "id"
 }
 ```
+
+`"language"` accepts `id` (Indonesian, the default) or `en`. You can also
+switch it live from WhatsApp with `.setlang` — or just ask `.ai` to change
+the language for you.
 
 ---
 
@@ -166,16 +174,16 @@ src/
 │   └── messages.ts          # upsert → drop rules → dispatch
 ├── commands/
 │   ├── index.ts             # static command registry + types
-│   ├── main/                # ai/ (prompt, tools, exchange), menu.ts
+│   ├── main/                # ai/ (prompt, tools, exchange), menu, setlang
 │   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook, pinterest
 │   └── converter/sticker.ts
 └── lib/
     ├── scrapers/            # one module per platform + shared http helpers
-    ├── queue.ts             # per-chat queue + global concurrency slots
+    ├── queue.ts             # global slot pool + per-user cooldown
     ├── serialize.ts         # WAMessage → flat SerializedMessage (incl. tap parsing)
     ├── sender.ts            # reply/audio/video/sticker/react/list/buttons
     ├── media.ts             # requireUrl, sendMedia (multi-file routing)
-    └── store · config · llm · logger · aiHistory · factory · buttons
+    └── store · config · lang · llm · logger · aiHistory · factory · buttons
 ```
 
 </details>
@@ -258,6 +266,13 @@ the fdown challenge may block it.
 
 <details>
 <summary>Recent changes</summary>
+
+**2026-08 — v1.1.0**
+- Multitasking: every command runs concurrently — one global slot pool, no per-command flags
+- Per-user 5 s cooldown on heavy commands (downloaders + sticker)
+- Media downloads capped at 30 MB (lower peak RAM)
+- AI reports real download results: title · duration · size
+- Reply language configurable via `config.json` / `.setlang` / `.ai`
 
 **2026-08 — v1.0.0**
 - Deep modularization: `lib/scrapers/*`, `socket.ts`, `ai/`, `queue` + `serialize` + `sender` + `media`

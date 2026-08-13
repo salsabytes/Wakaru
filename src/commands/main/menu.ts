@@ -1,4 +1,5 @@
 import { listCommands } from '../index.ts'
+import { t } from '../../lib/lang.ts'
 
 export default {
   name: 'menu',
@@ -17,6 +18,6 @@ export default {
       .map(([category, items]) => `📂 ${category}\n${items.join('\n')}`)
       .join('\n\n')
 
-    await ctx.reply(`✨ WAKARU MENU ✨\n\n${body}\n\nType ${ctx.prefix}menu to show this again`)
+    await ctx.reply(`✨ WAKARU MENU ✨\n\n${body}\n\n${t('menuFooter', { prefix: ctx.prefix })}`)
   },
 } satisfies Command

@@ -1,0 +1,96 @@
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+const ROOT = join(import.meta.dirname, '..', '..')
+const CFG_PATH = join(ROOT, 'config.json')
+
+export type Lang = 'id' | 'en'
+
+let lang: Lang = (() => {
+  try {
+    const cfg = JSON.parse(readFileSync(CFG_PATH, 'utf8')) as { language?: unknown }
+    return cfg.language === 'en' ? 'en' : 'id'
+  } catch {
+    return 'id'
+  }
+})()
+
+export const language = (): Lang => lang
+
+// persisted to config.json so it survives restarts; in-memory only if the write fails
+export const setLanguage = (next: string): Lang => {
+  lang = next === 'en' ? 'en' : 'id'
+  try {
+    const cfg = JSON.parse(readFileSync(CFG_PATH, 'utf8'))
+    cfg.language = lang
+    writeFileSync(CFG_PATH, JSON.stringify(cfg, null, 2) + '\n')
+  } catch {
+    // keep in-memory change
+  }
+  return lang
+}
+
+type Vars = Record<string, string | number>
+export const t = (key: string, vars?: Vars): string => {
+  let s = STRINGS[lang][key] ?? STRINGS.id[key] ?? key
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v))
+  return s
+}
+
+const STRINGS: Record<Lang, Record<string, string>> = {
+  id: {
+    cooldown: 'sabar dulu {s} detik ya 😅',
+    noOwners: 'no owners in config.json — owner commands disabled 🔒',
+    ownerOnly: 'owner only 🔒 (detected: {who})',
+    stalePlay: 'pilihannya udah keburu basi 😅 ketik ulang `.play <judul>` dulu ya',
+    cmdFailed: '❌ {name} failed: {msg}',
+    aiUsage: 'usage: {prefix}ai <pesan> — mis. "sticker", "kick budi", atau ngobrol aja',
+    usage: 'usage: {prefix}{name} {usage}',
+    sentToDm: '📩 {n} file dikirim ke chat pribadimu ya',
+    playUsage:
+      'usage: {prefix}play <judul lagu/video> — nanti balas pake nomor + format, mis. *1 mp3* atau *1 mp4*',
+    noResults: '❌ play: nggak nemu hasil buat query itu 😢',
+    resultList: '🎵 hasil cari *"{query}"* — ketuk salah satu:',
+    listTitle: 'Pilih hasil 🎵',
+    listFooter: 'nanti pilih format mp3/mp4, atau langsung balas nomor + format (mis. 2 mp4). 3 menit aja ya 😉',
+    badPick: 'hmm, gak kebaca nih 😅 coba balas pake *nomor + format* (mis. *1 mp3*) atau ketuk tombolnya',
+    outOfRange: 'nomornya cuma 1–5 aja ya 😉',
+    pickFormat: 'pilih format buat *{title}*',
+    footer3min: '3 menit aja ya 😉',
+    playFailed: '❌ play failed: {msg}',
+    stickerUsage: 'reply ke foto/video, atau kirim langsung pake .sticker 🛸',
+    notBuilt: 'engine sticker belum dibuild — jalanin: bun run build:sticker 🔧',
+    stickerFailed: 'sticker gagal 😢',
+    menuFooter: 'ketik {prefix}menu buat liat lagi',
+    langUsage: 'usage: {prefix}setlang <id|en> — sekarang: {lang}',
+    langSetEn: '✅ language set to English',
+    langSetId: '✅ bahasa diubah ke Indonesia',
+  },
+  en: {
+    cooldown: 'hold on {s} seconds 😅',
+    noOwners: 'no owners in config.json — owner commands disabled 🔒',
+    ownerOnly: 'owner only 🔒 (detected: {who})',
+    stalePlay: 'that pick already expired 😅 re-run `.play <title>` first',
+    cmdFailed: '❌ {name} failed: {msg}',
+    aiUsage: 'usage: {prefix}ai <message> — e.g. "sticker", "kick budi", or just chat',
+    usage: 'usage: {prefix}{name} {usage}',
+    sentToDm: '📩 {n} files sent to your private chat',
+    playUsage: 'usage: {prefix}play <song/video title> — reply with number + format, e.g. *1 mp3* or *1 mp4*',
+    noResults: '❌ play: no results for that query 😢',
+    resultList: '🎵 results for *"{query}"* — tap one:',
+    listTitle: 'Pick a result 🎵',
+    listFooter: 'then pick mp3/mp4 format, or reply number + format (e.g. 2 mp4). 3 minutes only 😉',
+    badPick: 'hmm, can\'t read that 😅 reply with *number + format* (e.g. *1 mp3*) or tap a button',
+    outOfRange: 'numbers are only 1–5 😉',
+    pickFormat: 'pick a format for *{title}*',
+    footer3min: '3 minutes only 😉',
+    playFailed: '❌ play failed: {msg}',
+    stickerUsage: 'reply to a photo/video, or send one directly with .sticker 🛸',
+    notBuilt: 'sticker engine not built — run: bun run build:sticker 🔧',
+    stickerFailed: 'sticker failed 😢',
+    menuFooter: 'type {prefix}menu to show this again',
+    langUsage: 'usage: {prefix}setlang <id|en> — current: {lang}',
+    langSetEn: '✅ language set to English',
+    langSetId: '✅ bahasa diubah ke Indonesia',
+  },
+}

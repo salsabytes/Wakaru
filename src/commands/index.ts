@@ -8,6 +8,7 @@ import facebook from './downloader/facebook.ts'
 import pinterest from './downloader/pinterest.ts'
 import ai from './main/ai/index.ts'
 import menu from './main/menu.ts'
+import setlang from './main/setlang.ts'
 
 export const PREFIX = '.'
 
@@ -31,6 +32,7 @@ function ensure(): void {
     { cmd: pinterest, category: 'downloader' },
     { cmd: ai, category: 'main' },
     { cmd: menu, category: 'main' },
+    { cmd: setlang, category: 'main' },
   ]
   for (const { cmd, category } of entries) {
     if (!cmd?.name || typeof cmd.run !== 'function') continue

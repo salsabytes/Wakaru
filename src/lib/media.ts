@@ -1,9 +1,10 @@
 import { makeSender, type Sender } from './sender.ts'
+import { t } from './lang.ts'
 
 const requireUrl = async (ctx: CommandContext, name: string, usage: string): Promise<string | undefined> => {
   const url = ctx.text.trim()
   if (!url) {
-    await ctx.reply(`usage: ${ctx.prefix}${name} ${usage}`)
+    await ctx.reply(t('usage', { prefix: ctx.prefix, name, usage }))
     return undefined
   }
   await ctx.react('⏳')
@@ -92,5 +93,5 @@ export async function sendMedia(ctx: CommandContext, media: OutMedia[]): Promise
     }
     throw err
   }
-  if (dm) await ctx.reply(`📩 ${media.length} file dikirim ke chat pribadimu ya`)
+  if (dm) await ctx.reply(t('sentToDm', { n: media.length }))
 }
