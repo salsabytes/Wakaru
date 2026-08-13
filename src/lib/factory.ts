@@ -12,7 +12,6 @@ export function makeDownloader(o: {
     name: o.name,
     desc: o.desc,
     aliases: o.aliases,
-    heavy: true,
     run: async (ctx: CommandContext) => {
       const url = await requireUrl(ctx, o.name, o.usage)
       if (!url) return

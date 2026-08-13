@@ -1,27 +1,18 @@
-import { logger } from './logger.ts'
-
-const chatQueues = new Map<string, Promise<void>>()
-export function enqueueChat(chat: string, task: () => Promise<void>): void {
-  const prev = chatQueues.get(chat) ?? Promise.resolve()
-  const next = prev.then(task).catch((err) => logger.error('queue task error:', err))
-  chatQueues.set(chat, next)
-  void next.finally(() => {
-    if (chatQueues.get(chat) === next) chatQueues.delete(chat)
-  })
-}
-
-const SLOT_LIMITS = { light: 3, heavy: 2 } as const
-const running = { light: 0, heavy: 0 }
+// one global slot pool shared by every command — multitasking by default, no per-command flags.
+// ponytail: single pool caps ALL commands (downloads included); worst case N concurrent downloads
+// ≈ N × 30MB × ~2.5 (buffer+base64) ≈ 300MB at N=4 — split download/light pools if RAM spikes.
+const SLOT_LIMIT = 4
+let running = 0
 const waiters: (() => void)[] = []
-export async function withSlot(weight: 'light' | 'heavy', fn: () => Promise<void>): Promise<void> {
-  while (running[weight] >= SLOT_LIMITS[weight]) {
+export async function withSlot(fn: () => Promise<void>): Promise<void> {
+  while (running >= SLOT_LIMIT) {
     await new Promise<void>((r) => waiters.push(r))
   }
-  running[weight]++
+  running++
   try {
     await fn()
   } finally {
-    running[weight]--
+    running--
     waiters.shift()?.()
   }
 }

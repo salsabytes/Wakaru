@@ -23,9 +23,7 @@ export const pendingPlay = (chat: string, sender: string): PendingPlay | undefin
   return p
 }
 
-export const dropPlay = (chat: string, sender: string): void => {
-  pending.delete(`${chat}:${sender}`)
-}
+export const dropPlay = (chat: string, sender: string): boolean => pending.delete(`${chat}:${sender}`)
 
 export function parsePick(text: string): { index: number; mode?: 'audio' | 'video' } | undefined {
   const m = text.trim().toLowerCase().match(/^(\d{1,2})\s*(mp3|mp4|audio|video)?$/)
@@ -63,10 +61,10 @@ export async function handlePlayPick(
       '3 menit aja ya 😉',
     )
   }
-  dropPlay(m.chat, sender)
+  if (!dropPlay(m.chat, sender)) return // pick already consumed by another concurrent pick
   await send.react('⏳', msg.key).catch(() => {})
   try {
-    await withSlot('heavy', async () => {
+    await withSlot(async () => {
       const media = await download(`https://youtu.be/${hit.id}`, mode)
       if (mode === 'audio') await send.audio(media.buf)
       else await send.video(media.buf, hit.title)

@@ -4,24 +4,16 @@ import { messageStore } from '../lib/store.ts'
 import { getCommand, PREFIX } from '../commands/index.ts'
 import { serializeMessage, type SerializedMessage } from '../lib/serialize.ts'
 import { makeSender } from '../lib/sender.ts'
-import { enqueueChat, withSlot } from '../lib/queue.ts'
+import { withSlot } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 
-// heavy downloads run concurrently (still slot-capped globally) so one downloader
-// no longer blocks other commands in the same chat; light commands keep per-chat ordering
-const isHeavyCommand = (m: SerializedMessage): boolean => {
-  if (!m.text.startsWith(PREFIX)) return false
-  const [rawName] = m.text.slice(PREFIX.length).trim().split(/\s+/)
-  return getCommand(rawName.toLowerCase())?.heavy === true
-}
-
+// every command runs concurrently (slot-capped globally) — no per-command flags,
+// so a slow downloader never blocks other commands in the same chat
 const dispatch = (msg: WAMessage, m: SerializedMessage, jid: string): void => {
-  const task = () => maybeRunCommand(msg, m, jid)
-  if (isHeavyCommand(m)) void task().catch((err) => logger.error('heavy command error:', err))
-  else enqueueChat(jid, task)
+  void maybeRunCommand(msg, m, jid).catch((err) => logger.error('command error:', err))
 }
 
 const lidCache = new Map<string, string>()
@@ -124,7 +116,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   }
 
   try {
-    await withSlot(cmd.heavy ? 'heavy' : 'light', async () => {
+    await withSlot(async () => {
       if (cmd.ownerOnly && !isOwner(ctx.sender)) {
         await ctx.reply(!OWNERS.length ? 'no owners in config.json — owner commands disabled 🔒' : `owner only 🔒 (detected: ${ctx.sender.split(/[@:]/)[0]})`)
         return

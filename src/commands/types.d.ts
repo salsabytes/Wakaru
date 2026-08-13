@@ -9,7 +9,6 @@ declare global {
     aliases?: string[]
     ownerOnly?: boolean
 
-    heavy?: boolean
     run: (ctx: CommandContext) => Promise<void> | void
   }
 

@@ -5,7 +5,6 @@ export default {
   name: 'instagram',
   desc: 'download an Instagram video, reels, photo or carousel without watermark',
   aliases: ['ig', 'igdl'],
-  heavy: true,
   run: async (ctx: CommandContext) => {
     const url = await requireUrl(ctx, 'instagram', '<instagram link>')
     if (!url) return
