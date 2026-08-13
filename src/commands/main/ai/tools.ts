@@ -33,6 +33,10 @@ export const runTool = async (r: { name: string; args: string }, ctx: CommandCon
         captured.push(`${o.text} ${o.sections.flatMap((s) => s.rows.map((r) => (r.header ? r.header + '. ' : '') + r.title)).join(' | ')}`)
         await ctx.sendList(o)
       },
+      sendButtons: async (buttons, text, footer) => {
+        captured.push(text)
+        await ctx.sendButtons(buttons, text, footer)
+      },
       sendImage: async (b, c) => { captured.push(mediaMeta(c || 'image', b)); await ctx.sendImage(b, c) },
       sendVideo: async (b, c) => { captured.push(mediaMeta(c || 'video', b)); await ctx.sendVideo(b, c) },
       sendAudio: async (b, t) => { captured.push(mediaMeta(t || 'audio', b)); await ctx.sendAudio(b) },

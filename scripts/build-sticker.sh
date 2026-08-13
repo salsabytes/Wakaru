@@ -4,9 +4,11 @@
 # exe it dies with 0xC0000135 (STATUS_DLL_NOT_FOUND) when the bot runs without
 # msys64/Git-mingw in PATH (e.g. started from install.bat or a service).
 set -e
+mkdir -p ../../bin
+
+# sticker: webp converter (needs MinGW DLLs beside it on Windows)
 cd native/sticker
 cargo build --release
-mkdir -p ../../bin
 if [ -f target/release/wakaru-sticker.exe ]; then
   cp target/release/wakaru-sticker.exe ../../bin/sticker.exe
   for d in /c/msys64/mingw64/bin "/c/Program Files/Git/mingw64/bin" \
@@ -18,4 +20,13 @@ if [ -f target/release/wakaru-sticker.exe ]; then
   done
 else
   cp target/release/wakaru-sticker ../../bin/sticker
+fi
+
+# audio: fMP4 -> M4A remuxer (pure std, no DLLs needed)
+cd ../audio
+cargo build --release
+if [ -f target/release/wakaru-audio.exe ]; then
+  cp target/release/wakaru-audio.exe ../../bin/audio.exe
+else
+  cp target/release/wakaru-audio ../../bin/audio && chmod +x ../../bin/audio
 fi

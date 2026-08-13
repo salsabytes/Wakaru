@@ -108,8 +108,9 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   const text = m.text
   const send = makeSender(waka, jid, msg)
 
+  // only pick-shaped messages are consumed; anything else falls through below
   const pick = !text.startsWith(PREFIX) ? pendingPlay(m.chat, sender) : undefined
-  if (pick) return handlePlayPick(msg, m, sender, send)
+  if (pick && (await handlePlayPick(msg, m, sender, send))) return
   if (m.button?.id.startsWith('play:')) return send.text(t('stalePlay'))
 
   const { cmd, queryText, args } = await parseCommand(m, sender, text)

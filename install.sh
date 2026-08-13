@@ -134,6 +134,7 @@ build_engine() {
   fi
 }
 build_engine native/sticker wakaru-sticker sticker
+build_engine native/audio wakaru-audio audio
 
 line
 printf "  ${PURPLE}${B}✨ All set — Wakaru is ready!${R}\n"

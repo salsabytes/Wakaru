@@ -312,6 +312,13 @@ where `n` is how many tags this month already has.
 <details>
 <summary>Recent changes</summary>
 
+**2026-08 — v26.08.2**
+- iPhone audio fix: ytmp3's "mp3" is AAC in a fragmented MP4 (iOS refuses to play) — new `native/audio` Rust engine remuxes it to a standard M4A (lossless, no codec deps)
+- `.play` results now render everywhere: quick_reply buttons + numbered text (the old native-flow list was blank on iOS) — still replyable as `1 mp3`
+- `.play` cancel: `❌ Batal` button on the list & format pick, or type `batal`/`gajadi`/`cancel`; chatting about other things no longer gets spam replies
+- `.add` accepts `+62` with spaces/dashes
+- Boot log prints `Wakaru v<version> (<commit>)` so restarts are verifiable
+
 **2026-08 — v26.08.1**
 - Group management: `.kick @member` (tag or reply) and `.add <number>` (accepts `+62` formats, multiple numbers)
 - `.kick`/`.add` guarded: group admins/owner only, bot must be admin

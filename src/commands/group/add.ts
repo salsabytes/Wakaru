@@ -8,8 +8,7 @@ export default {
   run: async (ctx: CommandContext) => {
     if (!ctx.isGroup) return ctx.reply(t('groupOnly'))
 
-    // merge a bare "+62" with the number that follows it (args are whitespace-split),
-    // then strip every non-digit and keep plausible phone numbers
+    // merge a bare "+62" with the number that follows (args are whitespace-split), then strip non-digits
     const nums = [
       ...new Set(
         ctx.text
