@@ -3,7 +3,7 @@ import { waka } from '../socket.ts'
 import { messageStore } from '../lib/store.ts'
 import { getCommand, PREFIX } from '../commands/index.ts'
 import { serializeMessage, type SerializedMessage } from '../lib/serialize.ts'
-import { makeSender } from '../lib/sender.ts'
+import { makeSender, type Sender } from '../lib/sender.ts'
 import { withSlot, cooldownLeft } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
 import { t } from '../lib/lang.ts'
@@ -56,6 +56,43 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
   }
 }
 
+type Parsed = { cmd: ReturnType<typeof getCommand>; queryText: string; args: string[] }
+
+const parseCommand = async (m: SerializedMessage, sender: string, text: string): Promise<Parsed> => {
+  if (text.startsWith(PREFIX)) {
+    const [rawName, ...rest] = text.slice(PREFIX.length).trim().split(/\s+/)
+    return {
+      cmd: getCommand(rawName.toLowerCase()),
+      queryText: text.slice(PREFIX.length + rawName.length).trim(),
+      args: rest,
+    }
+  }
+  const isReplyToBot =
+    !!m.quoted?.sender &&
+    !!waka.user?.id &&
+    (await resolveJid(m.quoted.sender)).split(':')[0].split('@')[0] ===
+      waka.user.id.split(':')[0].split('@')[0]
+  const isLink = /(?:https?:\/\/|www\.)/i.test(text)
+  const queryText = text.trim()
+  if (!isReplyToBot && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return { cmd: undefined, queryText, args: [] }
+  if (!queryText) return { cmd: undefined, queryText, args: [] }
+  return { cmd: getCommand('ai'), queryText, args: queryText.split(/\s+/) }
+}
+
+const blockedByCooldown = async (sender: string, cmd: Command, send: Sender): Promise<boolean> => {
+  if (!cmd.cooldown || isOwner(sender)) return false
+  const left = cooldownLeft(`${sender}:${cmd.name}`, cmd.cooldown)
+  if (!left) return false
+  await send.text(t('cooldown', { s: left }))
+  return true
+}
+
+const blockedByOwner = async (ctx: CommandContext, cmd: Command): Promise<boolean> => {
+  if (!cmd.ownerOnly || isOwner(ctx.sender)) return false
+  await ctx.reply(t(!OWNERS.length ? 'noOwners' : 'ownerOnly', { who: ctx.sender.split(/[@:]/)[0] }))
+  return true
+}
+
 async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string): Promise<void> {
   const sender = await resolveJid(m.sender)
   const text = m.text
@@ -63,43 +100,11 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
 
   const pick = !text.startsWith(PREFIX) ? pendingPlay(m.chat, sender) : undefined
   if (pick) return handlePlayPick(msg, m, sender, send)
+  if (m.button?.id.startsWith('play:')) return send.text(t('stalePlay'))
 
-  if (m.button?.id.startsWith('play:')) {
-    return send.text(t('stalePlay'))
-  }
-
-  let cmd: ReturnType<typeof getCommand> | undefined
-  let queryText = text
-  let args: string[] = []
-
-  if (text.startsWith(PREFIX)) {
-    const [rawName, ...rest] = text.slice(PREFIX.length).trim().split(/\s+/)
-    cmd = getCommand(rawName.toLowerCase())
-    queryText = text.slice(PREFIX.length + rawName.length).trim()
-    args = rest
-  } else {
-
-    const isReplyToBot =
-      !!m.quoted?.sender &&
-      !!waka.user?.id &&
-      (await resolveJid(m.quoted.sender)).split(':')[0].split('@')[0] ===
-        waka.user.id.split(':')[0].split('@')[0]
-    const isLink = /(?:https?:\/\/|www\.)/i.test(text)
-    if (!isReplyToBot && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return
-    if (!text.trim()) return
-    cmd = getCommand('ai')
-    queryText = text.trim()
-    args = queryText.split(/\s+/)
-  }
+  const { cmd, queryText, args } = await parseCommand(m, sender, text)
   if (!cmd) return
-
-  if (cmd.cooldown && !isOwner(sender)) {
-    const left = cooldownLeft(`${sender}:${cmd.name}`, cmd.cooldown)
-    if (left) {
-      await send.text(t('cooldown', { s: left }))
-      return
-    }
-  }
+  if (await blockedByCooldown(sender, cmd, send)) return
 
   const ctx: CommandContext = {
     sock: waka,
@@ -126,10 +131,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
 
   try {
     await withSlot(async () => {
-      if (cmd.ownerOnly && !isOwner(ctx.sender)) {
-        await ctx.reply(t(!OWNERS.length ? 'noOwners' : 'ownerOnly', { who: ctx.sender.split(/[@:]/)[0] }))
-        return
-      }
+      if (await blockedByOwner(ctx, cmd)) return
       await cmd.run(ctx)
     })
   } catch (err) {
