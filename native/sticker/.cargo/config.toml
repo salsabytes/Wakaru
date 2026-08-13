@@ -1,0 +1,4 @@
+# Static-link libgcc (crt-static) so the .exe needs one fewer MinGW DLL.
+# libstdc++ stays dynamic and is shipped next to the exe (see build:sticker).
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "target-feature=+crt-static"]

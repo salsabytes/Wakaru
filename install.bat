@@ -65,16 +65,14 @@ if errorlevel 1 (
   set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
 )
 echo [5/5] Building sticker engine (first run takes a few minutes)...
-cd native\sticker
-call cargo build --release
+REM build:sticker needs bash (Git) and ships the MinGW DLLs next to the exe
+set "PATH=%ProgramFiles%\Git\bin;%ProgramFiles(x86)%\Git\bin;%PATH%"
+call bun run build:sticker
 if errorlevel 1 (
   echo   sticker build failed - bot still works without it
 ) else (
-  if not exist ..\..\bin mkdir ..\..\bin
-  copy /y target\release\wakaru-sticker.exe ..\..\bin\sticker.exe >nul
   echo   sticker engine built
 )
-cd ..\..
 
 echo.
 echo   ✨ All set - starting Wakaru!

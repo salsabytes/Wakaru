@@ -17,3 +17,13 @@ export const OWNERS = (() => {
 })()
 
 export const isOwner = (sender: string) => OWNERS.includes(sender.split(/[@:]/)[0])
+
+// generic config.json string getter with a fallback (used for sticker pack/author etc.)
+export const cfg = (key: string, fallback: string): string => {
+  try {
+    const v = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8'))[key]
+    return typeof v === 'string' && v.length > 0 ? v : fallback
+  } catch {
+    return fallback
+  }
+}

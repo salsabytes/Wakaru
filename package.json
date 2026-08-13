@@ -7,7 +7,7 @@
   "scripts": {
     "start": "bun src/index.ts",
     "start:pairing": "bun src/index.ts --use-pairing-code",
-    "build:sticker": "cd native/sticker && cargo build --release && mkdir -p ../../bin && cp target/release/wakaru-sticker.exe ../../bin/sticker.exe || cp target/release/wakaru-sticker ../../bin/sticker",
+    "build:sticker": "bash scripts/build-sticker.sh",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

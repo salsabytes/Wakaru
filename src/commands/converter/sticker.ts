@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
 import { t } from '../../lib/lang.ts'
+import { cfg } from '../../lib/config.ts'
 
 const BIN = join(
   import.meta.dirname, '..', '..', '..', 'bin',
@@ -37,7 +38,13 @@ export default {
       const output = join(dir, 'sticker.webp')
       const buf = await media.download()
       await writeFile(input, buf)
-      await exec(BIN, [input, output], { timeout: 30_000 })
+      // optional `pack|author` — embeds WhatsApp sticker EXIF metadata (name shows in WhatsApp)
+      const raw = ctx.text.trim()
+      const [packName, author] = raw.includes('|')
+        ? raw.split('|')
+        : [raw || cfg('stickerPack', 'Wakaru'), cfg('stickerAuthor', '')]
+      const args = packName || author ? [input, output, packName, author] : [input, output]
+      await exec(BIN, args, { timeout: 30_000 })
       await ctx.sendSticker(await readFile(output))
     } catch (err) {
       logger.error('sticker error:', err)

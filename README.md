@@ -60,7 +60,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 |---|---|---|
 | `.ai <msg>` | — | Agentic chat; can run commands via `@run:`, remembers each sender |
 | `.menu` | `.help` | List every command |
-| `.sticker` | `.st` | Quoted photo/video → 512×512 webp sticker |
+| `.sticker` | `.st` | Quoted photo/video → 512×512 webp sticker (optional `.sticker <pack>|<author>` name) |
 | `.ytmp3 <url>` | `.ytm`, `.music` | Any video link → mp3 audio |
 | `.ytmp4 <url>` | `.ytv`, `.video` | Any video link → mp4 video |
 | `.play <query>` | `.yt`, `.song` | Search YouTube → tap a result → pick mp3/mp4 |
@@ -104,6 +104,7 @@ git clone https://github.com/salsabytes/Wakaru.git
 cd Wakaru
 bun install
 bun run build:sticker   # one-time: compile the Rust sticker engine
+                        # (on Windows it also ships the MinGW DLLs next to the exe)
 
 bun run start            # scan the QR with your phone
 bun run start:pairing    # or use a pairing code
@@ -152,13 +153,19 @@ The bot's reply language lives in the same file:
 ```json
 {
   "owners": ["6281234567890"],
-  "language": "id"
+  "language": "id",
+  "stickerPack": "Wakaru",
+  "stickerAuthor": "buatan gweh"
 }
 ```
 
 `"language"` accepts `id` (Indonesian, the default) or `en`. You can also
 switch it live from WhatsApp with `.setlang` — or just ask `.ai` to change
 the language for you.
+
+`"stickerPack"` / `"stickerAuthor"` are the default sticker name shown in
+WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
+`.sticker rawr|buatan gweh`).
 
 ---
 
