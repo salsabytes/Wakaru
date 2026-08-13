@@ -284,14 +284,14 @@ the fdown challenge may block it.
 
 ## 🏷️ Versioning
 
-Wakaru uses its own version scheme: **`<tahun>.<bulan>.<rilis>`** — e.g.
+Wakaru uses its own version scheme: **`<year>.<month>.<release>`** — e.g.
 `26.08.1` is the *1st release of August 2026*.
 
 | Part | Meaning |
 |---|---|
-| `tahun` | Last two digits of the year (`26`) |
-| `bulan` | Month, zero-padded (`08`) |
-| `rilis` | Release number within that month (`1`, `2`, …) |
+| `year` | Last two digits of the year (`26`) |
+| `month` | Month, zero-padded (`08`) |
+| `release` | Release number within that month (`1`, `2`, …) |
 
 Every month starts fresh at `YY.MM.1`, and the year+month prefix keeps
 versions unique forever (`27.08.1` is August 2027 — no collisions). No
