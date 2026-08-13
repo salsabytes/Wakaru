@@ -88,6 +88,12 @@ The installer detects your platform, installs the runtime, dependencies,
 and builds the native sticker engine. Re-running it **keeps Bun on the
 latest canary automatically** (`bun upgrade --canary`).
 
+### Windows
+
+Download [`install.bat`](install.bat), double-click it (or run it in
+`cmd`). It installs Git + Bun (via `winget`), clones the repo, installs
+dependencies, compiles the sticker engine, and starts the bot.
+
 ### Manual (Bun)
 
 <details>
@@ -115,12 +121,26 @@ Prefer a code? Run with `--use-pairing-code` or set `PAIRING_CODE=1`.
 
 ---
 
+## 🔄 Updating
+
+- Run **`.update`** (owner only) from WhatsApp — the bot backs up
+  `config.json` + `sessions/`, pulls the latest code, reinstalls
+dependencies, rebuilds the sticker engine, typechecks, and **restarts
+itself**. On any failure it rolls back to the previous version.
+- The bot also **checks for updates on every start** and logs when a new
+  one is available.
+- Channel: add `"updateChannel": "release"` to `config.json` to follow
+  the latest release tag instead of `master` (the default).
+
+---
+
 ## ⚙️ Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `SESSION_DIR` | `sessions` | Folder where the login session is stored |
 | `PAIRING_CODE` | — | Set to `1` to log in with a pairing code |
+| `updateChannel` | `master` | `master` = follow the branch, `release` = follow the latest release tag |
 | `IG_SESSIONID` | — | Optional fallback IG session cookie for `.instagram` stories when snapsave is down (use a burner account) |
 
 **Owner commands (`.ai`):** create `config.json` (gitignored) at the project
