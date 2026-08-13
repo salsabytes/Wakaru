@@ -5,6 +5,7 @@ export default {
   name: 'facebook',
   desc: 'download a Facebook video in HD',
   aliases: ['fb', 'fbdl'],
+  cooldown: 5,
   run: async (ctx: CommandContext) => {
     const url = await requireUrl(ctx, 'facebook', '<facebook link>')
     if (!url) return

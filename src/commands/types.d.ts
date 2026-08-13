@@ -8,6 +8,7 @@ declare global {
     desc?: string
     aliases?: string[]
     ownerOnly?: boolean
+    cooldown?: number // per-user cooldown in seconds (heavy commands)
 
     run: (ctx: CommandContext) => Promise<void> | void
   }

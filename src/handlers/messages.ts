@@ -4,7 +4,7 @@ import { messageStore } from '../lib/store.ts'
 import { getCommand, PREFIX } from '../commands/index.ts'
 import { serializeMessage, type SerializedMessage } from '../lib/serialize.ts'
 import { makeSender } from '../lib/sender.ts'
-import { withSlot } from '../lib/queue.ts'
+import { withSlot, cooldownLeft } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
 import { OWNERS, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
@@ -91,6 +91,14 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     args = queryText.split(/\s+/)
   }
   if (!cmd) return
+
+  if (cmd.cooldown && !isOwner(sender)) {
+    const left = cooldownLeft(`${sender}:${cmd.name}`, cmd.cooldown)
+    if (left) {
+      await send.text(`sabar dulu ${left} detik ya 😅`)
+      return
+    }
+  }
 
   const ctx: CommandContext = {
     sock: waka,

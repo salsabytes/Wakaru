@@ -1,6 +1,6 @@
 import type { WAMessage } from 'baileys'
 import { download, searchYouTube, type YtResult } from '../../lib/scrapers/index.ts'
-import { withSlot } from '../../lib/queue.ts'
+import { withSlot, cooldownLeft } from '../../lib/queue.ts'
 import { logger } from '../../lib/logger.ts'
 import type { SerializedMessage } from '../../lib/serialize.ts'
 import type { Sender } from '../../lib/sender.ts'
@@ -61,6 +61,8 @@ export async function handlePlayPick(
       '3 menit aja ya 😉',
     )
   }
+  const left = cooldownLeft(`${sender}:play`, 5)
+  if (left) return send.text(`sabar dulu ${left} detik ya 😅`)
   if (!dropPlay(m.chat, sender)) return // pick already consumed by another concurrent pick
   await send.react('⏳', msg.key).catch(() => {})
   try {
