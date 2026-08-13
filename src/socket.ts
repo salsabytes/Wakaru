@@ -62,7 +62,9 @@ export async function connectToWhatsApp(
     msgRetryCounterCache,
     callOfferCache,
     placeholderResendCache,
-    generateHighQualityLinkPreview: true,
+    // low quality: still generates a preview but skips the HD og:image fetch —
+    // data + RAM win on Aksa's phone (the user's own WhatsApp client makes the HD preview independently)
+    generateHighQualityLinkPreview: false,
   })
 
   waka.ev.on('connection.update', handleConnectionUpdate)

@@ -48,12 +48,15 @@ const igBestOf = (m: any): { type: 'video' | 'image'; url: string } | undefined 
   return url ? { type: m.media_type === 2 ? 'video' : 'image', url } : undefined
 }
 
-// HP low-end: download carousel batch 2 sekaligus, bukan semua paralel —
-// 10 item × 50MB = spike RAM di phone. Bounded concurrency, tetap allSettled.
+// HP low-end: cap TOTAL carousel bytes too, not just per-item — 10 item × 30MB
+// still spikes. Earlier items win; anything past the cap is skipped (earlier
+// items are usually the "main" media of a carousel).
 const CONCURRENCY = 2
+const CAROUSEL_MAX_TOTAL = 40 * 1024 * 1024
 
 async function igDownload(refs: { type: 'video' | 'image'; url: string }[], title: string) {
   const media: { type: 'video' | 'image'; buf: Buffer }[] = []
+  let total = 0
   for (let i = 0; i < refs.length; i += CONCURRENCY) {
     const batch = await Promise.allSettled(
       refs.slice(i, i + CONCURRENCY).map(async ({ type, url }) => ({
@@ -61,7 +64,12 @@ async function igDownload(refs: { type: 'video' | 'image'; url: string }[], titl
         buf: await fetchBuffer(url, { headers: { 'User-Agent': UA } }),
       })),
     )
-    for (const r of batch) if (r.status === 'fulfilled') media.push(r.value)
+    for (const r of batch) {
+      if (r.status !== 'fulfilled') continue
+      total += r.value.buf.length
+      if (total > CAROUSEL_MAX_TOTAL) continue
+      media.push(r.value)
+    }
   }
   if (!media.length) throw new Error('instagram: download failed')
   return { title, media }

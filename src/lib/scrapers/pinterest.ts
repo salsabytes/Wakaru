@@ -45,11 +45,14 @@ export type PinOut = { type: 'image' | 'video'; buf: Buffer; title?: string }
 
 const bestPinVideo = (videos: any): string | undefined => {
   const list: Record<string, any> = videos?.video_list ?? {}
+  // parse the resolution out of the variant key ONCE, not per sort comparison
+  const sizeOf = (k: string): number => Number(k.match(/\d+/)?.[0] ?? 0)
   const mp4s = Object.entries(list)
     .filter(([, v]: any) => /\.mp4($|\?)/i.test(v?.url ?? ''))
-    .sort(([a], [b]) => Number(b.match(/\d+/)?.[0] ?? 0) - Number(a.match(/\d+/)?.[0] ?? 0))
-  const capped = mp4s.find(([k]) => Number(k.match(/\d+/)?.[0] ?? 0) <= 720)
-  return (capped ?? mp4s[0])?.[1]?.url
+    .map(([k, v]) => ({ v, size: sizeOf(k) }))
+    .sort((a, b) => b.size - a.size)
+  const capped = mp4s.find((x) => x.size <= 720)
+  return (capped ?? mp4s[0])?.v?.url
 }
 
 const pinImageUrl = (p: any): string | undefined => p?.images?.orig?.url ?? p?.images?.originals?.url
