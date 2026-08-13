@@ -9,9 +9,11 @@ use openh264::OpenH264API;
 use webp_animation::prelude::*;
 
 const SIZE: u32 = 512;
-const MAX_FRAMES: usize = 120;
-const MAX_DURATION_MS: u32 = 10000;
-const TARGET_FPS: u32 = 12;
+// ponytail: MAX_FRAMES = 7s @ 24fps → ~170MB of raw frames held in RAM for the
+// worst case; the 500KB size ladder below drops fps anyway for long busy videos.
+const MAX_FRAMES: usize = 168;
+const MAX_DURATION_MS: u32 = 7000;
+const TARGET_FPS: u32 = 24;
 const MAX_BYTES: usize = 500 * 1024;
 
 pub fn convert_video(data: &[u8], output: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -47,7 +49,7 @@ pub fn convert_video(data: &[u8], output: &str) -> Result<(), Box<dyn std::error
   let sps: Vec<Vec<u8>> = avcc.sequence_parameter_sets.iter().map(|s| s.bytes.clone()).collect();
   let pps: Vec<Vec<u8>> = avcc.picture_parameter_sets.iter().map(|p| p.bytes.clone()).collect();
 
-  let target_frames = (((total_ms / 1000) as u32) * TARGET_FPS)
+  let target_frames = (((total_ms as u64 * TARGET_FPS as u64) / 1000) as u32)
     .min(MAX_FRAMES as u32)
     .max(1) as usize;
   let stride = ((cap as usize).div_ceil(target_frames)).max(1);
@@ -128,62 +130,53 @@ fn avc_to_annex_b(sample: &[u8], length_size: u8, sps: &[Vec<u8>], pps: &[Vec<u8
 
 fn frame_to_512(rgb: &[u8], w: u32, h: u32) -> Option<RgbaImage> {
   let img = image::RgbImage::from_raw(w, h, rgb.to_vec())?;
+  // always fill the longer side to SIZE (upscale small sources too); the leftover
+  // letterbox stays transparent instead of black
   let scale = SIZE as f32 / w.max(h) as f32;
-  let (nw, nh) = if scale < 1.0 {
-    (((w as f32 * scale) as u32).max(1), ((h as f32 * scale) as u32).max(1))
-  } else {
-    (w, h)
-  };
+  let (nw, nh) = (((w as f32 * scale) as u32).max(1), ((h as f32 * scale) as u32).max(1));
   let resized = image::DynamicImage::ImageRgb8(image::imageops::resize(&img, nw, nh, FilterType::Triangle))
     .to_rgba8();
-  let mut canvas = RgbaImage::from_pixel(SIZE, SIZE, image::Rgba([0, 0, 0, 255]));
+  let mut canvas = RgbaImage::from_pixel(SIZE, SIZE, image::Rgba([0, 0, 0, 0]));
   image::imageops::overlay(&mut canvas, &resized, ((SIZE - nw) / 2) as i64, ((SIZE - nh) / 2) as i64);
   Some(canvas)
 }
 
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use image::GenericImageView;
+
+  #[test]
+  fn portrait_fills_height_with_transparent_sides() {
+    let rgb = vec![255u8; (360 * 640 * 3) as usize];
+    let c = frame_to_512(&rgb, 360, 640).unwrap();
+    assert_eq!(c.dimensions(), (SIZE, SIZE));
+    assert_eq!(c.get_pixel(0, SIZE / 2)[3], 0); // side bar transparent
+    assert_eq!(c.get_pixel(SIZE / 2, SIZE / 2)[3], 255); // content opaque
+  }
+
+  #[test]
+  fn small_landscape_upscales_to_fill_width() {
+    let rgb = vec![255u8; (320 * 240 * 3) as usize];
+    let c = frame_to_512(&rgb, 320, 240).unwrap();
+    assert_eq!(c.dimensions(), (SIZE, SIZE));
+    assert_eq!(c.get_pixel(0, 0)[3], 0); // top bar transparent
+    assert_eq!(c.get_pixel(SIZE / 2, SIZE / 2)[3], 255); // content opaque
+  }
+}
+
 fn write_animated(frames: &[RgbaImage], total_ms: u32, output: &str) -> Result<(), Box<dyn std::error::Error>> {
   let total = total_ms.max(100);
-  let dms = ((total as usize / frames.len()).max(1)) as i32;
-  let options = EncoderOptions {
-    encoding_config: Some(EncodingConfig::new_lossy(70.0)),
-    ..Default::default()
-  };
-  let mut encoder = Encoder::new_with_options((SIZE, SIZE), options)?;
-  for (j, frame) in frames.iter().enumerate() {
-    encoder.add_frame(frame.as_raw(), (j as i32) * dms)?;
-  }
-  let done = encoder.finalize(total as i32)?;
-
-  if done.as_ref().len() <= MAX_BYTES {
-    std::fs::write(output, done.as_ref())?;
-    return Ok(());
-  }
-  let mut encoder = Encoder::new_with_options(
-    (SIZE, SIZE),
-    EncoderOptions {
-      encoding_config: Some(EncodingConfig::new_lossy(45.0)),
-      ..Default::default()
-    },
-  )?;
-  for (j, frame) in frames.iter().enumerate() {
-    encoder.add_frame(frame.as_raw(), (j as i32) * dms)?;
-  }
-  let done = encoder.finalize(total as i32)?;
-  if done.as_ref().len() <= MAX_BYTES {
-    std::fs::write(output, done.as_ref())?;
-    return Ok(());
-  }
-
-  for (stride, quality) in [(2, 45.0), (4, 45.0), (8, 45.0), (8, 35.0)] {
+  // ladder: keep the target fps as long as it fits under MAX_BYTES, then drop
+  // quality first, then fps (stride) — "naikin fps, sisanya dijaga ≤500KB".
+  for (stride, quality) in [(1usize, 70.0f32), (1, 55.0), (2, 50.0), (3, 45.0), (4, 40.0), (6, 35.0), (8, 30.0)] {
     let n = frames.len().div_ceil(stride);
     let dms = ((total as usize / n).max(1)) as i32;
-    let mut encoder = Encoder::new_with_options(
-      (SIZE, SIZE),
-      EncoderOptions {
-        encoding_config: Some(EncodingConfig::new_lossy(quality)),
-        ..Default::default()
-      },
-    )?;
+    let options = EncoderOptions {
+      encoding_config: Some(EncodingConfig::new_lossy(quality)),
+      ..Default::default()
+    };
+    let mut encoder = Encoder::new_with_options((SIZE, SIZE), options)?;
     for (j, frame) in frames.iter().step_by(stride).enumerate() {
       encoder.add_frame(frame.as_raw(), (j as i32) * dms)?;
     }
