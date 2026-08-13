@@ -1,15 +1,5 @@
-import sticker from './converter/sticker.ts'
-import ytmp3 from './downloader/ytmp3.ts'
-import ytmp4 from './downloader/ytmp4.ts'
-import play from './downloader/play.ts'
-import tiktok from './downloader/tiktok.ts'
-import instagram from './downloader/instagram.ts'
-import facebook from './downloader/facebook.ts'
-import pinterest from './downloader/pinterest.ts'
-import ai from './main/ai/index.ts'
-import menu from './main/menu.ts'
-import setlang from './main/setlang.ts'
-import update from './main/update.ts'
+import { readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
 
 export const PREFIX = '.'
 
@@ -17,41 +7,45 @@ type Registered = Command & { category: string }
 
 const commands = new Map<string, Registered>()
 const resolve = new Map<string, string>()
-let ready = false
+let ready: Promise<void> | undefined
 
-function ensure(): void {
-  if (ready) return
-  ready = true
-  const entries: { cmd: Command; category: string }[] = [
-    { cmd: sticker, category: 'converter' },
-    { cmd: ytmp3, category: 'downloader' },
-    { cmd: ytmp4, category: 'downloader' },
-    { cmd: play, category: 'downloader' },
-    { cmd: tiktok, category: 'downloader' },
-    { cmd: instagram, category: 'downloader' },
-    { cmd: facebook, category: 'downloader' },
-    { cmd: pinterest, category: 'downloader' },
-    { cmd: ai, category: 'main' },
-    { cmd: menu, category: 'main' },
-    { cmd: setlang, category: 'main' },
-    { cmd: update, category: 'main' },
-  ]
-  for (const { cmd, category } of entries) {
-    if (!cmd?.name || typeof cmd.run !== 'function') continue
+const ROOT = import.meta.dirname
+
+function walk(dir: string): string[] {
+  const out: string[] = []
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, ent.name)
+    if (ent.isDirectory()) out.push(...walk(full))
+    else if (ent.name.endsWith('.ts') && !ent.name.endsWith('.d.ts')) out.push(full)
+  }
+  return out
+}
+
+// registered lazily on first use (getCommand/listCommands) — a command file used
+// directly as an entry point (e.g. the ai selftest) can't deadlock on registration.
+// category is the first path segment (group/kick.ts -> 'group', main/ai/index.ts -> 'main').
+const load = async (): Promise<void> => {
+  for (const file of walk(ROOT)) {
+    if (file === join(ROOT, 'index.ts')) continue
+    const mod = (await import(file)) as { default?: Command }
+    const cmd = mod.default
+    if (!cmd?.name || typeof cmd.run !== 'function') continue // helpers (prompt.ts, tools.ts) auto-skip
     const canonical = cmd.name.toLowerCase()
-    commands.set(canonical, { ...cmd, name: canonical, category })
+    commands.set(canonical, { ...cmd, name: canonical, category: relative(ROOT, file).split(/[\\/]/)[0] })
     for (const alias of cmd.aliases ?? []) resolve.set(alias.toLowerCase(), canonical)
   }
 }
 
-export function getCommand(name: string): Registered | undefined {
-  ensure()
+const ensure = (): Promise<void> => (ready ??= load())
+
+export async function getCommand(name: string): Promise<Registered | undefined> {
+  await ensure()
   const canonical = resolve.get(name.toLowerCase()) ?? name.toLowerCase()
   return commands.get(canonical)
 }
 
-export function listCommands(): { name: string; category: string; desc?: string }[] {
-  ensure()
+export async function listCommands(): Promise<{ name: string; category: string; desc?: string }[]> {
+  await ensure()
   return [...commands.values()]
     .map(({ name, category, desc }) => ({ name, category, desc }))
     .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))

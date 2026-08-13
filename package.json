@@ -1,6 +1,6 @@
 {
   "name": "wakaru",
-  "version": "1.0.2",
+  "version": "26.08.1",
   "description": "Wakaru (分かる) — a tiny WhatsApp bot that understands you. Built on Baileys + TypeScript.",
   "private": true,
   "type": "module",

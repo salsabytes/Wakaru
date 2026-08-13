@@ -18,7 +18,7 @@ export const parseRuns = (text: string) =>
 
 export const runTool = async (r: { name: string; args: string }, ctx: CommandContext): Promise<string> => {
   if (r.name === 'ai') return '[ai] denied — no self-recursion'
-  const cmd = getCommand(r.name)
+  const cmd = await getCommand(r.name)
   if (!cmd) return `[${r.name}] no such command`
   if (cmd.ownerOnly && !isOwner(ctx.sender)) return `[${r.name}] denied — owner only`
   try {

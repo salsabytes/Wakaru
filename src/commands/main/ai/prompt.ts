@@ -89,7 +89,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       context,
       '',
       'AVAILABLE COMMANDS (name — description):',
-      listCommands()
+      (await listCommands())
         .filter((c) => c.name !== 'ai')
         .map((c) => `- ${c.name}${c.desc ? ' — ' + c.desc : ''}`)
         .join('\n'),

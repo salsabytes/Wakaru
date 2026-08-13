@@ -7,7 +7,7 @@ export default {
   aliases: ['help'],
   run: async (ctx: CommandContext) => {
     const byCategory = new Map<string, string[]>()
-    for (const { name, category, desc } of listCommands()) {
+    for (const { name, category, desc } of await listCommands()) {
       const line = `   ✧ ${ctx.prefix}${name}${desc ? ` — ${desc}` : ''}`
       const items = byCategory.get(category) ?? []
       items.push(line)

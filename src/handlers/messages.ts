@@ -18,13 +18,24 @@ const dispatch = (msg: WAMessage, m: SerializedMessage, jid: string): void => {
 }
 
 const lidCache = new Map<string, string>()
-const resolveJid = async (sender: string) => {
-  if (!sender.endsWith('@lid') && !sender.endsWith('@hosted.lid')) return sender
-  const cached = lidCache.get(sender)
+const resolveJid = async (jid: string) => {
+  if (!jid.endsWith('@lid') && !jid.endsWith('@hosted.lid')) return jid
+  const cached = lidCache.get(jid)
   if (cached) return cached
-  const pn = await waka.signalRepository.lidMapping.getPNForLID(sender)
-  if (pn) lidCache.set(sender, pn)
-  return pn ?? sender
+  const pn = await waka.signalRepository.lidMapping.getPNForLID(jid)
+  if (pn) lidCache.set(jid, pn)
+  return pn ?? jid
+}
+
+// LID→PN is resolved once, here at the message boundary — commands and callers
+// below only ever see plain phone jids for sender / quoted.sender.
+// mentionedJid stays RAW (PN or LID): WhatsApp sends mentions in the same
+// identity form the group metadata uses, so commands match them directly.
+const serialize = async (msg: WAMessage): Promise<SerializedMessage> => {
+  const m = serializeMessage(msg)
+  m.sender = await resolveJid(m.sender)
+  if (m.quoted?.sender) m.quoted.sender = await resolveJid(m.quoted.sender)
+  return m
 }
 
 export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.upsert']): Promise<void> {
@@ -37,7 +48,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
     for (const msg of upsert.messages) {
       const jid = msg.key?.remoteJid
       if (!jid || msg.key?.fromMe) continue
-      const m = serializeMessage(msg)
+      const m = await serialize(msg)
       if (!m.button) continue
       logger.info(`🔘 ${jid} [append]: ${m.button.text || m.button.id}`)
       dispatch(msg, m, jid)
@@ -48,7 +59,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
   for (const msg of upsert.messages) {
     const jid = msg.key?.remoteJid
     if (!jid || msg.key?.fromMe) continue
-    const m = serializeMessage(msg)
+    const m = await serialize(msg)
 
     if (!m.text && !m.button) continue
     logger.info(m.button ? `🔘 ${jid}: ${m.button.text || m.button.id}` : `📥 ${jid}: ${m.text}`)
@@ -56,13 +67,13 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
   }
 }
 
-type Parsed = { cmd: ReturnType<typeof getCommand>; queryText: string; args: string[] }
+type Parsed = { cmd: Awaited<ReturnType<typeof getCommand>>; queryText: string; args: string[] }
 
 const parseCommand = async (m: SerializedMessage, sender: string, text: string): Promise<Parsed> => {
   if (text.startsWith(PREFIX)) {
     const [rawName, ...rest] = text.slice(PREFIX.length).trim().split(/\s+/)
     return {
-      cmd: getCommand(rawName.toLowerCase()),
+      cmd: await getCommand(rawName.toLowerCase()),
       queryText: text.slice(PREFIX.length + rawName.length).trim(),
       args: rest,
     }
@@ -70,13 +81,12 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
   const isReplyToBot =
     !!m.quoted?.sender &&
     !!waka.user?.id &&
-    (await resolveJid(m.quoted.sender)).split(':')[0].split('@')[0] ===
-      waka.user.id.split(':')[0].split('@')[0]
+    m.quoted.sender.split(':')[0].split('@')[0] === waka.user.id.split(':')[0].split('@')[0]
   const isLink = /(?:https?:\/\/|www\.)/i.test(text)
   const queryText = text.trim()
   if (!isReplyToBot && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return { cmd: undefined, queryText, args: [] }
   if (!queryText) return { cmd: undefined, queryText, args: [] }
-  return { cmd: getCommand('ai'), queryText, args: queryText.split(/\s+/) }
+  return { cmd: await getCommand('ai'), queryText, args: queryText.split(/\s+/) }
 }
 
 const blockedByCooldown = async (sender: string, cmd: Command, send: Sender): Promise<boolean> => {
@@ -94,7 +104,7 @@ const blockedByOwner = async (ctx: CommandContext, cmd: Command): Promise<boolea
 }
 
 async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string): Promise<void> {
-  const sender = await resolveJid(m.sender)
+  const sender = m.sender
   const text = m.text
   const send = makeSender(waka, jid, msg)
 
@@ -116,6 +126,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     pushName: msg.pushName ?? undefined,
     isGroup: m.isGroup,
     mtype: m.mtype,
+    mentionedJid: m.mentionedJid,
     download: m.download,
     button: m.button,
     quoted: m.quoted,

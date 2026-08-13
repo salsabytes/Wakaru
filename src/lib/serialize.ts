@@ -15,6 +15,7 @@ export interface SerializedMessage {
   isGroup: boolean
   mtype: string
   text: string
+  mentionedJid: string[]
   download: () => Promise<Buffer>
   button?: { id: string; text: string }
   quoted?: MediaMeta
@@ -71,17 +72,18 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
 
   const download = () => downloadMediaMessage(msg, 'buffer', {}) as unknown as Promise<Buffer>
 
+  const ctxt = content.contextInfo
   const s: SerializedMessage = {
     chat,
     sender,
     isGroup: chat.endsWith('@g.us'),
     mtype,
     text,
+    mentionedJid: ctxt?.mentionedJid ?? [],
     ...(button ? { button } : {}),
     download,
   }
 
-  const ctxt = content.contextInfo
   const q = ctxt?.quotedMessage
   if (q) {
     const qtype = Object.keys(q)[0]

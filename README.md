@@ -312,6 +312,16 @@ where `n` is how many tags this month already has.
 <details>
 <summary>Recent changes</summary>
 
+**2026-08 — v26.08.1**
+- Group management: `.kick @member` (tag or reply) and `.add <number>` (accepts `+62` formats, multiple numbers)
+- `.kick`/`.add` guarded: group admins/owner only, bot must be admin
+- LID→PN resolved once at the message boundary; mentions stay raw — commands match any jid form
+- Commands auto-discovered from `commands/` — new command = drop a file, no `index.ts` edits (category from folder name)
+- Sticker: fills the 512 canvas edge-to-edge with a transparent letterbox; 24 fps, 7 s cap, ≤500 KB ladder
+- Sticker EXIF rewritten to the JSON payload WhatsApp reads today (pack name shows again)
+- Windows: `sticker.exe` ships its MinGW DLLs — fixes the silent `code 53` crash on clean PATHs
+- Version scheme switched to `YY.MM.R`
+
 **2026-08 — v1.0.0**
 - Multitasking: every command runs concurrently — one global slot pool, no per-command flags
 - Per-user 5 s cooldown on heavy commands (downloaders + sticker)

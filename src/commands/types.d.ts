@@ -23,6 +23,7 @@ declare global {
     pushName?: string
     isGroup: boolean
     mtype: string
+    mentionedJid: string[]
     download: () => Promise<Buffer>
 
     button?: { id: string; text: string }
