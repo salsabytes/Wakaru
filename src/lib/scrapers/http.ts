@@ -20,9 +20,10 @@ export const curl = (args: string[], timeout = 60_000): Promise<Buffer> =>
     })
   })
 
-// WA video upload limit ~64MB — cap 50MB biar HP low-end gak kebanjiran RAM,
-// dan download yang bakal gagal upload ditolak sebelum ngabisin kuota.
-const DEFAULT_MAX_BYTES = 50 * 1024 * 1024
+// WA video upload limit ~64MB — cap 30MB biar HP low-end gak kebanjiran RAM:
+// peak per download ≈ 2-3× file size (buffer + base64 upload), × 2 slot heavy.
+// 30MB masih nutup semua lagu + kebanyakan video pendek; naikin kalau butuh video panjang.
+const DEFAULT_MAX_BYTES = 30 * 1024 * 1024
 
 export const fetchBuffer = async (
   url: string,

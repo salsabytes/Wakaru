@@ -32,7 +32,7 @@ declare global {
     sendSticker: (buffer: Buffer) => Promise<void>
     sendImage: (buffer: Buffer, caption?: string) => Promise<void>
     sendVideo: (buffer: Buffer, caption?: string) => Promise<void>
-    sendAudio: (buffer: Buffer) => Promise<void>
+    sendAudio: (buffer: Buffer, title?: string) => Promise<void>
 
     sendButtons: (buttons: { id: string; text: string }[], text: string, footer?: string) => Promise<void>
 

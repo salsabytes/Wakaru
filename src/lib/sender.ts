@@ -10,7 +10,8 @@ export const makeSender = (sock: WASocket, chat: string, quoted?: WAMessage) => 
     sticker: async (buffer: Buffer) => { await send({ sticker: buffer }) },
     image: async (buffer: Buffer, caption?: string) => { await send({ image: buffer, caption }) },
     video: async (buffer: Buffer, caption?: string) => { await send({ video: buffer, caption }) },
-    audio: async (buffer: Buffer) => { await send({ audio: buffer, mimetype: 'audio/mpeg' }) },
+    // title is only for AI capture — WhatsApp audio has no visible caption
+    audio: async (buffer: Buffer, _title?: string) => { await send({ audio: buffer, mimetype: 'audio/mpeg' }) },
     buttons: async (buttons: Button[], text: string, footer?: string) => { await sendButtons(sock, chat, { text, footer, buttons }) },
     list: async (o: ListContent) => { await sendList(sock, chat, o) },
   }

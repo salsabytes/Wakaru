@@ -17,7 +17,7 @@ export function makeDownloader(o: {
       const url = await requireUrl(ctx, o.name, o.usage)
       if (!url) return
       const r = await download(url, o.mode)
-      if (o.mode === 'audio') await ctx.sendAudio(r.buf)
+      if (o.mode === 'audio') await ctx.sendAudio(r.buf, r.title)
       else await ctx.sendVideo(r.buf, r.title)
     },
   }

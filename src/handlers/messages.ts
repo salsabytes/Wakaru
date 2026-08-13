@@ -10,6 +10,20 @@ import { OWNERS, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 
+// heavy downloads run concurrently (still slot-capped globally) so one downloader
+// no longer blocks other commands in the same chat; light commands keep per-chat ordering
+const isHeavyCommand = (m: SerializedMessage): boolean => {
+  if (!m.text.startsWith(PREFIX)) return false
+  const [rawName] = m.text.slice(PREFIX.length).trim().split(/\s+/)
+  return getCommand(rawName.toLowerCase())?.heavy === true
+}
+
+const dispatch = (msg: WAMessage, m: SerializedMessage, jid: string): void => {
+  const task = () => maybeRunCommand(msg, m, jid)
+  if (isHeavyCommand(m)) void task().catch((err) => logger.error('heavy command error:', err))
+  else enqueueChat(jid, task)
+}
+
 const lidCache = new Map<string, string>()
 const resolveJid = async (sender: string) => {
   if (!sender.endsWith('@lid') && !sender.endsWith('@hosted.lid')) return sender
@@ -33,7 +47,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
       const m = serializeMessage(msg)
       if (!m.button) continue
       logger.info(`🔘 ${jid} [append]: ${m.button.text || m.button.id}`)
-      enqueueChat(jid, () => maybeRunCommand(msg, m, jid))
+      dispatch(msg, m, jid)
     }
     return
   }
@@ -45,7 +59,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
 
     if (!m.text && !m.button) continue
     logger.info(m.button ? `🔘 ${jid}: ${m.button.text || m.button.id}` : `📥 ${jid}: ${m.text}`)
-    enqueueChat(jid, () => maybeRunCommand(msg, m, jid))
+    dispatch(msg, m, jid)
   }
 }
 

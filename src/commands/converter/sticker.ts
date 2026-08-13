@@ -19,6 +19,7 @@ export default {
   name: 'sticker',
   desc: 'make a sticker from a quoted photo or video',
   aliases: ['st'],
+  heavy: true, // Rust conversion can take 30s — don't block the chat queue
   run: async (ctx: CommandContext) => {
 
     const media = isImageOrVideo(ctx.mtype)
