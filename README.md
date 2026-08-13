@@ -267,14 +267,12 @@ the fdown challenge may block it.
 <details>
 <summary>Recent changes</summary>
 
-**2026-08 — v1.1.0**
+**2026-08 — v1.0.0**
 - Multitasking: every command runs concurrently — one global slot pool, no per-command flags
 - Per-user 5 s cooldown on heavy commands (downloaders + sticker)
 - Media downloads capped at 30 MB (lower peak RAM)
 - AI reports real download results: title · duration · size
 - Reply language configurable via `config.json` / `.setlang` / `.ai`
-
-**2026-08 — v1.0.0**
 - Deep modularization: `lib/scrapers/*`, `socket.ts`, `ai/`, `queue` + `serialize` + `sender` + `media`
 - `.play` two-stage pick: search → tap result → MP3/MP4 buttons (native-flow list)
 - New downloaders: `.facebook` (HD) and `.pinterest` (pin link or search query)
