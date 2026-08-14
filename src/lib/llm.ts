@@ -1,5 +1,5 @@
 // Chat via askgpt5.app — anonymous, free, no API key, no login, no cookies.
-// Inspired by AyGemuy's askgpt5.js (https://github.com/AyGemuy/api-wudysoft);
+// Inspired by @AyGemuy askgpt5.js (https://github.com/AyGemuy/api-wudysoft);
 // rewritten for this bot: one flat in-process session, no base64 state juggling.
 export type ChatMsg = { role: string; content: string }
 
