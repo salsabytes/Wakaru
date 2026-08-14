@@ -117,7 +117,12 @@ build_engine() {
     if [ "$IS_TERMUX" = 1 ]; then mute "installing rust..."; pkg install -y rust
     elif has winget; then mute "installing rust..."; winget_install Rustlang.Rustup
     elif has brew; then mute "installing rust..."; brew install rust
-    else skip "no Rust found — skipped (bot still works)"; return 0
+    else
+      # containers (Pterodactyl etc.) have no apt/root — rustup installs per-user, no sudo needed
+      mute "installing rust via rustup (~/.cargo, no root)..."
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+      export PATH="$HOME/.cargo/bin:$PATH"
+      if ! has cargo; then skip "no Rust found — skipped (bot still works)"; return 0; fi
     fi
   fi
   mute "building (a few minutes on first run)..."
