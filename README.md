@@ -163,6 +163,12 @@ The bot's reply language lives in the same file:
 switch it live from WhatsApp with `.setlang` — or just ask `.ai` to change
 the language for you.
 
+The `.ai` brain chats through **askgpt5.app — anonymous, free, zero setup**
+(port of [AyGemuy's `askgpt5.js`](https://github.com/AyGemuy/api-wudysoft),
+no API key, no Python, no cookies). On first use it auto-registers a random
+guest account (valid 24h) and streams the reply. Nothing to configure — if
+the session expires it re-registers automatically.
+
 `"stickerPack"` / `"stickerAuthor"` are the default sticker name shown in
 WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
 `.sticker rawr|buatan gweh`).
