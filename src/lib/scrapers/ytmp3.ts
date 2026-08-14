@@ -1,3 +1,5 @@
+import { readFile, writeFile, mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { UA, getJson, fetchBuffer } from './http.ts'
 
 const YTMP3_HOME = 'https://id.ytmp3.mobi/'
@@ -25,6 +27,38 @@ const ytmp3Jar = async (): Promise<string> => {
 const videoIdOf = (rawUrl: string): string | undefined => {
   const m = rawUrl.match(/youtu\.be\/([A-Za-z0-9_-]{11})|shorts\/([A-Za-z0-9_-]{11})|(?:embed|live)\/([A-Za-z0-9_-]{11})|[?&]v=([A-Za-z0-9_-]{11})/)
   return (m && (m[1] ?? m[2] ?? m[3] ?? m[4])) || undefined
+}
+
+// disk cache by video id — repeat requests (the norm in groups) skip the whole
+// convert+download path; bin/ is gitignored so this never lands in git
+const CACHE_DIR = join(import.meta.dirname, '..', '..', '..', 'bin', 'cache')
+const CACHE_MAX = 500 * 1024 * 1024
+
+const cacheGet = async (vid: string, ext: 'mp3' | 'mp4'): Promise<{ buf: Buffer; title: string } | null> => {
+  try {
+    const [buf, title] = await Promise.all([
+      readFile(join(CACHE_DIR, `${vid}.${ext}`)),
+      readFile(join(CACHE_DIR, `${vid}.${ext}.title`), 'utf8'),
+    ])
+    return { buf, title }
+  } catch {
+    return null // partial/corrupt file → just re-download
+  }
+}
+
+const cachePut = async (vid: string, ext: 'mp3' | 'mp4', buf: Buffer, title: string) => {
+  await mkdir(CACHE_DIR, { recursive: true })
+  // wipe-on-overflow, no LRU — cache is a perf nicety, not a feature
+  try {
+    const files = await readdir(CACHE_DIR)
+    let total = 0
+    for (const f of files) total += (await stat(join(CACHE_DIR, f))).size
+    if (total > CACHE_MAX) for (const f of files) await rm(join(CACHE_DIR, f), { force: true })
+  } catch {}
+  await Promise.all([
+    writeFile(join(CACHE_DIR, `${vid}.${ext}`), buf),
+    writeFile(join(CACHE_DIR, `${vid}.${ext}.title`), title),
+  ])
 }
 
 async function sessionHeaders(): Promise<Record<string, string>> {
@@ -69,8 +103,9 @@ async function pollProgress(
   downloadURL: string,
   fallbackTitle: string,
 ): Promise<Resolved> {
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 1000))
+  // first check immediately, then every 500ms — conversion is often done in <2s
+  for (let i = 0; i < 60; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 500))
     const p = await getJson(progressURL, h)
     if (p.error > 0) throw new Error('ytmp3: conversion failed')
     if (p.progress >= 3) return { url: downloadURL, title: p.title || fallbackTitle }
@@ -95,7 +130,14 @@ async function ytmp3Mobi(rawUrl: string, format: 'mp3' | 'mp4'): Promise<Resolve
 }
 
 export async function download(url: string, mode: 'audio' | 'video') {
+  const ext = mode === 'audio' ? 'mp3' : 'mp4'
+  const vid = videoIdOf(url)
+  if (vid) {
+    const hit = await cacheGet(vid, ext)
+    if (hit) return hit
+  }
   const got = await ytmp3Mobi(url, mode === 'audio' ? 'mp3' : 'mp4')
   const buf = await fetchBuffer(got.url, { headers: { 'User-Agent': UA } })
+  if (vid) await cachePut(vid, ext, buf, got.title).catch(() => {})
   return { buf, title: got.title } as const
 }

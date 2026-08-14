@@ -15,8 +15,7 @@ export const cooldownLeft = (key: string, sec: number): number => {
 }
 
 // one global slot pool shared by every command — multitasking by default, no per-command flags.
-// ponytail: single pool caps ALL commands (downloads included); worst case N concurrent downloads
-// ≈ N × 30MB × ~2.5 (buffer+base64) ≈ 300MB at N=4 — split download/light pools if RAM spikes.
+// worst case N concurrent downloads ≈ N × 30MB × ~2.5 (buffer+base64) ≈ 300MB at N=4 — split pools if RAM spikes.
 const SLOT_LIMIT = 4
 let running = 0
 const waiters: (() => void)[] = []

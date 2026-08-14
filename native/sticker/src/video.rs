@@ -9,7 +9,7 @@ use openh264::OpenH264API;
 use webp_animation::prelude::*;
 
 const SIZE: u32 = 512;
-// ponytail: MAX_FRAMES = 7s @ 24fps → ~170MB of raw frames held in RAM for the
+// MAX_FRAMES = 7s @ 24fps → ~170MB of raw frames held in RAM for the
 // worst case; the 500KB size ladder below drops fps anyway for long busy videos.
 const MAX_FRAMES: usize = 168;
 const MAX_DURATION_MS: u32 = 7000;

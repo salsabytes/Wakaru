@@ -19,7 +19,7 @@ export const OWNERS = (() => {
 export const isOwner = (sender: string) => OWNERS.includes(sender.split(/[@:]/)[0])
 
 // generic config.json string getter with a fallback (used for sticker pack/author etc.)
-// ponytail: parsed ONCE per process — restart the bot to pick up config.json edits
+// parsed ONCE per process — restart the bot to pick up config.json edits
 // (OWNERS already behaves this way, so this only aligns cfg() with it).
 let cfgCache: Record<string, string> | undefined
 export const cfg = (key: string, fallback: string): string => {

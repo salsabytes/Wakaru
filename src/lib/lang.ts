@@ -46,6 +46,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     cmdFailed: '❌ {name} failed: {msg}',
     aiUsage: 'usage: {prefix}ai <pesan> — mis. "sticker", "kick budi", atau ngobrol aja',
     usage: 'usage: {prefix}{name} {usage}',
+    processing: '⏳ lagi diproses…',
     sentToDm: '📩 {n} file dikirim ke chat pribadimu ya',
     playUsage:
       'usage: {prefix}play <judul lagu/video> — nanti balas pake nomor + format, mis. *1 mp3* atau *1 mp4*',
@@ -92,6 +93,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     cmdFailed: '❌ {name} failed: {msg}',
     aiUsage: 'usage: {prefix}ai <message> — e.g. "sticker", "kick budi", or just chat',
     usage: 'usage: {prefix}{name} {usage}',
+    processing: '⏳ processing…',
     sentToDm: '📩 {n} files sent to your private chat',
     playUsage: 'usage: {prefix}play <song/video title> — reply with number + format, e.g. *1 mp3* or *1 mp4*',
     noResults: '❌ play: no results for that query 😢',

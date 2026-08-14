@@ -7,6 +7,7 @@ native/*/target/
 bin/
 
 config.json
+flowchart.md
 .agents
 .hermes/
 .codegraph.json

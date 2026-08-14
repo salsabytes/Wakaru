@@ -37,7 +37,7 @@ const typecheck = (bun: boolean): void => {
   if (bun) sh('bun', ['run', 'typecheck'], 120_000)
   else sh('npx', ['tsc', '--noEmit'], 180_000)
 }
-// ponytail: sticker build failure only warns — bot works without it (matches install.sh); fatal only on fresh installs where bin/ is empty
+// sticker build failure only warns — bot works without it (matches install.sh); fatal only on fresh installs where bin/ is empty
 const buildSticker = (bun: boolean): void => {
   try {
     if (bun) sh('bun', ['run', 'build:sticker'], 600_000)
