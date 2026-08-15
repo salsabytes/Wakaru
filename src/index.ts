@@ -7,6 +7,26 @@ import { logger } from './lib/logger.ts'
 import { checkForUpdate } from './lib/updater.ts'
 import pkg from '../package.json' with { type: 'json' }
 
+// libsignal logs its session lifecycle to console.info/warn on every media send —
+// filtered at the console so the fix survives reinstalls
+const signalSpam = [
+  'Closing session:',
+  'Opening session:',
+  'Session already closed',
+  'Session already open',
+  'Removing old closed session:',
+  'Migrating session to:',
+]
+const dropSignal = (...args: unknown[]): boolean => {
+  const first = args[0]
+  return typeof first === 'string' && signalSpam.some((s) => first.startsWith(s))
+}
+const info = console.info.bind(console)
+const warn = console.warn.bind(console)
+console.info = (...args: unknown[]) => { if (!dropSignal(...args)) info(...args) }
+console.warn = (...args: unknown[]) => { if (!dropSignal(...args)) warn(...args) }
+logger.info('libsignal session spam filter: active')
+
 // boot marker — lets you confirm the running process is actually this build
 // (after a fix, the short commit hash must change on restart)
 let commit = '?'

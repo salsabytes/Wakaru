@@ -11,8 +11,7 @@ import { OWNERS, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 
-// every command runs concurrently (slot-capped globally) — no per-command flags,
-// so a slow downloader never blocks other commands in the same chat
+// commands run concurrently (globally slot-capped) so a slow downloader never blocks other chats
 const dispatch = (msg: WAMessage, m: SerializedMessage, jid: string): void => {
   void maybeRunCommand(msg, m, jid).catch((err) => logger.error('command error:', err))
 }
@@ -27,10 +26,7 @@ const resolveJid = async (jid: string) => {
   return pn ?? jid
 }
 
-// LID→PN is resolved once, here at the message boundary — commands and callers
-// below only ever see plain phone jids for sender / quoted.sender.
-// mentionedJid stays RAW (PN or LID): WhatsApp sends mentions in the same
-// identity form the group metadata uses, so commands match them directly.
+// LID→PN resolved once at the boundary; mentionedJid stays raw — WhatsApp sends mentions as-is
 const serialize = async (msg: WAMessage): Promise<SerializedMessage> => {
   const m = serializeMessage(msg)
   m.sender = await resolveJid(m.sender)

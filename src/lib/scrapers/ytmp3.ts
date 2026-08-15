@@ -29,8 +29,7 @@ const videoIdOf = (rawUrl: string): string | undefined => {
   return (m && (m[1] ?? m[2] ?? m[3] ?? m[4])) || undefined
 }
 
-// disk cache by video id — repeat requests (the norm in groups) skip the whole
-// convert+download path; bin/ is gitignored so this never lands in git
+// disk cache by video id — repeat requests (the norm in groups) skip convert+download
 const CACHE_DIR = join(import.meta.dirname, '..', '..', '..', 'bin', 'cache')
 const CACHE_MAX = 500 * 1024 * 1024
 

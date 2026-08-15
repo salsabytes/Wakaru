@@ -1,6 +1,4 @@
-// Chat via askgpt5.app — anonymous, free, no API key, no login, no cookies.
-// Inspired by @AyGemuy askgpt5.js (https://github.com/AyGemuy/api-wudysoft);
-// rewritten for this bot: one flat in-process session, no base64 state juggling.
+// Chat via askgpt5.app — anonymous, no API key (inspired by @AyGemuy askgpt5.js)
 export type ChatMsg = { role: string; content: string }
 
 const API = 'https://loadbalancer.askgpt5.app/api'
@@ -16,8 +14,7 @@ let expiresAt = 0
 const randHex = (n: number) =>
   Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, '0')).join('')
 
-// register a fresh guest account, then open its chat room (the room id falls back to a
-// fixed value the API tolerates when the response omits it)
+// register a guest account, then open its chat room (id falls back to a value the API tolerates)
 async function ensureSession(): Promise<void> {
   if (token && Date.now() < expiresAt) return
   const salt = randHex(4)
@@ -83,8 +80,7 @@ async function stream(prompt: string): Promise<string> {
     }),
     signal: AbortSignal.timeout(120_000),
   })
-  // anti-block: auth/rate-limit codes and empty bodies mean this guest session is toast —
-  // drop it so the caller's retry registers a fresh account instead of replaying a dead token
+  // auth/rate-limit codes mean this guest session is toast — drop it so retry registers fresh
   if (!res.ok) {
     if (res.status === 401 || res.status === 403 || res.status === 429) token = ''
     throw new Error(`askgpt5 stream HTTP ${res.status}`)
@@ -111,8 +107,7 @@ async function stream(prompt: string): Promise<string> {
   return out
 }
 
-// fold one SSE "data:" line into the running text — full_content is cumulative and
-// replaces, otherwise the chunk appends. Exported for the self-check.
+// fold one SSE data: line — full_content replaces, chunk appends. Exported for the self-check.
 export function sseLine(line: string, text: string): string {
   const t = line.trim()
   if (!t.startsWith('data:')) return text

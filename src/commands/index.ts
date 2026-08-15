@@ -21,9 +21,8 @@ function walk(dir: string): string[] {
   return out
 }
 
-// registered lazily on first use (getCommand/listCommands) — a command file used
-// directly as an entry point (e.g. the ai selftest) can't deadlock on registration.
-// category is the first path segment (group/kick.ts -> 'group', main/ai/index.ts -> 'main').
+// lazy registration — a command file used directly as an entry (e.g. ai selftest) can't deadlock;
+// category = first path segment (group/kick.ts -> 'group')
 const load = async (): Promise<void> => {
   for (const file of walk(ROOT)) {
     if (file === join(ROOT, 'index.ts')) continue

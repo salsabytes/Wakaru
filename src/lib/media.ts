@@ -21,8 +21,7 @@ const fmtDur = (sec: number): string => {
 export const fmtBytes = (n: number): string =>
   n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.round(n / 1e3)} KB`
 
-// sniff-based duration from the media buffer — mp3 assumes CBR
-// (ytmp3 output is 128kbps CBR); VBR mp3 durations will be off, fine for a summary line.
+// sniff-based duration; mp3 assumes CBR (VBR durations will be off, fine for a summary)
 export const mediaDuration = (buf: Buffer): string | undefined => {
   const mvhd = buf.indexOf(Buffer.from('mvhd'))
   if (mvhd > 0 && mvhd + 36 <= buf.length) {

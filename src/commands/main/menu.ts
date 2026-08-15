@@ -37,8 +37,7 @@ const greeting = (): string => {
   return GREET[language()][h < 11 ? 0 : h < 15 ? 1 : h < 18 ? 2 : 3]
 }
 
-// soft horizontal rules, no box corners/rails — sent inside a ``` block so
-// WhatsApp renders monospace; 24 wide so it fits a phone screen on one line
+// soft rules inside ``` for monospace; 24 wide fits a phone screen
 const RULE = 24
 const rule = (label = ''): string =>
   label ? `── ${label} ${'─'.repeat(Math.max(0, RULE - label.length - 4))}` : '─'.repeat(RULE)

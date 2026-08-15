@@ -48,9 +48,7 @@ const igBestOf = (m: any): { type: 'video' | 'image'; url: string } | undefined 
   return url ? { type: m.media_type === 2 ? 'video' : 'image', url } : undefined
 }
 
-// HP low-end: cap TOTAL carousel bytes too, not just per-item — 10 item × 30MB
-// still spikes. Earlier items win; anything past the cap is skipped (earlier
-// items are usually the "main" media of a carousel).
+// cap TOTAL carousel bytes too; earlier items win
 const CONCURRENCY = 2
 const CAROUSEL_MAX_TOTAL = 40 * 1024 * 1024
 

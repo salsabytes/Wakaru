@@ -62,8 +62,7 @@ export async function connectToWhatsApp(
     msgRetryCounterCache,
     callOfferCache,
     placeholderResendCache,
-    // low quality: still generates a preview but skips the HD og:image fetch —
-    // data + RAM win on Aksa's phone (the user's own WhatsApp client makes the HD preview independently)
+    // low quality: skips the HD og:image fetch — saves data/RAM
     generateHighQualityLinkPreview: false,
   })
 

@@ -14,8 +14,7 @@ export const cooldownLeft = (key: string, sec: number): number => {
   return Math.max(1, Math.ceil((last + sec * 1000 - Date.now()) / 1000))
 }
 
-// one global slot pool shared by every command — multitasking by default, no per-command flags.
-// worst case N concurrent downloads ≈ N × 30MB × ~2.5 (buffer+base64) ≈ 300MB at N=4 — split pools if RAM spikes.
+// one global slot pool — worst case ≈300MB RAM at N=4 concurrent downloads; split pools if it spikes
 const SLOT_LIMIT = 4
 let running = 0
 const waiters: (() => void)[] = []
