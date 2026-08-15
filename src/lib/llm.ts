@@ -5,7 +5,7 @@ export type ChatMsg = { role: string; content: string }
 
 const API = 'https://loadbalancer.askgpt5.app/api'
 const UA = 'okhttp/4.10.0'
-const MODEL = 'qwen3.5-397b-a17b'
+const MODEL = 'gpt-4o-mini' // fastest verified on askgpt5 (~6s vs ~12s); gpt-4o/deepseek-chat also work
 const TTL = 24 * 60 * 60 * 1000
 
 // one session per process — a random guest account + its chat room, valid 24h
@@ -83,7 +83,12 @@ async function stream(prompt: string): Promise<string> {
     }),
     signal: AbortSignal.timeout(120_000),
   })
-  if (!res.ok) throw new Error(`askgpt5 stream HTTP ${res.status}`)
+  // anti-block: auth/rate-limit codes and empty bodies mean this guest session is toast —
+  // drop it so the caller's retry registers a fresh account instead of replaying a dead token
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403 || res.status === 429) token = ''
+    throw new Error(`askgpt5 stream HTTP ${res.status}`)
+  }
 
   const reader = res.body!.getReader()
   const dec = new TextDecoder()
@@ -99,7 +104,10 @@ async function stream(prompt: string): Promise<string> {
   }
   text = sseLine(buffer, text) // last line may arrive without a trailing newline
   const out = text.trim()
-  if (!out) throw new Error('askgpt5: empty response')
+  if (!out) {
+    token = '' // empty stream = throttled/blocked session; retry gets a fresh one
+    throw new Error('askgpt5: empty response')
+  }
   return out
 }
 
