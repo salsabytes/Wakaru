@@ -36,9 +36,9 @@ should be updated as soon as possible.
 
 | Version | Supported |
 |---|---|
-| Latest release of the current month (e.g. `26.08.x`) | ✅ Actively patched |
+| Latest release (e.g. `v1.1.0`) | ✅ Actively patched |
 | `master` branch | ✅ Actively patched |
-| Older months' releases | ❌ Update to the latest |
+| Older releases | ❌ Update to the latest |
 
 > 💡 Wakaru ships a built-in updater: run **`.update`** (owner only) from
 > WhatsApp, or set `"updateChannel": "release"` in `config.json` to follow

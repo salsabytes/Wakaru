@@ -297,19 +297,14 @@ the fdown challenge may block it.
 
 ## 🏷️ Versioning
 
-Wakaru uses its own version scheme: **`<year>.<month>.<release>`** — e.g.
-`26.08.1` is the *1st release of August 2026*.
+Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch`
+(e.g. `1.1.0`).
 
-| Part | Meaning |
+| Bump | When |
 |---|---|
-| `year` | Last two digits of the year (`26`) |
-| `month` | Month, zero-padded (`08`) |
-| `release` | Release number within that month (`1`, `2`, …) |
-
-Every month starts fresh at `YY.MM.1`, and the year+month prefix keeps
-versions unique forever (`27.08.1` is August 2027 — no collisions). No
-commit-counting rules to remember — the next release is just `YY.MM.(n+1)`
-where `n` is how many tags this month already has.
+| `major` | Breaking changes |
+| `minor` | New features (`1.1.0`, `1.2.0`, …) |
+| `patch` | Bug fixes (`1.1.1`, `1.1.2`, …) |
 
 ---
 
@@ -318,14 +313,12 @@ where `n` is how many tags this month already has.
 <details>
 <summary>Recent changes</summary>
 
-**2026-08 — v26.08.2**
+**v1.1.0** — back to [semver](https://semver.org/) (the short-lived `YY.MM.R` releases were dropped; this is the same code, re-released cleanly)
 - iPhone audio fix: ytmp3's "mp3" is AAC in a fragmented MP4 (iOS refuses to play) — new `native/audio` Rust engine remuxes it to a standard M4A (lossless, no codec deps)
 - `.play` results now render everywhere: quick_reply buttons + numbered text (the old native-flow list was blank on iOS) — still replyable as `1 mp3`
 - `.play` cancel: `❌ Batal` button on the list & format pick, or type `batal`/`gajadi`/`cancel`; chatting about other things no longer gets spam replies
 - `.add` accepts `+62` with spaces/dashes
 - Boot log prints `Wakaru v<version> (<commit>)` so restarts are verifiable
-
-**2026-08 — v26.08.1**
 - Group management: `.kick @member` (tag or reply) and `.add <number>` (accepts `+62` formats, multiple numbers)
 - `.kick`/`.add` guarded: group admins/owner only, bot must be admin
 - LID→PN resolved once at the message boundary; mentions stay raw — commands match any jid form
@@ -333,9 +326,8 @@ where `n` is how many tags this month already has.
 - Sticker: fills the 512 canvas edge-to-edge with a transparent letterbox; 24 fps, 7 s cap, ≤500 KB ladder
 - Sticker EXIF rewritten to the JSON payload WhatsApp reads today (pack name shows again)
 - Windows: `sticker.exe` ships its MinGW DLLs — fixes the silent `code 53` crash on clean PATHs
-- Version scheme switched to `YY.MM.R`
 
-**2026-08 — v1.0.0**
+**v1.0.0**
 - Multitasking: every command runs concurrently — one global slot pool, no per-command flags
 - Per-user 5 s cooldown on heavy commands (downloaders + sticker)
 - Media downloads capped at 30 MB (lower peak RAM)
