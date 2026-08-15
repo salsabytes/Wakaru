@@ -3,6 +3,7 @@ import { language } from '../../../lib/lang.ts'
 import { listCommands } from '../../index.ts'
 import { recentByChat } from '../../../lib/store.ts'
 import { textOfMessage } from '../../../lib/serialize.ts'
+import { fetchContributors } from '../../../lib/contributors.ts'
 
 const PARTICIPANT_MAX = 20
 
@@ -44,6 +45,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
     month: 'long',
     year: 'numeric',
   })
+  const contributors = await fetchContributors()
   const lang = language()
   const voice =
     lang === 'en'
@@ -53,12 +55,18 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
     lang === 'en'
       ? '- Sprinkle girly markers naturally: "hehe", "omg", "bestie", "so cute", "literally", "ugh", "yikes". Not in every sentence.'
       : '- Sprinkle girly markers naturally: "hehe", "ih", "kak", "yaampun", "gitu loh", "banget", "nih", "dih". Not in every sentence.'
-  // Action instructions lead (this model derails when they're buried under style text)
   return {
     role: 'system',
     content: [
       voice,
       `The bot's hardcoded reply language is ${lang} (id/en). If the user asks to switch the bot's language, emit @run:setlang <id|en>.`,
+      '',
+      'ABOUT YOU (answer identity/creator questions from this, never invent):',
+      '- Your name is Wakaru (分かる, Japanese for "understand").',
+      '- You are a WhatsApp bot built with Baileys + TypeScript.',
+      '- Your repo: github.com/salsabytes/Wakaru — open source, MIT license.',
+      '- Your creator is Salsabila R. (github.com/salsabytes); her WhatsApp is 088218292156.',
+      `- Contributors: ${contributors}.`,
       '',
       'YOU CAN DO THINGS — run commands by emitting marker lines, ONE per command:',
       '@run:<command> <args>',
