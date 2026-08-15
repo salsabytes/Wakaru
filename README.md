@@ -68,6 +68,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.instagram <url>` | `.ig`, `.igdl` | IG reels, videos, photos & carousels, no watermark |
 | `.facebook <url>` | `.fb`, `.fbdl` | Facebook video in HD |
 | `.pinterest <url\|query>` | `.pin`, `.pins` | Images from a pin link, or a search query |
+| `.x <url>` | `.twitter`, `.tw` | X (Twitter) video, no watermark |
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
 
 Multi-file results (IG carousels, Pinterest searches) are delivered to your
