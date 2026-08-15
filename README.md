@@ -66,7 +66,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.play <query>` | `.yt`, `.song` | Search YouTube → tap a result → pick mp3/mp4 |
 | `.tiktok <url>` | `.tt`, `.ttdl` | TikTok video, no watermark |
 | `.instagram <url>` | `.ig`, `.igdl` | IG reels, videos, photos & carousels, no watermark |
-| `.facebook <url>` | `.fb`, `.fbdl` | Facebook video in HD |
+| `.facebook <url>` | `.fb`, `.fbdl` | Facebook video or photos |
 | `.pinterest <url\|query>` | `.pin`, `.pins` | Images from a pin link, or a search query |
 | `.x <url>` | `.twitter`, `.tw` | X (Twitter) video, no watermark |
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
