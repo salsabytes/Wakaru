@@ -68,6 +68,8 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.instagram <url>` | `.ig`, `.igdl` | IG reels, videos, photos & carousels, no watermark |
 | `.facebook <url>` | `.fb`, `.fbdl` | Facebook video or photos |
 | `.pinterest <url\|query>` | `.pin`, `.pins` | Images from a pin link, or a search query |
+| `.soundcloud <url>` | `.sc` | SoundCloud track → audio (mp3), no watermark |
+| `.spotify <url>` | `.sp` | Spotify track/album → matched on YouTube → audio |
 | `.x <url>` | `.twitter`, `.tw` | X (Twitter) video, no watermark |
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
 

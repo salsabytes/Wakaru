@@ -69,7 +69,7 @@ if (process.env.MEDIA_SELFTEST) {
 }
 
 export interface OutMedia {
-  type: 'image' | 'video'
+  type: 'image' | 'video' | 'audio'
   buf: Buffer
   caption?: string
 }
@@ -80,6 +80,7 @@ export async function sendMedia(ctx: CommandContext, media: OutMedia[]): Promise
     for (const [i, m] of media.entries()) {
       const caption = i === 0 ? m.caption : undefined
       if (m.type === 'video') await s.video(m.buf, caption)
+      else if (m.type === 'audio') await s.audio(m.buf, caption)
       else await s.image(m.buf, caption)
     }
   }
