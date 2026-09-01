@@ -1,134 +1,49 @@
-// Chat via askgpt5.app — anonymous, no API key (inspired by @AyGemuy askgpt5.js)
+// Poolside directly — OpenAI-compatible, fetch only (no extra deps)
+import { cfg } from './config.ts'
+
 export type ChatMsg = { role: string; content: string }
 
-const API = 'https://loadbalancer.askgpt5.app/api'
-const UA = 'okhttp/4.10.0'
-const MODEL = 'gpt-4o-mini' // fastest verified on askgpt5 (~6s vs ~12s); gpt-4o/deepseek-chat also work
-const TTL = 24 * 60 * 60 * 1000
+const BASE = (process.env.POOLSIDE_BASE_URL || cfg('poolsideBaseUrl', 'https://inference.poolside.ai/v1')).replace(/\/$/, '')
+const MODEL = process.env.POOLSIDE_MODEL || cfg('poolsideModel', 'poolside/laguna-xs-2.1')
 
-// one session per process — a random guest account + its chat room, valid 24h
-let token = ''
-let chatId = ''
-let expiresAt = 0
+// Opsi 2 (clone-and-use): taruh shared Poolside API key di sini sebagai fallback.
+// Ambil di https://platform.poolside.ai/ → API Keys. KOSONGKAN jika mau wajibkan user isi sendiri.
+// SECURITY WARNING: Key yang di-hardcode di file ini akan terekspos di git. Siapapun bisa pakai dan menghabiskan quota/billing kamu.
+// Jika repo public, pertimbangkan pakai OpenRouter :free sebagai gantinya.
+const FALLBACK_KEY = 'sky_RxrZbyiA.j4ietAqQfUIp9rdXbWZg4WY9VCd52yFm'
 
-const randHex = (n: number) =>
-  Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, '0')).join('')
-
-// register a guest account, then open its chat room (id falls back to a value the API tolerates)
-async function ensureSession(): Promise<void> {
-  if (token && Date.now() < expiresAt) return
-  const salt = randHex(4)
-  const reg = await fetch(`${API}/auth/register`, {
-    method: 'POST',
-    headers: { 'User-Agent': UA, 'Content-Type': 'application/json', newversion: 'true' },
-    body: JSON.stringify({ email: `guest${salt}@mail.com`, password: `Pwd${salt}A1!`, name: `Guest${salt}` }),
-    signal: AbortSignal.timeout(30_000),
-  })
-  if (!reg.ok) throw new Error(`askgpt5 register HTTP ${reg.status}`)
-  const data = (await reg.json()) as Record<string, any>
-  token = data?.access_token || data?.token || data?.data?.token || data?.result?.token
-  if (!token) throw new Error(`askgpt5: no token in register response: ${JSON.stringify(data).slice(0, 200)}`)
-
-  const room = await fetch(`${API}/chats/`, {
-    method: 'POST',
-    headers: {
-      'User-Agent': UA,
-      authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      newversion: 'true',
-    },
-    body: JSON.stringify({ title: 'New Chat' }),
-    signal: AbortSignal.timeout(30_000),
-  })
-  if (!room.ok) throw new Error(`askgpt5 room HTTP ${room.status}`)
-  const roomData = (await room.json()) as Record<string, any>
-  chatId = roomData?.id || roomData?.chat_id || '150903'
-  expiresAt = Date.now() + TTL
+function apiKey(): string {
+  return process.env.POOLSIDE_API_KEY || cfg('poolsideApiKey', '') || cfg('POOLSIDE_API_KEY', '') || FALLBACK_KEY
 }
 
 export async function askLLM(messages: ChatMsg[]): Promise<string> {
-  const prompt = messages
-    .map((m) => {
-      const body = m.content.trim()
-      if (!body) return ''
-      const role = m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user'
-      return `${role}: ${body}`
-    })
-    .filter(Boolean)
-    .join('\n\n')
-  await ensureSession()
-  return stream(prompt)
-}
-
-async function stream(prompt: string): Promise<string> {
-  const res = await fetch(`${API}/chats/${chatId}/messages/stream`, {
+  const key = apiKey()
+  if (!key) throw new Error('POOLSIDE_API_KEY not set — isi FALLBACK_KEY di src/lib/llm.ts atau env POOLSIDE_API_KEY / config.json { "poolsideApiKey": "..." } (https://platform.poolside.ai/ → API Keys)')
+  const res = await fetch(`${BASE}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'User-Agent': UA,
-      authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      'cache-control': 'no-cache',
-      newversion: 'true',
-    },
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      content: prompt,
-      client_message_id: randHex(5),
-      web_search: true,
       model: MODEL,
-      persona: { name: 'User', role: '', info: '', tags: ['friendly'], personality: 'default' },
+      messages: messages
+        .filter((m) => m.content?.trim())
+        .map((m) => ({
+          role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content.trim(),
+        })),
     }),
     signal: AbortSignal.timeout(120_000),
   })
-  // auth/rate-limit codes mean this guest session is toast — drop it so retry registers fresh
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403 || res.status === 429) token = ''
-    throw new Error(`askgpt5 stream HTTP ${res.status}`)
+    const txt = await res.text().catch(() => '')
+    throw new Error(`poolside ${res.status} ${txt.slice(0, 300)}`)
   }
-
-  const reader = res.body!.getReader()
-  const dec = new TextDecoder()
-  let buffer = ''
-  let text = ''
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += dec.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-    for (const line of lines) text = sseLine(line, text)
-  }
-  text = sseLine(buffer, text) // last line may arrive without a trailing newline
-  const out = text.trim()
-  if (!out) {
-    token = '' // empty stream = throttled/blocked session; retry gets a fresh one
-    throw new Error('askgpt5: empty response')
-  }
+  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+  const out = data.choices?.[0]?.message?.content?.trim() ?? ''
+  if (!out) throw new Error('poolside: empty response')
   return out
 }
 
-// fold one SSE data: line — full_content replaces, chunk appends. Exported for the self-check.
-export function sseLine(line: string, text: string): string {
-  const t = line.trim()
-  if (!t.startsWith('data:')) return text
-  const raw = t.slice(5).trim()
-  if (!raw || raw === '[DONE]') return text
-  try {
-    const json = JSON.parse(raw) as { chunk?: string; full_content?: string }
-    if (json.chunk) return json.full_content || text + json.chunk
-  } catch {
-    /* broken/partial json — skip */
-  }
+// kept for compat — previously parsed askgpt5 SSE; Poolside uses plain JSON
+export function sseLine(_line: string, text: string): string {
   return text
-}
-
-if (process.env.GEMINI_SELFTEST) {
-  let text = ''
-  text = sseLine('data: {"chunk":"Hel","full_content":"Hello"}', text)
-  text = sseLine('data: {"chunk":"lo"}', text)
-  text = sseLine('data: [DONE]', text)
-  text = sseLine('data: {"chunk":" world","full_content":"Hello world"}', text)
-  if (text !== 'Hello world') throw new Error(`sseLine = ${JSON.stringify(text)}`)
-  console.log('llm self-check ok')
-  process.exit(0)
 }
