@@ -4,7 +4,7 @@ import { cfg } from './config.ts'
 export type ChatMsg = { role: string; content: string }
 
 const BASE = (process.env.POOLSIDE_BASE_URL || cfg('poolsideBaseUrl', 'https://inference.poolside.ai/v1')).replace(/\/$/, '')
-const MODEL = process.env.POOLSIDE_MODEL || cfg('poolsideModel', 'poolside/laguna-xs-2.1')
+const MODEL = process.env.POOLSIDE_MODEL || cfg('poolsideModel', 'poolside/laguna-s-2.1')
 
 // Opsi 2 (clone-and-use): taruh shared Poolside API key di sini sebagai fallback.
 // Ambil di https://platform.poolside.ai/ → API Keys. KOSONGKAN jika mau wajibkan user isi sendiri.
