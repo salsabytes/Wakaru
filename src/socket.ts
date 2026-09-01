@@ -15,6 +15,7 @@ import {
   type WASocket,
 } from 'baileys'
 import { getMessage } from './lib/store.ts'
+import { flushAll } from './lib/disk.ts'
 import { logger } from './lib/logger.ts'
 
 const SESSION_DIR = process.env.SESSION_DIR ?? 'sessions'
@@ -121,6 +122,7 @@ export async function shutdown(signal: string): Promise<void> {
   isShuttingDown = true
   if (reconnectTimer) clearTimeout(reconnectTimer)
   logger.info(`Received ${signal} — shutting down...`)
+  flushAll() // don't lose the last throttle window of chat history
   try {
     await waka?.end(new Error('Bot stopped manually'))
   } catch (err) {
