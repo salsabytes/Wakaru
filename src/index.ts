@@ -14,6 +14,7 @@ const signalSpam = [
   'Opening session:',
   'Session already closed',
   'Session already open',
+  'Closing open session in favor',
   'Removing old closed session:',
   'Migrating session to:',
 ]

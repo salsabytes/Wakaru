@@ -34,6 +34,13 @@ const serialize = async (msg: WAMessage): Promise<SerializedMessage> => {
   return m
 }
 
+// WA server backfills missed messages as fresh 'notify' upserts after reconnect —
+// without an age check the AI answers hours-old chats. 90s grace absorbs clock jitter.
+const isStale = (msg: WAMessage): boolean => {
+  const ts = Number(msg.messageTimestamp ?? 0)
+  return ts > 0 && Date.now() / 1000 - ts > 90
+}
+
 export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.upsert']): Promise<void> {
   for (const msg of upsert.messages) {
     if (msg.key?.id) messageStore.set(msg.key.id, msg)
@@ -43,7 +50,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
 
     for (const msg of upsert.messages) {
       const jid = msg.key?.remoteJid
-      if (!jid || msg.key?.fromMe) continue
+      if (!jid || msg.key?.fromMe || isStale(msg)) continue
       const m = await serialize(msg)
       if (!m.button) continue
       logger.info(`🔘 ${jid} [append]: ${m.button.text || m.button.id}`)
@@ -54,7 +61,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
 
   for (const msg of upsert.messages) {
     const jid = msg.key?.remoteJid
-    if (!jid || msg.key?.fromMe) continue
+    if (!jid || msg.key?.fromMe || isStale(msg)) continue
     const m = await serialize(msg)
 
     if (!m.text && !m.button) continue
