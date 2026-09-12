@@ -7,12 +7,25 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::process::ExitCode;
 
 use image::imageops::FilterType;
-use image::GenericImageView;
+use image::{DynamicImage, GenericImageView};
 
 const SIZE: u32 = 512;
 
 fn main() -> ExitCode {
   let args: Vec<String> = env::args().skip(1).collect();
+  if args.first().is_some_and(|a| a == "timg") {
+    if args.len() != 3 {
+      eprintln!("usage: sticker timg <input.webp> <output.png>");
+      return ExitCode::FAILURE;
+    }
+    return match webp_to_png(&args[1], &args[2]) {
+      Ok(()) => ExitCode::SUCCESS,
+      Err(e) => {
+        eprintln!("timg: {e}");
+        ExitCode::FAILURE
+      }
+    };
+  }
   // optional trailing pack/author → embedded as WhatsApp sticker EXIF metadata
   if args.len() != 2 && args.len() != 4 {
     eprintln!("usage: sticker <input> <output> [pack author]");
@@ -225,6 +238,19 @@ mod tests {
 
 fn is_mp4(data: &[u8]) -> bool {
   data.len() >= 12 && &data[4..8] == b"ftyp"
+}
+
+// sticker (webp) -> png. Animated takes the first frame only —
+// WA animated stickers are tiny loops; frame 0 is the representative shot.
+fn webp_to_png(input: &str, output: &str) -> Result<(), Box<dyn std::error::Error>> {
+  let data = fs::read(input)?;
+  let anim = webp::AnimDecoder::new(&data).decode().ok();
+  let img: DynamicImage = match anim.as_ref().and_then(|a| a.get_frame(0)) {
+    Some(frame) => DynamicImage::from(&frame),
+    None => webp::Decoder::new(&data).decode().map(|w| w.to_image()).ok_or("not a webp")?,
+  };
+  img.save(output)?;
+  Ok(())
 }
 
 fn convert_image(data: &[u8], output: &str) -> Result<(), Box<dyn std::error::Error>> {
