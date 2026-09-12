@@ -7,9 +7,10 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::process::ExitCode;
 
 use image::imageops::FilterType;
-use image::{DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
 
 const SIZE: u32 = 512;
+const DIM: u32 = 350;
 
 fn main() -> ExitCode {
   let args: Vec<String> = env::args().skip(1).collect();
@@ -22,6 +23,19 @@ fn main() -> ExitCode {
       Ok(()) => ExitCode::SUCCESS,
       Err(e) => {
         eprintln!("timg: {e}");
+        ExitCode::FAILURE
+      }
+    };
+  }
+  if args.first().is_some_and(|a| a == "brat") {
+    if args.len() != 3 {
+      eprintln!("usage: sticker brat <text> <output.webp>");
+      return ExitCode::FAILURE;
+    }
+    return match brat_to_sticker(&args[1], &args[2]) {
+      Ok(()) => ExitCode::SUCCESS,
+      Err(e) => {
+        eprintln!("brat: {e}");
         ExitCode::FAILURE
       }
     };
@@ -73,9 +87,8 @@ fn main() -> ExitCode {
   }
 }
 
-// WhatsApp reads a custom EXIF tag (0x5741, type UNDEFINED) whose payload names the
-// sticker pack/author. Format: 22-byte TIFF header + JSON payload (same bytes as
-// wa-sticker-formatter); byte 14 holds the payload length (LE).
+// WhatsApp sticker pack/author lives in a custom EXIF tag (0x5741):
+// 22-byte TIFF header + JSON payload, length at byte 14 (LE).
 fn build_exif(pack: &str, author: &str) -> Vec<u8> {
   let payload = format!(
     "{{\"sticker-pack-id\":\"wakaru\",\"sticker-pack-name\":\"{}\",\"sticker-pack-publisher\":\"{}\",\"emojis\":[]}}",
@@ -106,11 +119,7 @@ fn add_exif(path: &str, pack: &str, author: &str) -> Result<(), Box<dyn std::err
   Ok(())
 }
 
-// WebP EXIF lives in its own RIFF chunk, which per spec requires a VP8X chunk with
-// the EXIF flag (0x08) set — and the EXIF chunk goes AFTER the image data
-// (VP8X → ICCP → ANIM → ANMF… → EXIF → XMP), matching node-webpmux/wa-sticker-formatter.
-// Video output already has VP8X (just set the flag); a plain VP8/VP8L image gets a
-// VP8X built from the known 512×512 canvas.
+// EXIF chunk must come after image data, with the VP8X EXIF flag set.
 fn inject_exif(webp: &[u8], exif: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
   if webp.len() < 12 || &webp[0..4] != b"RIFF" || &webp[8..12] != b"WEBP" {
     return Err("not a webp".into());
@@ -125,7 +134,7 @@ fn inject_exif(webp: &[u8], exif: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::
       break;
     }
     chunks.push((fourcc, webp[start..start + size].to_vec()));
-    i = start + size + (size & 1); // chunks are padded to even length
+    i = start + size + (size & 1);
   }
   if chunks.is_empty() {
     return Err("no webp chunks found".into());
@@ -133,19 +142,19 @@ fn inject_exif(webp: &[u8], exif: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::
 
   let mut out = Vec::with_capacity(webp.len() + exif.len() + 64);
   out.extend_from_slice(b"RIFF");
-  out.extend_from_slice(&[0u8; 4]); // size patched at the end
+  out.extend_from_slice(&[0u8; 4]);
   out.extend_from_slice(b"WEBP");
 
   let mut rest = chunks.into_iter();
   if let Some((fourcc, mut data)) = rest.next() {
     if fourcc == b"VP8X" {
       if !data.is_empty() {
-        data[0] |= 0x08; // EXIF present
+        data[0] |= 0x08;
       }
       push_chunk(&mut out, &fourcc, &data);
     } else {
       let mut vp8x = vec![0u8; 10];
-      vp8x[0] = 0x08; // EXIF present
+      vp8x[0] = 0x08;
       let d = (SIZE - 1).to_le_bytes();
       vp8x[4..7].copy_from_slice(&d[..3]);
       vp8x[7..10].copy_from_slice(&d[..3]);
@@ -153,7 +162,7 @@ fn inject_exif(webp: &[u8], exif: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::
       push_chunk(&mut out, &fourcc, &data);
     }
   }
-  // image/data chunks keep their original order (ICCP, ANIM, ANMF, VP8, VP8L, ALPH…)
+  // image/data chunks keep original order
   for (fourcc, data) in rest {
     push_chunk(&mut out, &fourcc, &data);
   }
@@ -209,11 +218,11 @@ mod tests {
     let cs = chunks(&out);
     assert_eq!(cs.len(), 3);
     assert_eq!(cs[0].0, b"VP8X");
-    assert_eq!(cs[0].1[0] & 0x08, 0x08); // EXIF flag
-    assert_eq!(cs[0].1[4..7], [0xff, 0x01, 0x00]); // 512 - 1
-    assert_eq!(cs[1].0, b"VP8 "); // image data first…
+    assert_eq!(cs[0].1[0] & 0x08, 0x08);
+    assert_eq!(cs[0].1[4..7], [0xff, 0x01, 0x00]);
+    assert_eq!(cs[1].0, b"VP8 ");
     assert_eq!(cs[1].1, [1, 2, 3]);
-    assert_eq!(cs[2].0, b"EXIF"); // …EXIF after, per container spec
+    assert_eq!(cs[2].0, b"EXIF");
     assert_eq!(
       &cs[2].1[22..],
       b"{\"sticker-pack-id\":\"wakaru\",\"sticker-pack-name\":\"rawr\",\"sticker-pack-publisher\":\"buatan gweh\",\"emojis\":[]}"
@@ -230,9 +239,9 @@ mod tests {
     let cs = chunks(&out);
     assert_eq!(cs.len(), 3);
     assert_eq!(cs[0].0, b"VP8X");
-    assert_eq!(cs[0].1[0], 0x18); // 0x10 | EXIF
-    assert_eq!(cs[1].0, b"VP8 "); // image data first…
-    assert_eq!(cs[2].0, b"EXIF"); // …EXIF after
+    assert_eq!(cs[0].1[0], 0x18);
+    assert_eq!(cs[1].0, b"VP8 ");
+    assert_eq!(cs[2].0, b"EXIF");
   }
 }
 
@@ -240,8 +249,7 @@ fn is_mp4(data: &[u8]) -> bool {
   data.len() >= 12 && &data[4..8] == b"ftyp"
 }
 
-// sticker (webp) -> png. Animated takes the first frame only —
-// WA animated stickers are tiny loops; frame 0 is the representative shot.
+// sticker (webp) -> png, animated takes frame 0 only
 fn webp_to_png(input: &str, output: &str) -> Result<(), Box<dyn std::error::Error>> {
   let data = fs::read(input)?;
   let anim = webp::AnimDecoder::new(&data).decode().ok();
@@ -253,11 +261,153 @@ fn webp_to_png(input: &str, output: &str) -> Result<(), Box<dyn std::error::Erro
   Ok(())
 }
 
+fn brat_to_sticker(text: &str, output: &str) -> Result<(), Box<dyn std::error::Error>> {
+  use ab_glyph::{Font, FontRef, PxScale, PxScaleFont, ScaleFont};
+  let font = FontRef::try_from_slice(include_bytes!("../assets/brat.ttf"))?;
+  let text: String = text
+    .split_whitespace()
+    .collect::<Vec<_>>()
+    .join(" ")
+    .chars()
+    .filter(|&c| c == ' ' || font.glyph_id(c).0 != 0)
+    .take(300)
+    .collect();
+  if text.trim().is_empty() {
+    return Err("empty text".into());
+  }
+  let rd = 1000u32;
+  let r = rd as f32 / 500.0;
+  let pad = rd as f32 * 0.04;
+  let max_w = rd as f32 - pad * 2.0;
+  let max_h = rd as f32 - pad * 2.0;
+  let upm = font.units_per_em().unwrap_or(2048.0);
+  let em_fix = font.height_unscaled() / upm;
+  let px = |size: f32| PxScale::from(size * em_fix);
+  let words: Vec<&str> = text.split(' ').collect();
+  let layout = |scale: PxScale| -> Option<Vec<(f32, String)>> {
+    let sf = font.as_scaled(scale);
+    let space = sf.h_advance(sf.glyph_id(' '));
+    let mut lines: Vec<(f32, String)> = Vec::new();
+    let mut cur = String::new();
+    let mut cur_w = 0.0f32;
+    for w in &words {
+      let mut ww = 0.0f32;
+      let mut prev = None;
+      for c in w.chars() {
+        let id = sf.glyph_id(c);
+        if let Some(p) = prev {
+          ww += sf.kern(p, id);
+        }
+        ww += sf.h_advance(id);
+        prev = Some(id);
+      }
+      let add = if cur.is_empty() { ww } else { space + ww };
+      if cur_w + add > max_w && !cur.is_empty() {
+        lines.push((cur_w, std::mem::take(&mut cur)));
+        cur_w = 0.0;
+      }
+      if !cur.is_empty() {
+        cur.push(' ');
+        cur_w += space;
+      }
+      cur.push_str(w);
+      cur_w += ww;
+    }
+    if !cur.is_empty() {
+      lines.push((cur_w, cur));
+    }
+    if lines.is_empty() || (lines.len() as f32) * scale.y / em_fix > max_h {
+      return None;
+    }
+    if lines.iter().any(|(w, _)| *w > max_w) {
+      return None;
+    }
+    Some(lines)
+  };
+  let mut size = 170.0 * r;
+  let floor = 20.0 * r;
+  while size > floor && layout(px(size)).is_none() {
+    size -= 4.0 * r;
+  }
+  let scale = px(size.max(floor));
+  let (lines, _) = match layout(scale) {
+    Some(lines) => (lines, scale),
+    None => (vec![(0.0, text.clone())], scale),
+  };
+  let sf = font.as_scaled(scale);
+  let lh = scale.y / em_fix;
+  let mut y = pad + sf.ascent() - size * 0.094;
+
+  let mut canvas = RgbaImage::from_pixel(rd, rd, Rgba([255, 255, 255, 255]));
+  let draw_line = |canvas: &mut RgbaImage, sf: &PxScaleFont<&FontRef>, line: &str, line_w: f32, y: f32| {
+    let gaps = line.split(' ').count().saturating_sub(1);
+    let step = if gaps > 0 { (max_w - line_w) / gaps as f32 } else { 0.0 };
+    let mut x = pad;
+    let mut prev = None;
+    for c in line.chars() {
+      if c == ' ' {
+        x += sf.h_advance(sf.glyph_id(' ')) + step;
+        prev = None;
+        continue;
+      }
+      let id = sf.glyph_id(c);
+      if let Some(p) = prev {
+        x += sf.kern(p, id);
+      }
+      let g = id.with_scale_and_position(scale, ab_glyph::point(x, y));
+      if let Some(o) = sf.outline_glyph(g) {
+        let bx = o.px_bounds().min.x as i32;
+        let by = o.px_bounds().min.y as i32;
+        o.draw(|gx, gy, v| {
+          let px = bx + gx as i32;
+          let py = by + gy as i32;
+          if px >= 0 && py >= 0 && px < rd as i32 && py < rd as i32 {
+            let p = canvas.get_pixel_mut(px as u32, py as u32);
+            let v = v.clamp(0.0, 1.0);
+            let keep = p[0] as f32 / 255.0 * (1.0 - v);
+            let c = (keep * 255.0) as u8;
+            p[0] = c;
+            p[1] = c;
+            p[2] = c;
+            p[3] = 255;
+          }
+        });
+      }
+      x += sf.h_advance(id);
+      prev = Some(id);
+    }
+  };
+  for (w, line) in &lines {
+    draw_line(&mut canvas, &sf, line, *w, y);
+    y += lh;
+  }
+
+  let blurred = image::imageops::blur(&canvas, 2.2 * r);
+  let sharp = image::imageops::resize(&blurred, DIM, DIM, image::imageops::FilterType::Lanczos3);
+  let file = fs::File::create(output)?;
+  let mut writer = BufWriter::new(file);
+  let enc = webp::Encoder::from_rgba(sharp.as_raw(), DIM, DIM);
+  let bytes = enc.encode(90.0);
+  writer.write_all(&bytes)?;
+  Ok(())
+}
+
+fn brat_to_webp(data: &[u8], output: &str) -> Result<(), Box<dyn std::error::Error>> {
+  let img = image::load_from_memory(data)?;
+  let (w, h) = img.dimensions();
+  assert_eq!((w, h), (DIM, DIM));
+  let rgba = img.to_rgba8();
+  let file = fs::File::create(output)?;
+  let mut writer = BufWriter::new(file);
+  let enc = webp::Encoder::from_rgba(rgba.as_raw(), DIM, DIM);
+  let bytes = enc.encode(80.0);
+  writer.write_all(&*bytes)?;
+  Ok(())
+}
+
 fn convert_image(data: &[u8], output: &str) -> Result<(), Box<dyn std::error::Error>> {
   let img = image::load_from_memory(data)?;
   let (w, h) = img.dimensions();
-  // always fill the longer side to SIZE (upscale small sources too); the leftover
-  // letterbox stays transparent instead of black
   let scale = SIZE as f32 / w.max(h) as f32;
   let (nw, nh) = (((w as f32 * scale) as u32).max(1), ((h as f32 * scale) as u32).max(1));
   let resized = img.resize(nw, nh, FilterType::Lanczos3).to_rgba8();

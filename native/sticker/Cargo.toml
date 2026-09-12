@@ -9,6 +9,7 @@ webp = "0.3"
 mp4 = "0.14"
 openh264 = { version = "0.9", features = ["source"] }
 webp-animation = "0.10"
+ab_glyph = "0.2.32"
 
 [profile.release]
 strip = true

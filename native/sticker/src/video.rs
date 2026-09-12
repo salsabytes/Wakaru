@@ -9,8 +9,6 @@ use openh264::OpenH264API;
 use webp_animation::prelude::*;
 
 const SIZE: u32 = 512;
-// MAX_FRAMES = 7s @ 24fps → ~170MB of raw frames held in RAM for the
-// worst case; the 500KB size ladder below drops fps anyway for long busy videos.
 const MAX_FRAMES: usize = 168;
 const MAX_DURATION_MS: u32 = 7000;
 const TARGET_FPS: u32 = 24;
@@ -67,7 +65,6 @@ pub fn convert_video(data: &[u8], output: &str) -> Result<(), Box<dyn std::error
     };
     avc_to_annex_b(&sample.bytes, length_size, &sps, &pps, &mut buffer);
     match decoder.decode(&buffer) {      Ok(Some(img)) => {
-        // skip strided frames BEFORE converting YUV->RGB (decode is mandatory, conversion is not)
         if ((i - 1) as usize) % stride != 0 {
           continue;
         }
@@ -130,8 +127,6 @@ fn avc_to_annex_b(sample: &[u8], length_size: u8, sps: &[Vec<u8>], pps: &[Vec<u8
 
 fn frame_to_512(rgb: &[u8], w: u32, h: u32) -> Option<RgbaImage> {
   let img = image::RgbImage::from_raw(w, h, rgb.to_vec())?;
-  // always fill the longer side to SIZE (upscale small sources too); the leftover
-  // letterbox stays transparent instead of black
   let scale = SIZE as f32 / w.max(h) as f32;
   let (nw, nh) = (((w as f32 * scale) as u32).max(1), ((h as f32 * scale) as u32).max(1));
   let resized = image::DynamicImage::ImageRgb8(image::imageops::resize(&img, nw, nh, FilterType::Triangle))
@@ -151,8 +146,8 @@ mod tests {
     let rgb = vec![255u8; (360 * 640 * 3) as usize];
     let c = frame_to_512(&rgb, 360, 640).unwrap();
     assert_eq!(c.dimensions(), (SIZE, SIZE));
-    assert_eq!(c.get_pixel(0, SIZE / 2)[3], 0); // side bar transparent
-    assert_eq!(c.get_pixel(SIZE / 2, SIZE / 2)[3], 255); // content opaque
+    assert_eq!(c.get_pixel(0, SIZE / 2)[3], 0);
+    assert_eq!(c.get_pixel(SIZE / 2, SIZE / 2)[3], 255);
   }
 
   #[test]
@@ -160,15 +155,14 @@ mod tests {
     let rgb = vec![255u8; (320 * 240 * 3) as usize];
     let c = frame_to_512(&rgb, 320, 240).unwrap();
     assert_eq!(c.dimensions(), (SIZE, SIZE));
-    assert_eq!(c.get_pixel(0, 0)[3], 0); // top bar transparent
-    assert_eq!(c.get_pixel(SIZE / 2, SIZE / 2)[3], 255); // content opaque
+    assert_eq!(c.get_pixel(0, 0)[3], 0);
+    assert_eq!(c.get_pixel(SIZE / 2, SIZE / 2)[3], 255);
   }
 }
 
 fn write_animated(frames: &[RgbaImage], total_ms: u32, output: &str) -> Result<(), Box<dyn std::error::Error>> {
   let total = total_ms.max(100);
-  // ladder: keep the target fps as long as it fits under MAX_BYTES, then drop
-  // quality first, then fps (stride) — "naikin fps, sisanya dijaga ≤500KB".
+  // keep fps as long as it fits 500KB, else drop quality first, then fps
   for (stride, quality) in [(1usize, 70.0f32), (1, 55.0), (2, 50.0), (3, 45.0), (4, 40.0), (6, 35.0), (8, 30.0)] {
     let n = frames.len().div_ceil(stride);
     let dms = ((total as usize / n).max(1)) as i32;
