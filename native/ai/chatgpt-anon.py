@@ -8,6 +8,15 @@ from datetime import datetime, timezone
 
 from curl_cffi import requests
 
+# Windows console defaults to cp1252 — emoji in prompt/answer would crash
+# stdout on write. Force UTF-8 pipes so 😭 survives the trip to TS.
+try:
+  sys.stdin.reconfigure(encoding='utf-8', errors='replace')
+  sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+  sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+  pass
+
 # One-shot anonymous chat with chatgpt.com: prompt in (argv or stdin),
 # answer out on stdout. Every run mints a fresh device + tokens.
 # Needs curl_cffi — plain fetch gets stopped at the edge (TLS fingerprint).
@@ -72,6 +81,13 @@ def parse_stream(text):
   return ''.join(x for x in out if isinstance(x, str))
 
 
+# One clear line on stderr + a distinct exit code per stage,
+# so the TS side can tell *where* it died without parsing tracebacks.
+def fail(msg, code):
+  print(f'GPTANON_FAIL {msg}', file=sys.stderr, flush=True)
+  raise SystemExit(code)
+
+
 def main():
   t_start = time.time()
   mark = lambda: round((time.time() - t_start) * 1000)
@@ -80,18 +96,18 @@ def main():
   prompt = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] != '--timed' else sys.stdin.read()
   prompt = prompt.strip()
   if not prompt:
-    raise SystemExit('empty prompt')
+    fail('empty prompt', 10)
   s = requests.Session(impersonate='chrome133a')
   s.headers.update({'user-agent': UA})
   log('session-ready')
   land = s.get(BASE, timeout=30)
   if land.status_code != 200:
-    raise SystemExit(f'landing HTTP {land.status_code}')
+    fail(f'landing HTTP {land.status_code}', 11)
   log('landing', land.status_code)
   try:
     prod = land.text.split('data-build="')[1].split('"')[0]
   except IndexError:
-    raise SystemExit('no data-build in landing')
+    fail('no data-build in landing', 12)
   did = s.cookies.get('oai-did') or str(uuid.uuid4())
   t0 = int(time.time() * 1000)
   now = datetime.now(timezone.utc).astimezone()
@@ -103,7 +119,7 @@ def main():
   req = s.post(BASE + '/backend-anon/sentinel/chat-requirements', json={'p': 'gAAAAAC' + enc(cfg)},
     headers=req_h, timeout=30)
   if req.status_code != 200:
-    raise SystemExit(f'requirements HTTP {req.status_code} {req.text[:200]}')
+    fail(f'requirements HTTP {req.status_code} {req.text[:200]}', 13)
   jr = req.json()
   log('requirements', req.status_code)
   t_pow = time.time()
@@ -123,7 +139,7 @@ def main():
   except Exception:
     pass
   if not conduit:
-    raise SystemExit(f'prepare HTTP {prep.status_code} {prep.text[:200]}')
+    fail(f'prepare HTTP {prep.status_code} {prep.text[:200]}', 14)
   log('prepare', prep.status_code)
   # Turnstile goes out blank — the backend currently waves it through,
   # so no need to lug around the whole VM decompiler.
@@ -143,12 +159,20 @@ def main():
     'system_hints': [], 'supports_buffering': True, 'supported_encodings': ['v1']}, timeout=60)
   log('conversation', conv.status_code, len(conv.text))
   if conv.status_code != 200:
-    raise SystemExit(f'conversation HTTP {conv.status_code} {conv.text[:300]}')
+    fail(f'conversation HTTP {conv.status_code} {conv.text[:300]}', 15)
   text = parse_stream(conv.text).strip()
   if not text:
-    raise SystemExit('empty response')
+    fail('empty response', 16)
   sys.stdout.write(text)
 
 
 if __name__ == '__main__':
-  main()
+  try:
+    main()
+  except SystemExit:
+    raise
+  except Exception as e:
+    # anything unexpected (network drop, bad JSON, curl hiccup) gets one
+    # clean line + code 17 instead of a raw traceback
+    print(f'GPTANON_FAIL unexpected {type(e).__name__}: {str(e)[:300]}', file=sys.stderr, flush=True)
+    raise SystemExit(17)

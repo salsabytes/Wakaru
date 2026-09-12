@@ -47,7 +47,9 @@ export default {
     }
 
     saveAiHistory(histKey, query, finalText)
-    await ctx.reply(finalText)
+    // LLMs always emit Markdown **bold** — WhatsApp only renders *single*,
+    // so double stars show up as literal asterisks. Normalize before sending.
+    await ctx.reply(finalText.replace(/\*\*(.+?)\*\*/g, '*$1'))
   },
 }
 

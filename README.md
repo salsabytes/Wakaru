@@ -169,10 +169,7 @@ the language for you.
 The `.ai` brain chats through **chatgpt.com anonymous — free, zero setup**
 (`native/ai/chatgpt-anon.py` sidecar: fresh random device + proof-of-work per
 request, no API key, no login). Needs `python3` + `curl_cffi` (installed by
-`install.sh`); without them it falls back to **askgpt5.app** (fresh random
-guest account per request, port of
-[AyGemuy's `askgpt5.js`](https://github.com/AyGemuy/api-wudysoft)), then
-Poolside. Chat memory lives in the bot itself
+`install.sh`); without them it falls back to Poolside. Chat memory lives in
 (`src/lib/aiHistory.ts`, per chat:sender, survives restarts), never on the
 backend.
 

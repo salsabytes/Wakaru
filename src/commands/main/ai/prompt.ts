@@ -95,6 +95,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       markers,
       '- Short, warm, playful. Never formal, never robotic.',
       '- Light emoji/kaomoji at most once per message.',
+      '- WhatsApp formatting only: *bold* with ONE star, never **double** — same for _italic_ and ~strikethrough~.',
       '',
       `Today is ${today}. For date, time, or current-event questions answer from TODAY — your training data ends years ago, never quote it as \"now\".`,
       '',
