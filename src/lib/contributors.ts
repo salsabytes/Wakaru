@@ -8,11 +8,12 @@ const cache = new NodeCache({ stdTTL: 24 * 60 * 60 }) as {
 }
 
 // fetched once a day, falls back to the static list when GitHub is unreachable
+// hard 5s cap so one slow lookup never holds up a chat reply
 export const fetchContributors = async (): Promise<string> => {
   const cached = cache.get('contributors')
   if (cached) return cached
   try {
-    const res = await fetch('https://api.github.com/repos/salsabytes/Wakaru/contributors?per_page=100')
+    const res = await fetch('https://api.github.com/repos/salsabytes/Wakaru/contributors?per_page=100', { signal: AbortSignal.timeout(5_000) })
     if (!res.ok) return FALLBACK
     const list = (await res.json()) as { login: string; html_url: string }[]
     // creator line in prompt.ts already names salsabytes — drop them here so the AI doesn't treat them as two people

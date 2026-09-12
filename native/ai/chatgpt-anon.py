@@ -73,15 +73,21 @@ def parse_stream(text):
 
 
 def main():
-  prompt = sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read()
+  t_start = time.time()
+  mark = lambda: round((time.time() - t_start) * 1000)
+  timed = '--timed' in sys.argv
+  log = lambda *a: timed and print('TIMED', mark(), *a, file=sys.stderr, flush=True)
+  prompt = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] != '--timed' else sys.stdin.read()
   prompt = prompt.strip()
   if not prompt:
     raise SystemExit('empty prompt')
   s = requests.Session(impersonate='chrome133a')
   s.headers.update({'user-agent': UA})
+  log('session-ready')
   land = s.get(BASE, timeout=30)
   if land.status_code != 200:
     raise SystemExit(f'landing HTTP {land.status_code}')
+  log('landing', land.status_code)
   try:
     prod = land.text.split('data-build="')[1].split('"')[0]
   except IndexError:
@@ -99,7 +105,10 @@ def main():
   if req.status_code != 200:
     raise SystemExit(f'requirements HTTP {req.status_code} {req.text[:200]}')
   jr = req.json()
+  log('requirements', req.status_code)
+  t_pow = time.time()
   pow_token = solve_pow(jr['proofofwork']['seed'], jr['proofofwork']['difficulty'], cfg)
+  log('pow', round((time.time() - t_pow) * 1000))
   prep_h = {'accept': '*/*', 'content-type': 'application/json', 'oai-client-version': prod,
     'oai-device-id': did, 'oai-language': 'id-ID', 'origin': BASE, 'referer': BASE + '/',
     'x-conduit-token': 'no-token'}
@@ -115,6 +124,7 @@ def main():
     pass
   if not conduit:
     raise SystemExit(f'prepare HTTP {prep.status_code} {prep.text[:200]}')
+  log('prepare', prep.status_code)
   # Turnstile goes out blank — the backend currently waves it through,
   # so no need to lug around the whole VM decompiler.
   conv_h = {'accept': 'text/event-stream', 'content-type': 'application/json',
@@ -130,7 +140,8 @@ def main():
     'parent_message_id': 'client-created-root', 'model': 'auto',
     'timezone_offset_min': 420, 'timezone': 'Asia/Jakarta',
     'history_and_training_disabled': True, 'conversation_mode': {'kind': 'primary_assistant'},
-    'system_hints': [], 'supports_buffering': True, 'supported_encodings': ['v1']}, timeout=120)
+    'system_hints': [], 'supports_buffering': True, 'supported_encodings': ['v1']}, timeout=60)
+  log('conversation', conv.status_code, len(conv.text))
   if conv.status_code != 200:
     raise SystemExit(f'conversation HTTP {conv.status_code} {conv.text[:300]}')
   text = parse_stream(conv.text).strip()

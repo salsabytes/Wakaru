@@ -6,6 +6,9 @@ import { textOfMessage } from '../../../lib/serialize.ts'
 import { fetchContributors } from '../../../lib/contributors.ts'
 
 const PARTICIPANT_MAX = 20
+// groupMetadata can hang on a flaky connection — cap it so the reply never waits on member names
+const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
+  Promise.race([p.then((v): T | null => v), new Promise<T | null>((r) => setTimeout(() => r(null), ms))])
 
 async function buildContext(ctx: CommandContext): Promise<string> {
   const lines = [`chat: ${ctx.chat}`, `sender: ${ctx.sender}`, ctx.isGroup ? 'chat type: group' : 'chat type: private']
@@ -14,7 +17,8 @@ async function buildContext(ctx: CommandContext): Promise<string> {
   if (ctx.quoted?.text) lines.push(`user is replying to: "${ctx.quoted.text.slice(0, 200)}"`)
   if (ctx.isGroup) {
     try {
-      const meta = await ctx.sock.groupMetadata(ctx.chat)
+      const meta = await withTimeout(ctx.sock.groupMetadata(ctx.chat), 3_000)
+      if (!meta) return lines.join('\n')
       const me = meta.participants.find((p) => p.id.split(':')[0] === ctx.sender.split(':')[0])
       if (me?.notify) lines.push(`current sender's name in this group: ${me.notify}`)
       const members = meta.participants
@@ -26,7 +30,7 @@ async function buildContext(ctx: CommandContext): Promise<string> {
 
     }
   }
-  const recent = recentByChat(ctx.chat, 8)
+  const recent = recentByChat(ctx.chat, 4)
   if (recent.length) {
     const chatLines = recent.map((m) => {
       const sender = (m.key?.participant ?? m.key?.remoteJid ?? '?').split('@')[0]
@@ -38,14 +42,18 @@ async function buildContext(ctx: CommandContext): Promise<string> {
 }
 
 export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
-  const context = await buildContext(ctx)
+  // independent lookups run together — serial awaits waste 1-2s per message
+  const [context, contributors, commands] = await Promise.all([
+    buildContext(ctx),
+    fetchContributors(),
+    listCommands(),
+  ])
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   })
-  const contributors = await fetchContributors()
   const lang = language()
   const voice =
     lang === 'en'
@@ -94,7 +102,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       context,
       '',
       'AVAILABLE COMMANDS (name — description):',
-      (await listCommands())
+      commands
         .filter((c) => c.name !== 'ai')
         .map((c) => `- ${c.name}${c.desc ? ' — ' + c.desc : ''}`)
         .join('\n'),

@@ -2,8 +2,8 @@ import NodeCache from '@cacheable/node-cache'
 import type { ChatMsg } from './llm.ts'
 import { readJson, register, saveJson } from './disk.ts'
 
-const HISTORY_MAX = 20
-const HISTORY_CHAR_MAX = 8000
+const HISTORY_MAX = 12
+const HISTORY_CHAR_MAX = 4000
 const SESSION_TTL = 6 * 60 * 60 * 1000
 
 const history = new NodeCache({ stdTTL: 6 * 60 * 60, checkperiod: 600, maxKeys: 2000 }) as {
