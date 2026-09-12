@@ -166,11 +166,15 @@ The bot's reply language lives in the same file:
 switch it live from WhatsApp with `.setlang` — or just ask `.ai` to change
 the language for you.
 
-The `.ai` brain chats through **askgpt5.app — anonymous, free, zero setup**
-(port of [AyGemuy's `askgpt5.js`](https://github.com/AyGemuy/api-wudysoft),
-no API key, no Python, no cookies). On first use it auto-registers a random
-guest account (valid 24h) and streams the reply. Nothing to configure — if
-the session expires it re-registers automatically.
+The `.ai` brain chats through **chatgpt.com anonymous — free, zero setup**
+(`native/ai/chatgpt-anon.py` sidecar: fresh random device + proof-of-work per
+request, no API key, no login). Needs `python3` + `curl_cffi` (installed by
+`install.sh`); without them it falls back to **askgpt5.app** (fresh random
+guest account per request, port of
+[AyGemuy's `askgpt5.js`](https://github.com/AyGemuy/api-wudysoft)), then
+Poolside. Chat memory lives in the bot itself
+(`src/lib/aiHistory.ts`, per chat:sender, survives restarts), never on the
+backend.
 
 `"stickerPack"` / `"stickerAuthor"` are the default sticker name shown in
 WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.

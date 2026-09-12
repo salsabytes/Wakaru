@@ -106,6 +106,17 @@ step "Dependencies"
 if [ "$use_bun" = 1 ]; then bun install; else npm install; fi
 ok "dependencies installed"
 
+# .ai primary backend needs python3 + curl_cffi — missing pieces only
+# knock out the sidecar, the askgpt5/poolside fallbacks still answer.
+step "AI sidecar (chatgpt-anon)"
+if has python3; then
+  python3 -m pip install --quiet curl_cffi 2>/dev/null \
+    && ok "curl_cffi installed" \
+    || skip "curl_cffi install failed - .ai falls back to askgpt5"
+else
+  skip "python3 missing - .ai falls back to askgpt5"
+fi
+
 step "Engines (sticker)"
 build_engine() {
   local crate="$1" binary="$2" out="$3"

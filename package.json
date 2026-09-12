@@ -7,7 +7,7 @@
   "scripts": {
     "start": "bun src/index.ts",
     "start:pairing": "bun src/index.ts --use-pairing-code",
-    "build:sticker": "bash scripts/build-sticker.sh",
+    "build:sticker": "bash native/build.sh",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

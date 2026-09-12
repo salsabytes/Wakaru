@@ -1,5 +1,8 @@
 import { UA } from '../src/lib/scrapers/http.ts'
 
+// Manual probe for the ytmp3 backend — not part of CI, just a quick
+// sanity check when downloads start acting up. Point it at a video id,
+// watch the timings, confirm the file actually lands.
 const vid = 'dQw4w9WgXcQ'
 const HOME = 'https://id.ytmp3.mobi/'
 const HOST = 'a.ymcdn.org'

@@ -5,6 +5,7 @@ on:
     paths:
       - install.sh
       - .github/workflows/install.yml
+      - native/ai/**
       - src/commands/main/ai/**
   workflow_dispatch:
 
