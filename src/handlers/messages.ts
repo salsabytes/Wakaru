@@ -17,12 +17,19 @@ const dispatch = (msg: WAMessage, m: SerializedMessage, jid: string): void => {
 }
 
 const lidCache = new Map<string, string>()
+const LID_CACHE_MAX = 1000
+
 const resolveJid = async (jid: string) => {
   if (!jid.endsWith('@lid') && !jid.endsWith('@hosted.lid')) return jid
   const cached = lidCache.get(jid)
   if (cached) return cached
   const pn = await waka.signalRepository.lidMapping.getPNForLID(jid)
-  if (pn) lidCache.set(jid, pn)
+  if (pn) {
+    lidCache.set(jid, pn)
+    if (lidCache.size > LID_CACHE_MAX) {
+      lidCache.delete(lidCache.keys().next().value!)
+    }
+  }
   return pn ?? jid
 }
 
