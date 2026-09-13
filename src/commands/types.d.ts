@@ -30,6 +30,7 @@ declare global {
     quoted?: MediaMeta
     reply: (text: string) => Promise<void>
     react: (emoji: string) => Promise<void>
+    fromMe: boolean
     sendSticker: (buffer: Buffer) => Promise<void>
     sendImage: (buffer: Buffer, caption?: string) => Promise<void>
     sendVideo: (buffer: Buffer, caption?: string) => Promise<void>

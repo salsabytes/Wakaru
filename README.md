@@ -72,6 +72,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.spotify <url>` | `.sp` | Spotify track/album → matched on YouTube → audio |
 | `.x <url>` | `.twitter`, `.tw` | X (Twitter) video, no watermark |
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
+| `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |
 
 Multi-file results (IG carousels, Pinterest searches) are delivered to your
 **private chat** so groups stay tidy.
@@ -157,6 +158,7 @@ The bot's reply language lives in the same file:
 {
   "owners": ["6281234567890"],
   "language": "id",
+  "mode": "public",
   "stickerPack": "Wakaru",
   "stickerAuthor": "buatan gweh"
 }
@@ -172,6 +174,10 @@ request, no API key, no login). Needs `python3` + `curl_cffi` (installed by
 `install.sh`); without them it falls back to Poolside. Chat memory lives in
 (`src/lib/aiHistory.ts`, per chat:sender, survives restarts), never on the
 backend.
+
+`"mode"` accepts `public` (everyone, the default), `self` (only commands
+sent from the bot's own account), or `private` (owners only). Switch it
+live with `.mode` — or ask `.ai`.
 
 `"stickerPack"` / `"stickerAuthor"` are the default sticker name shown in
 WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.

@@ -12,6 +12,7 @@ export interface MediaMeta {
 export interface SerializedMessage {
   chat: string
   sender: string
+  fromMe: boolean
   isGroup: boolean
   mtype: string
   text: string
@@ -76,6 +77,7 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
   const s: SerializedMessage = {
     chat,
     sender,
+    fromMe: !!msg.key?.fromMe,
     isGroup: chat.endsWith('@g.us'),
     mtype,
     text,

@@ -67,7 +67,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
     role: 'system',
     content: [
       voice,
-      `The bot's hardcoded reply language is ${lang} (id/en). If the user asks to switch the bot's language, emit @run:setlang <id|en>.`,
+      `The bot's hardcoded reply language is ${lang} (id/en). If the user asks to switch the bot's language, emit @run:setlang <id|en>. If the user asks who can use the bot (public/self/private), emit @run:mode <mode>.`,
       '',
       'ABOUT YOU (answer identity/creator questions from this, never invent):',
       '- Your name is Wakaru (分かる, Japanese for "understand").',

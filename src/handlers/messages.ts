@@ -7,7 +7,7 @@ import { makeSender, type Sender } from '../lib/sender.ts'
 import { withSlot, cooldownLeft } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
 import { t } from '../lib/lang.ts'
-import { OWNERS, isOwner } from '../lib/config.ts'
+import { OWNERS, botMode, isOwner } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 
@@ -57,8 +57,9 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
 
     for (const msg of upsert.messages) {
       const jid = msg.key?.remoteJid
-      if (!jid || msg.key?.fromMe || isStale(msg)) continue
+      if (!jid || isStale(msg)) continue
       const m = await serialize(msg)
+      if (m.fromMe && botMode() !== 'self') continue
       if (!m.button) continue
       logger.info(`🔘 ${jid} [append]: ${m.button.text || m.button.id}`)
       dispatch(msg, m, jid)
@@ -68,8 +69,9 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
 
   for (const msg of upsert.messages) {
     const jid = msg.key?.remoteJid
-    if (!jid || msg.key?.fromMe || isStale(msg)) continue
+    if (!jid || isStale(msg)) continue
     const m = await serialize(msg)
+    if (m.fromMe && botMode() !== 'self') continue
 
     if (!m.text && !m.button) continue
     logger.info(m.button ? `🔘 ${jid}: ${m.button.text || m.button.id}` : `📥 ${jid}: ${m.text}`)
@@ -126,6 +128,8 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   const { cmd, queryText, args } = await parseCommand(m, sender, text)
   if (!cmd) return
   if (await blockedByCooldown(sender, cmd, send)) return
+  const mode = botMode()
+  if (mode !== 'public' && !m.fromMe && !isOwner(sender)) return
 
   const ctx: CommandContext = {
     sock: waka,
@@ -143,6 +147,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     quoted: m.quoted,
     reply: send.text,
     react: (emoji) => send.react(emoji, msg.key),
+    fromMe: m.fromMe,
     sendSticker: send.sticker,
     sendImage: send.image,
     sendVideo: send.video,
