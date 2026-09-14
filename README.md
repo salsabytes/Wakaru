@@ -193,10 +193,10 @@ sent from the bot's own account), or `private` (owners only). Switch it
 live with `.mode` — or ask `.ai`.
 
 `"prefixes"` is the command prefix list (max 5, no spaces). Switch it live
-with `.prefix <chars>` (e.g. `.prefix !`, multi: `.prefix ! /`), or
-`.prefix none` for bare mode — commands fire without any prefix. With
-prefixes set, a bare command (`menu`) only fires when sent twice in a row;
-in bare mode it fires right away.
+with `.prefix <chars>` (e.g. `.prefix !`, multi: `.prefix ! /`). Add `none`
+to also accept bare commands (`.prefix ! / none`) — or `none` alone for
+full bare mode. With prefixes only, a bare command (`menu`) only fires
+when sent twice in a row; with bare on it fires right away.
 
 `"maxDownloadMB"` caps media downloads (default 100, clamped 10–2048).
 Switch it live with `.limit <MB>` — or ask `.ai`. Bigger files eat more

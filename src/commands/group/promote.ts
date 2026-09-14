@@ -5,8 +5,10 @@ export default {
   name: 'promote',
   desc: 'promote member(s) to group admin (tag or reply)',
   aliases: ['angkat'],
+  groupOnly: true,
+  adminOnly: true,
+  botAdmin: true,
   run: async (ctx: CommandContext) => {
-    if (!ctx.isGroup) return ctx.reply(t('groupOnly'))
     const targets = [...ctx.mentionedJid, ...(ctx.quoted?.sender ? [ctx.quoted.sender] : [])]
     if (!targets.length) return ctx.reply(t('promoteUsage', { prefix: ctx.prefix }))
     const g = await groupGuards(ctx)

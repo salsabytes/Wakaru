@@ -3,6 +3,7 @@
   "language": "id",
   "mode": "public",
   "prefixes": ["."],
+  "bare": false,
   "maxDownloadMB": 100,
   "stickerPack": "Wakaru",
   "stickerAuthor": "buatan gweh",

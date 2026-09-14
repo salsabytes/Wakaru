@@ -44,9 +44,12 @@ let mode: Mode = (() => {
 
 export const botMode = (): Mode => mode
 
+export const BARE_TOKENS = ['none', 'off', 'bare']
+
 const cleanPrefixes = (src: unknown): string[] =>
   (Array.isArray(src) ? src : [src])
     .filter((p): p is string => typeof p === 'string' && p.length > 0 && !/\s/.test(p))
+    .filter((p) => !BARE_TOKENS.includes(p.toLowerCase()))
     .slice(0, 5)
 
 let prefixes: string[] = (() => {
@@ -60,6 +63,20 @@ let prefixes: string[] = (() => {
 
 export const botPrefixes = (): string[] => prefixes
 
+let bare: boolean = (() => {
+  try {
+    const cfg = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')) as { bare?: unknown; prefixes?: unknown; prefix?: unknown }
+    if (typeof cfg.bare === 'boolean') return cfg.bare
+    const raw = Array.isArray(cfg.prefixes) ? cfg.prefixes : cfg.prefix !== undefined ? cfg.prefix : '.'
+    if (Array.isArray(raw) && raw.some((p) => typeof p === 'string' && BARE_TOKENS.includes(p.toLowerCase()))) return true
+    return cleanPrefixes(raw).length === 0
+  } catch {
+    return false
+  }
+})()
+
+export const botBare = (): boolean => bare
+
 const patchCfg = (mut: (cfg: Record<string, unknown>) => void): void => {
   try {
     const path = join(ROOT, 'config.json')
@@ -71,22 +88,24 @@ const patchCfg = (mut: (cfg: Record<string, unknown>) => void): void => {
   }
 }
 
-export const setPrefixes = (next: unknown): string[] => {
+export const setPrefixes = (next: unknown, allowBare?: boolean): string[] => {
   prefixes = cleanPrefixes(next)
+  bare = allowBare ?? prefixes.length === 0
   patchCfg((cfg) => {
     cfg.prefixes = prefixes
+    cfg.bare = bare
   })
   return prefixes
 }
 
 // body after the (longest-match) prefix; undefined = no prefix used.
-// empty prefix list = bare mode: whole text is the body.
+// bare mode (empty list or bare flag): whole text is the body.
 export const prefixBody = (text: string): string | undefined => {
-  if (!prefixes.length) return text.trim()
   const hit = prefixes
     .filter((p) => text.startsWith(p))
     .sort((a, b) => b.length - a.length)[0]
-  return hit === undefined ? undefined : text.slice(hit.length).trim()
+  if (hit !== undefined) return text.slice(hit.length).trim()
+  return bare || !prefixes.length ? text.trim() : undefined
 }
 
 // bare mode never counts as prefixed (so .play picks still work there)

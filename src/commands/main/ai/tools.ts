@@ -20,6 +20,9 @@ export const runTool = async (r: { name: string; args: string }, ctx: CommandCon
   if (r.name === 'ai') return '[ai] denied — no self-recursion'
   const cmd = await getCommand(r.name)
   if (!cmd) return `[${r.name}] no such command`
+  if (cmd.groupOnly && !ctx.isGroup) return `[${r.name}] denied — groups only`
+  if (cmd.adminOnly && !ctx.isOwner && !ctx.isAdmin) return `[${r.name}] denied — group admins only`
+  if (cmd.botAdmin && !ctx.isBotAdmin) return `[${r.name}] denied — bot is not an admin`
   if (cmd.ownerOnly && !isOwner(ctx.sender)) return `[${r.name}] denied — owner only`
   try {
     const captured: string[] = []

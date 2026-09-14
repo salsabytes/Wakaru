@@ -5,8 +5,10 @@ export default {
   name: 'kick',
   desc: 'kick a member from the group (tag or reply)',
   aliases: ['tendang', 'keluarkan'],
+  groupOnly: true,
+  adminOnly: true,
+  botAdmin: true,
   run: async (ctx: CommandContext) => {
-    if (!ctx.isGroup) return ctx.reply(t('groupOnly'))
     const targets = [...ctx.mentionedJid, ...(ctx.quoted?.sender ? [ctx.quoted.sender] : [])]
     if (!targets.length) return ctx.reply(t('kickUsage', { prefix: ctx.prefix }))
     const g = await groupGuards(ctx)

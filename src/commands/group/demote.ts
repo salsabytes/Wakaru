@@ -5,8 +5,10 @@ export default {
   name: 'demote',
   desc: 'demote admin(s) back to member (tag or reply)',
   aliases: ['turunkan'],
+  groupOnly: true,
+  adminOnly: true,
+  botAdmin: true,
   run: async (ctx: CommandContext) => {
-    if (!ctx.isGroup) return ctx.reply(t('groupOnly'))
     const targets = [...ctx.mentionedJid, ...(ctx.quoted?.sender ? [ctx.quoted.sender] : [])]
     if (!targets.length) return ctx.reply(t('demoteUsage', { prefix: ctx.prefix }))
     const g = await groupGuards(ctx)

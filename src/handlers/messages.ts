@@ -7,7 +7,7 @@ import { makeSender, type Sender } from '../lib/sender.ts'
 import { withSlot, cooldownLeft } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
 import { t } from '../lib/lang.ts'
-import { OWNERS, botMode, botPrefixes, isOwner, prefixBody, usedPrefix } from '../lib/config.ts'
+import { OWNERS, botBare, botMode, botPrefixes, isOwner, prefixBody, usedPrefix } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 import { participantMaps } from '../lib/group.ts'
@@ -110,9 +110,9 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
     if (bareSeen.size > 2000) bareSeen.clear()
     const last = bareSeen.get(key) ?? 0
     bareSeen.set(key, now)
-    // prefixes set: same bare command twice in a row = deliberate, once = chat.
-    // bare mode (no prefixes): fire right away — the owner asked for it.
-    if (botPrefixes().length && now - last > BARE_WINDOW_MS) return { cmd: undefined, queryText: '', args: [] }
+    // prefixes only: same bare command twice in a row = deliberate, once = chat.
+    // bare on (flag or empty list): fire right away — the owner asked for it.
+    if (!botBare() && botPrefixes().length && now - last > BARE_WINDOW_MS) return { cmd: undefined, queryText: '', args: [] }
     const after = noPrefix.slice(guess.length).trim()
     return { cmd: bareCmd, queryText: after, args: after ? after.split(/\s+/) : [] }
   }
@@ -200,6 +200,9 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
 
   try {
     await withSlot(async () => {
+      if (cmd.groupOnly && !ctx.isGroup) return ctx.reply(t('groupOnly'))
+      if (cmd.adminOnly && !ctx.isOwner && !ctx.isAdmin) return ctx.reply(t('kickAdminOnly'))
+      if (cmd.botAdmin && !ctx.isBotAdmin) return ctx.reply(t('kickBotNotAdmin'))
       if (await blockedByOwner(ctx, cmd)) return
       await cmd.run(ctx)
     })

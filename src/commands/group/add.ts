@@ -5,8 +5,10 @@ export default {
   name: 'add',
   desc: 'add a member to the group by phone number',
   aliases: ['tambah'],
+  groupOnly: true,
+  adminOnly: true,
+  botAdmin: true,
   run: async (ctx: CommandContext) => {
-    if (!ctx.isGroup) return ctx.reply(t('groupOnly'))
     const nums = [
       ...new Set(
         ctx.text

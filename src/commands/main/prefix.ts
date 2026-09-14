@@ -1,25 +1,26 @@
-import { botPrefixes, setPrefixes } from '../../lib/config.ts'
+import { botBare, botPrefixes, setPrefixes, BARE_TOKENS } from '../../lib/config.ts'
 import { t } from '../../lib/lang.ts'
 
-const displayPrefixes = (p: string[]): string => (p.length ? p.join(' ') : t('prefixNone'))
+const displayPrefixes = (p: string[], bare: boolean): string => {
+  if (!p.length) return t('prefixNone')
+  return bare ? `${p.join(' ')} + ${t('prefixNone')}` : p.join(' ')
+}
 
 export default {
   name: 'prefix',
-  desc: 'change command prefixes, or none for bare mode (owner only)',
+  desc: 'change command prefixes, multi, and optional bare (owner only)',
   ownerOnly: true,
   run: async (ctx: CommandContext) => {
     const raw = ctx.text.trim().toLowerCase()
     if (!raw) {
-      return ctx.reply(t('prefixUsage', { prefix: ctx.prefix, prefixes: displayPrefixes(botPrefixes()) }))
+      return ctx.reply(t('prefixUsage', { prefix: ctx.prefix, prefixes: displayPrefixes(botPrefixes(), botBare()) }))
     }
-    if (raw === 'none' || raw === 'off' || raw === 'bare') {
-      setPrefixes([])
-      return ctx.reply(t('prefixSet', { prefixes: displayPrefixes(botPrefixes()) }))
+    const toks = raw.split(/\s+/)
+    const wantBare = toks.some((tok) => BARE_TOKENS.includes(tok))
+    const next = setPrefixes(toks.filter((tok) => !BARE_TOKENS.includes(tok)), wantBare)
+    if (!next.length && !wantBare) {
+      return ctx.reply(t('prefixUsage', { prefix: ctx.prefix, prefixes: displayPrefixes(botPrefixes(), botBare()) }))
     }
-    const next = setPrefixes(raw.split(/\s+/))
-    if (!next.length) {
-      return ctx.reply(t('prefixUsage', { prefix: ctx.prefix, prefixes: displayPrefixes(botPrefixes()) }))
-    }
-    await ctx.reply(t('prefixSet', { prefixes: displayPrefixes(next) }))
+    await ctx.reply(t('prefixSet', { prefixes: displayPrefixes(next, botBare()) }))
   },
 } satisfies Command
