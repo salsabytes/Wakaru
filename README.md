@@ -50,6 +50,7 @@ it *do* things for you.
 - 🔁 **Never leaves you hanging** — auto-reconnects with exponential backoff
 - 🔐 **Easy in** — log in with a QR code or a pairing code
 - 📱 **Runs on your phone** — first-class Termux support, no root needed
+- 🌐 **Speaks your language** — free-form `.setlang` (`id`/`en`/`ja`/…) with file cache
 - 🎨 **Prettily logged** — charmbracelet-style console output, clock-only timestamps
 - ⚡ **Fast & cheap** — every command runs in parallel (one global slot pool), per-user cooldown on heavy commands, configurable download cap (100 MB default), no self-hosted servers
 
@@ -80,7 +81,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.promote` | `.angkat` | Promote member(s) to admin (tag or reply, group admins/owner only) |
 | `.demote` | `.turunkan` | Demote admin(s) to member (tag or reply, group admins/owner only) |
 | `.add <number>` | `.tambah` | Add members by phone number (group admins/owner only) |
-| `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
+| `.setlang <code>` | `.lang`, `.bahasa` | Switch the bot's reply language, any code (`id`/`en`/`ja`/…) |
 | `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |
 | `.prefix <chars\|none>` | — | Command prefixes, multi, or bare mode (owner only) |
 | `.limit <MB>` | — | Max media download size, 10–2048 MB (owner only) |
@@ -179,9 +180,7 @@ The bot's reply language lives in the same file:
 }
 ```
 
-`"language"` accepts `id` (Indonesian, the default) or `en`. You can also
-switch it live from WhatsApp with `.setlang` — or just ask `.ai` to change
-the language for you.
+`"language"` accepts any code — `id` (Indonesian, the default), `en`, `ja`, and more. Other codes read `data/lang/<code>.json` (a plain `{ key: translation }` file, `{placeholders}` intact); missing file or key falls back to English. Switch live with `.setlang` — or just ask `.ai`.
 
 The `.ai` brain chats through **chatgpt.com anonymous — free, zero setup**
 (`native/ai/chatgpt-anon.py` sidecar: fresh random device + proof-of-work per
@@ -196,9 +195,10 @@ live with `.mode` — or ask `.ai`.
 
 `"prefixes"` is the command prefix list (max 5, no spaces). Switch it live
 with `.prefix <chars>` (e.g. `.prefix !`, multi: `.prefix ! /`). Add `none`
-to also accept bare commands (`.prefix ! / none`) — or `none` alone for
+to also accept bare commands alongside (`.prefix ! / none`) — or `none` alone for
 full bare mode. With prefixes only, a bare command (`menu`) only fires
 when sent twice in a row; with bare on it fires right away.
+Replies to the bot and link follow-ups always reach `.ai`, even in bare mode.
 
 `"maxDownloadMB"` caps media downloads (default 100, clamped 10–2048).
 Switch it live with `.limit <MB>` — or ask `.ai`. Bigger files eat more
@@ -250,7 +250,7 @@ src/
 │   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook,
 │   │                        # pinterest, soundcloud, spotify, twitter
 │   ├── converter/           # sticker, toimg, brat
-│   └── group/               # kick, add
+│   └── group/               # kick, promote, demote, add (groupOnly + adminOnly + botAdmin)
 ├── lib/
 │   ├── scrapers/            # one module per platform + shared http/curl helpers
 │   ├── queue.ts             # global slot pool + per-user cooldown
@@ -360,11 +360,18 @@ Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch
 <details>
 <summary>Recent changes</summary>
 
+**Unreleased**
+- Reply language is free-form: `.setlang <code>` takes any code with `data/lang/<code>.json` file cache and pivot fallback
+- Reply-to-bot and link follow-ups reach `.ai` even with bare mode on
+- `.ai` output is WhatsApp-safe: `[text](url)` flattened, `**bold**` → `*bold*`
+- Group commands are declarative (`groupOnly`/`adminOnly`/`botAdmin`)
+- README in English, Indonesian, and Japanese (full translations, cross-linked)
+
 **v1.2.0**
 - `.prefix` command: custom prefix, multi-prefix (`.prefix ! /`), or bare no-prefix mode (`.prefix none`) — also settable via `"prefixes"` in `config.json`
 - Bare commands need a double-tap when prefixes are set (chat-safe); fire instantly in bare mode
 - Fix: `queryText` ate one char when a space follows the prefix (`. brat halo` → `t halo`)
-- README sync: Python AI sidecar in tech stack, full 21-command table, live project tree
+- README sync: Python AI sidecar in tech stack, full 24-command table, live project tree
 
 **v1.1.1**
 - `.mode` command: `public` (everyone) / `self` (bot account only) / `private` (owners only) reply gate, switchable live or via `config.json`
