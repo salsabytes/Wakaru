@@ -1,5 +1,3 @@
-> 🌐 Read in: [Indonesia](README.id.md) · [日本語](README.ja.md)
-
 <div align="center">
 
 # ✨ Wakaru
@@ -17,6 +15,8 @@ command list you can grow yourself.
 [![Bun](https://img.shields.io/badge/Bun-1E293B?style=for-the-badge&logo=bun&logoColor=FDE68A)](https://bun.sh/)
 [![Rust](https://img.shields.io/badge/Rust%20sidecar-D97706?style=for-the-badge&logo=rust&logoColor=white)](native/sticker)
 [![CodeFactor](https://img.shields.io/codefactor/grade/github/salsabytes/wakaru/master?style=for-the-badge&logo=codefactor&logoColor=white&label=CodeFactor)](https://www.codefactor.io/repository/github/salsabytes/wakaru)
+
+<p>🌐 <b>English</b> · <a href="README.id.md">Bahasa Indonesia</a> · <a href="README.ja.md">日本語</a></p>
 
 </div>
 
