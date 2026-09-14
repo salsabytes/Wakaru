@@ -1,5 +1,6 @@
 import type { WAMessage } from 'baileys'
 import { downloadMediaMessage, getContentType, normalizeMessageContent } from 'baileys'
+import { waka } from '../socket.ts'
 
 export interface MediaMeta {
   mtype: string
@@ -66,6 +67,26 @@ function buttonOf(mtype: string, content: any): { id: string; text: string } | u
   return undefined
 }
 
+const statusOf = (err: unknown): number | undefined => {
+  const e = err as { output?: { statusCode?: number }; status?: unknown }
+  return e?.output?.statusCode ?? (typeof e?.status === 'number' ? e.status : undefined)
+}
+
+// URL CDN basi (403) / media kehapus (404/410): minta URL fresh ke pengirim, retry sekali.
+// ponytail: retry gagal = throw asli, command reply "gagal" seperti biasa
+const withReupload = (msg: WAMessage, download: () => Promise<Buffer>): (() => Promise<Buffer>) => {
+  return async () => {
+    try {
+      return await download()
+    } catch (err) {
+      const s = statusOf(err)
+      if (!waka || (s !== 403 && s !== 404 && s !== 410)) throw err
+      const fresh = await waka.updateMediaMessage(msg)
+      return downloadMediaMessage(fresh, 'buffer', {}) as unknown as Promise<Buffer>
+    }
+  }
+}
+
 export function serializeMessage(msg: WAMessage): SerializedMessage {
   const chat = msg.key?.remoteJid ?? ''
   const sender = msg.key?.participant || chat
@@ -73,7 +94,8 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
   const button = buttonOf(mtype, content)
   const text = button?.text || textOfMessage(msg)
 
-  const download = () => downloadMediaMessage(msg, 'buffer', {}) as unknown as Promise<Buffer>
+  const raw = () => downloadMediaMessage(msg, 'buffer', {}) as unknown as Promise<Buffer>
+  const download = withReupload(msg, raw)
 
   const ctxt = content.contextInfo
   const s: SerializedMessage = {
@@ -93,21 +115,18 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
   if (q) {
     const qtype = Object.keys(q)[0]
     const qc = (q as any)?.[qtype] ?? {}
+    const qmsg = {
+      key: { id: ctxt.stanzaId, remoteJid: ctxt.remoteJid, participant: ctxt.participant },
+      message: q,
+    } as WAMessage
+    const qraw = () => downloadMediaMessage(qmsg, 'buffer', {}) as unknown as Promise<Buffer>
     s.quoted = {
       mtype: qtype,
       mimetype: qc.mimetype,
       chat: ctxt.remoteJid ?? chat,
       sender: ctxt.participant ?? '',
       text: qc.text || qc.caption || '',
-      download: () =>
-        downloadMediaMessage(
-          {
-            key: { id: ctxt.stanzaId, remoteJid: ctxt.remoteJid, participant: ctxt.participant },
-            message: q,
-          } as WAMessage,
-          'buffer',
-          {},
-        ) as unknown as Promise<Buffer>,
+      download: withReupload(qmsg, qraw),
     }
   }
 
