@@ -83,10 +83,11 @@ type Parsed = { cmd: Awaited<ReturnType<typeof getCommand>>; queryText: string; 
 
 const parseCommand = async (m: SerializedMessage, sender: string, text: string): Promise<Parsed> => {
   if (text.startsWith(PREFIX)) {
-    const [rawName, ...rest] = text.slice(PREFIX.length).trim().split(/\s+/)
+    const body = text.slice(PREFIX.length).trim()
+    const [rawName, ...rest] = body.split(/\s+/)
     return {
       cmd: await getCommand(rawName.toLowerCase()),
-      queryText: text.slice(PREFIX.length + rawName.length).trim(),
+      queryText: body.slice(rawName.length).trim(),
       args: rest,
     }
   }
