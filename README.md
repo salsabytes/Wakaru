@@ -75,6 +75,8 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.spotify <url>` | `.sp` | Spotify track/album → matched on YouTube → audio |
 | `.twitter <url>` | `.x`, `.tw`, `.twdl` | X (Twitter) video, no watermark |
 | `.kick` | `.tendang`, `.keluarkan` | Kick a member (tag or reply, group admins/owner only) |
+| `.promote` | `.angkat` | Promote member(s) to admin (tag or reply, group admins/owner only) |
+| `.demote` | `.turunkan` | Demote admin(s) to member (tag or reply, group admins/owner only) |
 | `.add <number>` | `.tambah` | Add members by phone number (group admins/owner only) |
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
 | `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |

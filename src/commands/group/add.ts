@@ -1,4 +1,4 @@
-import { isOwner } from '../../lib/config.ts'
+import { groupGuards } from '../../lib/group.ts'
 import { t } from '../../lib/lang.ts'
 
 export default {
@@ -7,8 +7,6 @@ export default {
   aliases: ['tambah'],
   run: async (ctx: CommandContext) => {
     if (!ctx.isGroup) return ctx.reply(t('groupOnly'))
-
-    // merge a bare "+62" with the number that follows (args are whitespace-split), then strip non-digits
     const nums = [
       ...new Set(
         ctx.text
@@ -25,24 +23,8 @@ export default {
       ),
     ]
     if (!nums.length) return ctx.reply(t('addUsage', { prefix: ctx.prefix }))
-
-    const met = await ctx.sock.groupMetadata(ctx.chat).catch(() => undefined)
-    if (!met) return ctx.reply(t('addFailed', { msg: 'groupMetadata' }))
-
-    // only owner or group admins may add; the bot itself needs admin rights
-    const byPart = new Map<string, (typeof met.participants)[number]>()
-    for (const p of met.participants) {
-      for (const num of [p.id, p.phoneNumber, p.lid]) {
-        if (num) byPart.set(num.split('@')[0], p)
-      }
-    }
-    const senderNum = ctx.sender.split(/[@:]/)[0]
-    const botNum = ctx.sock.user?.id?.split(':')[0].split('@')[0]
-    const senderP = byPart.get(senderNum)
-    const botP = botNum ? byPart.get(botNum) : undefined
-    if (!isOwner(ctx.sender) && !senderP?.admin) return ctx.reply(t('addAdminOnly'))
-    if (!botP?.admin) return ctx.reply(t('addBotNotAdmin'))
-
+    const g = await groupGuards(ctx)
+    if (!g) return
     try {
       const jids = nums.map((n) => `${n}@s.whatsapp.net`)
       const res = await ctx.sock.groupParticipantsUpdate(ctx.chat, jids, 'add')
