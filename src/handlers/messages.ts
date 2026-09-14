@@ -10,6 +10,7 @@ import { t } from '../lib/lang.ts'
 import { OWNERS, botMode, botPrefixes, isOwner, prefixBody, usedPrefix } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
+import { participantMaps } from '../lib/group.ts'
 
 // commands run concurrently (globally slot-capped) so a slow downloader never blocks other chats
 const dispatch = (msg: WAMessage, m: SerializedMessage, jid: string): void => {
@@ -156,6 +157,18 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   const mode = botMode()
   if (mode !== 'public' && !m.fromMe && !isOwner(sender)) return
 
+  let isAdmin = false
+  let isBotAdmin = false
+  if (m.isGroup) {
+    const met = await waka.groupMetadata(m.chat).catch(() => undefined)
+    if (met) {
+      const { byPart } = participantMaps(met)
+      isAdmin = !!byPart.get(sender.split(/[@:]/)[0])?.admin
+      const botNum = waka.user?.id?.split(':')[0].split('@')[0]
+      isBotAdmin = !!botNum && !!byPart.get(botNum)?.admin
+    }
+  }
+
   const ctx: CommandContext = {
     sock: waka,
     prefix: botPrefixes()[0] ?? '',
@@ -165,6 +178,9 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     sender,
     pushName: msg.pushName ?? undefined,
     isGroup: m.isGroup,
+    isAdmin,
+    isBotAdmin,
+    isOwner: isOwner(sender),
     mtype: m.mtype,
     mentionedJid: m.mentionedJid,
     download: m.download,

@@ -22,6 +22,9 @@ declare global {
     sender: string
     pushName?: string
     isGroup: boolean
+    isAdmin: boolean
+    isBotAdmin: boolean
+    isOwner: boolean
     mtype: string
     mentionedJid: string[]
     download: () => Promise<Buffer>
