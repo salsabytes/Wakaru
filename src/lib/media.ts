@@ -74,12 +74,28 @@ export interface OutMedia {
   caption?: string
 }
 
+const INLINE_MAX = 64 * 1024 * 1024
+const DOC_MAX = 2 * 1024 * 1024 * 1024
+
+const asDoc = (m: OutMedia): { buf: Buffer; name: string; mime: string } => {
+  const base = (m.caption ?? m.type).replace(/[^\w\- ]+/g, '').trim().slice(0, 60) || m.type
+  const mime = m.type === 'video' ? 'video/mp4' : m.type === 'audio' ? 'audio/mpeg' : 'image/jpeg'
+  const ext = m.type === 'video' ? 'mp4' : m.type === 'audio' ? 'mp3' : 'jpg'
+  return { buf: m.buf, name: `${base}.${ext}`, mime }
+}
+
+export const oversizedDoc = (m: OutMedia): { buf: Buffer; name: string; mime: string } | undefined =>
+  m.buf.length > INLINE_MAX && m.buf.length <= DOC_MAX ? asDoc(m) : undefined
+
 export async function sendMedia(ctx: CommandContext, media: OutMedia[]): Promise<void> {
   const dm = media.length > 1 && ctx.isGroup
   const sendOne = async (s: Sender) => {
     for (const [i, m] of media.entries()) {
       const caption = i === 0 ? m.caption : undefined
-      if (m.type === 'video') await s.video(m.buf, caption)
+      if (m.buf.length > DOC_MAX) throw new Error(`file too large (${(m.buf.length / 1e9).toFixed(1)}GB > 2GB max)`)
+      const doc = oversizedDoc(m)
+      if (doc) await s.document(doc.buf, doc.name, doc.mime)
+      else if (m.type === 'video') await s.video(m.buf, caption)
       else if (m.type === 'audio') await s.audio(m.buf, caption)
       else await s.image(m.buf, caption)
     }

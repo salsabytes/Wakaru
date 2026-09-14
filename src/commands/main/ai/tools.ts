@@ -1,6 +1,6 @@
 import { getCommand } from '../../index.ts'
 import { isOwner } from '../../../lib/config.ts'
-import { fmtBytes, mediaDuration } from '../../../lib/media.ts'
+import { fmtBytes, mediaDuration, oversizedDoc } from '../../../lib/media.ts'
 
 const mediaMeta = (label: string, buf: Buffer): string => {
   const parts = [label]
@@ -38,8 +38,17 @@ export const runTool = async (r: { name: string; args: string }, ctx: CommandCon
         await ctx.sendButtons(buttons, text, footer)
       },
       sendImage: async (b, c) => { captured.push(mediaMeta(c || 'image', b)); await ctx.sendImage(b, c) },
-      sendVideo: async (b, c) => { captured.push(mediaMeta(c || 'video', b)); await ctx.sendVideo(b, c) },
-      sendAudio: async (b, t) => { captured.push(mediaMeta(t || 'audio', b)); await ctx.sendAudio(b) },
+      sendVideo: async (b, c) => {
+        const doc = oversizedDoc({ type: 'video', buf: b, caption: c })
+        if (doc) { captured.push(mediaMeta(doc.name, b)); await ctx.sendDocument(doc.buf, doc.name, doc.mime) }
+        else { captured.push(mediaMeta(c || 'video', b)); await ctx.sendVideo(b, c) }
+      },
+      sendAudio: async (b, t2) => {
+        const doc = oversizedDoc({ type: 'audio', buf: b, caption: t2 })
+        if (doc) { captured.push(mediaMeta(doc.name, b)); await ctx.sendDocument(doc.buf, doc.name, doc.mime) }
+        else { captured.push(mediaMeta(t2 || 'audio', b)); await ctx.sendAudio(b) }
+      },
+      sendDocument: async (b, f) => { captured.push(mediaMeta(f, b)); await ctx.sendDocument(b, f) },
       sendSticker: async (b) => { captured.push(mediaMeta('sticker', b)); await ctx.sendSticker(b) },
     }
     await cmd.run(sub)

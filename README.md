@@ -81,7 +81,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
 | `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |
 | `.prefix <chars\|none>` | — | Command prefixes, multi, or bare mode (owner only) |
-| `.limit <MB>` | — | Max media download size, 10–200 MB (owner only) |
+| `.limit <MB>` | — | Max media download size, 10–2048 MB (owner only) |
 | `.update` | — | Pull latest code, rebuild, restart (owner only) |
 
 Multi-file results (IG carousels, Pinterest searches) are delivered to your
@@ -198,9 +198,11 @@ with `.prefix <chars>` (e.g. `.prefix !`, multi: `.prefix ! /`), or
 prefixes set, a bare command (`menu`) only fires when sent twice in a row;
 in bare mode it fires right away.
 
-`"maxDownloadMB"` caps media downloads (default 100, clamped 10–200).
+`"maxDownloadMB"` caps media downloads (default 100, clamped 10–2048).
 Switch it live with `.limit <MB>` — or ask `.ai`. Bigger files eat more
 RAM while downloading (≈2-3×), so keep it low on small phones.
+Files over ~64MB can't play inline — the bot sends those as documents
+instead (up to 2GB, WhatsApp's hard cap).
 
 `"stickerPack"` / `"stickerAuthor"` are the default sticker name shown in
 WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.

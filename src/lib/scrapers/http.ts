@@ -15,7 +15,7 @@ export const getJson = async (url: string, headers: Record<string, string>): Pro
 // fdown CF-challenges node/bun's OpenSSL fingerprint but not Windows' Schannel curl — shell out to curl
 export const curl = (args: string[], timeout = 60_000): Promise<Buffer> =>
   new Promise((resolve, reject) => {
-    execFile('curl', args, { maxBuffer: 64 * 1024 * 1024, timeout }, (err, stdout, stderr) => {
+    execFile('curl', args, { maxBuffer: 2 * 1024 * 1024 * 1024, timeout }, (err, stdout, stderr) => {
       if (err) reject(new Error(`fdown: curl ${(stderr || err.message).trim()}`))
       else resolve(Buffer.from(stdout))
     })

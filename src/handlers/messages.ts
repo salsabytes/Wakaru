@@ -177,6 +177,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     sendImage: send.image,
     sendVideo: send.video,
     sendAudio: send.audio,
+    sendDocument: send.document,
     sendButtons: (buttons, text, footer) => send.buttons(buttons, text, footer),
     sendList: (o) => send.list(o),
   }

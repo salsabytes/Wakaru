@@ -101,7 +101,7 @@ export const setMode = (next: Mode): Mode => {
 }
 
 export const MAX_MB_MIN = 10
-export const MAX_MB_MAX = 200
+export const MAX_MB_MAX = 2048
 export const MAX_MB_DEFAULT = 100
 
 const clampMb = (n: unknown): number => {
