@@ -1,5 +1,5 @@
 import { askLLM, type ChatMsg } from '../../../lib/llm.ts'
-import { t } from '../../../lib/lang.ts'
+import { tx } from '../../../lib/lang.ts'
 import { getAiHistory, saveAiHistory } from '../../../lib/aiHistory.ts'
 import { buildSystem } from './prompt.ts'
 import { parseRuns, runTool } from './tools.ts'
@@ -32,7 +32,7 @@ export default {
   desc: 'chat or DO things: .ai <msg> — can run any command, remembers each sender',
   run: async (ctx: CommandContext) => {
     const query = ctx.text.trim()
-    if (!query) return ctx.reply(t('aiUsage', { prefix: ctx.prefix }))
+    if (!query) return ctx.reply(await tx('aiUsage', { prefix: ctx.prefix }))
     ctx.sock.sendPresenceUpdate('composing', ctx.chat).catch(() => {})
 
     let finalText = ''
@@ -49,7 +49,11 @@ export default {
     saveAiHistory(histKey, query, finalText)
     // LLMs always emit Markdown **bold** — WhatsApp only renders *single*,
     // so double stars show up as literal asterisks. Normalize before sending.
-    await ctx.reply(finalText.replace(/\*\*(.+?)\*\*/g, '*$1'))
+    // Same for [text](url) links — WA shows them raw, so flatten to text + url.
+    const waSafe = finalText
+      .replace(/\[(.+?)\]\((https?:[^)\s]+)\)/g, '$1 $2')
+      .replace(/\*\*(.+?)\*\*/g, '*$1')
+    await ctx.reply(waSafe)
   },
 }
 

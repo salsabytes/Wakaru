@@ -1,6 +1,6 @@
 import { downloadSoundCloud } from '../../lib/scrapers/index.ts'
 import { oversizedDoc, requireUrl } from '../../lib/media.ts'
-import { t } from '../../lib/lang.ts'
+import { tx } from '../../lib/lang.ts'
 
 export default {
   name: 'soundcloud',
@@ -10,7 +10,7 @@ export default {
   run: async (ctx: CommandContext) => {
     const url = await requireUrl(ctx, 'soundcloud', '<soundcloud link>')
     if (!url) return
-    await ctx.reply(t('processing'))
+    await ctx.reply(await tx('processing'))
     const r = await downloadSoundCloud(url)
     const doc = oversizedDoc({ type: 'audio', buf: r.buf, caption: r.title })
     if (doc) await ctx.sendDocument(doc.buf, doc.name, doc.mime)

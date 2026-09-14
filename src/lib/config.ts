@@ -46,11 +46,14 @@ export const botMode = (): Mode => mode
 
 export const BARE_TOKENS = ['none', 'off', 'bare']
 
-const cleanPrefixes = (src: unknown): string[] =>
-  (Array.isArray(src) ? src : [src])
-    .filter((p): p is string => typeof p === 'string' && p.length > 0 && !/\s/.test(p))
-    .filter((p) => !BARE_TOKENS.includes(p.toLowerCase()))
-    .slice(0, 5)
+const cleanPrefixes = (src: unknown): string[] => [
+  ...new Set(
+    (Array.isArray(src) ? src : [src])
+      .filter((p): p is string => typeof p === 'string' && p.length > 0 && !/\s/.test(p))
+      .filter((p) => !BARE_TOKENS.includes(p.toLowerCase()))
+      .slice(0, 5),
+  ),
+]
 
 let prefixes: string[] = (() => {
   try {

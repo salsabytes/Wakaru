@@ -7,7 +7,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
-import { t } from '../../lib/lang.ts'
+import { tx } from '../../lib/lang.ts'
 
 const BIN = join(
   import.meta.dirname, '..', '..', '..', 'bin',
@@ -27,8 +27,8 @@ export default {
       : isSticker(ctx.quoted?.mtype)
         ? ctx.quoted
         : undefined
-    if (!media) return ctx.reply(t('toimgUsage'))
-    if (!existsSync(BIN)) return ctx.reply(t('notBuilt'))
+    if (!media) return ctx.reply(await tx('toimgUsage'))
+    if (!existsSync(BIN)) return ctx.reply(await tx('notBuilt'))
 
     const dir = await mkdtemp(join(tmpdir(), 'wakaru-toimg-'))
     try {
@@ -39,7 +39,7 @@ export default {
       await ctx.sendImage(await readFile(output))
     } catch (err) {
       logger.error('toimg error:', err)
-      await ctx.reply(t('toimgFailed'))
+      await ctx.reply(await tx('toimgFailed'))
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

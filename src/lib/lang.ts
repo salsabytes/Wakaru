@@ -3,13 +3,15 @@ import { join } from 'node:path'
 
 const ROOT = join(import.meta.dirname, '..', '..')
 const CFG_PATH = join(ROOT, 'config.json')
+const LANG_DIR = join(ROOT, 'data', 'lang')
 
-export type Lang = 'id' | 'en'
+export type Lang = string
 
 let lang: Lang = (() => {
   try {
     const cfg = JSON.parse(readFileSync(CFG_PATH, 'utf8')) as { language?: unknown }
-    return cfg.language === 'en' ? 'en' : 'id'
+    const l = typeof cfg.language === 'string' ? cfg.language.trim().toLowerCase() : ''
+    return /^[a-z]{2,3}(-[a-z]{2,4})?$/.test(l) ? l : 'id'
   } catch {
     return 'id'
   }
@@ -17,9 +19,35 @@ let lang: Lang = (() => {
 
 export const language = (): Lang => lang
 
+export const LANG_NAMES: Record<string, string> = {
+  id: 'Indonesian',
+  en: 'English',
+  ja: 'Japanese',
+  jv: 'Javanese',
+  su: 'Sundanese',
+  ms: 'Malay',
+  zh: 'Chinese',
+  ko: 'Korean',
+  th: 'Thai',
+  vi: 'Vietnamese',
+  ar: 'Arabic',
+  hi: 'Hindi',
+  pt: 'Portuguese',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  nl: 'Dutch',
+  it: 'Italian',
+  ru: 'Russian',
+  tr: 'Turkish',
+}
+
+export const langName = (code: string): string => LANG_NAMES[code.toLowerCase()] ?? code
+
 // persisted to config.json so it survives restarts; in-memory only if the write fails
 export const setLanguage = (next: string): Lang => {
-  lang = next === 'en' ? 'en' : 'id'
+  const l = next.trim().toLowerCase()
+  lang = /^[a-z]{2,3}(-[a-z]{2,4})?$/.test(l) ? l : 'id'
   try {
     const cfg = JSON.parse(readFileSync(CFG_PATH, 'utf8'))
     cfg.language = lang
@@ -31,13 +59,39 @@ export const setLanguage = (next: string): Lang => {
 }
 
 type Vars = Record<string, string | number>
-export const t = (key: string, vars?: Vars): string => {
-  let s = STRINGS[lang][key] ?? STRINGS.id[key] ?? key
+const fill = (s: string, vars?: Vars): string => {
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v))
   return s
 }
 
-const STRINGS: Record<Lang, Record<string, string>> = {
+export const t = (key: string, vars?: Vars): string =>
+  fill(STRINGS[lang]?.[key] ?? STRINGS.en[key] ?? STRINGS.id[key] ?? key, vars)
+
+const mem = new Map<string, Record<string, string>>()
+
+const loadCache = (l: string): Record<string, string> => {
+  const hit = mem.get(l)
+  if (hit) return hit
+  let d: Record<string, string> = {}
+  try {
+    d = JSON.parse(readFileSync(join(LANG_DIR, `${l}.json`), 'utf8')) as Record<string, string>
+  } catch {
+    d = {}
+  }
+  mem.set(l, d)
+  return d
+}
+
+// pivot id/en stay static; any other code reads data/lang/<code>.json
+// (a plain { key: translation } file, placeholders intact). missing file
+// or key falls back to the pivot so the bot never breaks.
+export const tx = async (key: string, vars?: Vars): Promise<string> => {
+  if (lang === 'id' || lang === 'en') return t(key, vars)
+  const hit = loadCache(lang)[key]
+  return fill(typeof hit === 'string' ? hit : (STRINGS.en[key] ?? STRINGS.id[key] ?? key), vars)
+}
+
+const STRINGS: Record<string, Record<string, string>> = {
   id: {
     cooldown: 'sabar dulu {s} detik ya 😅',
     noOwners: 'no owners in config.json — owner commands disabled 🔒',
@@ -86,7 +140,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     stickerFailed: 'sticker gagal 😢',
     menuFooter: 'ketik {prefix}menu buat liat lagi',
     menuStats: '⚡ {n} perintah · {ms}ms',
-    langUsage: 'usage: {prefix}setlang <id|en> — sekarang: {lang}',
+    menuRoleOwner: '👑 Owner',
+    menuRoleUser: '👤 User',
+    langUsage: 'usage: {prefix}setlang <kode> — sekarang: {lang} — mis. {prefix}setlang ja',
     modeUsage: 'usage: {prefix}mode <public|self|private> — sekarang: {mode}',
     modeSet: '✅ mode: {mode} — public: semua orang bisa pake · self: cuma perintah dari akun ini · private: cuma owner',
     prefixUsage: 'usage: {prefix}prefix <..> — sekarang: {prefixes} — mis. {prefix}prefix ! / buat multi, tambah none biar tanpa prefix juga jalan ({prefix}prefix ! / none)',
@@ -94,8 +150,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     prefixNone: '(tanpa prefix)',
     limitUsage: 'usage: {prefix}limit <MB> — sekarang: {limit}MB (default {def}, {min}–{max}) — mis. {prefix}limit 150',
     limitSet: '✅ limit download: {limit}MB ({min}–{max})',
-    langSetEn: '✅ language set to English',
-    langSetId: '✅ bahasa diubah ke Indonesia',
+    langSet: '✅ bahasa: {lang}',
     updateStart: '⏳ updating… brb ✨',
     updateNone: '✅ udah versi terbaru kok',
     updateConflict: '❌ update dibatalin — ada file lokal yang beda sama GitHub (stash/commit dulu ya)',
@@ -150,7 +205,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     stickerFailed: 'sticker failed 😢',
     menuFooter: 'type {prefix}menu to show this again',
     menuStats: '⚡ {n} commands · {ms}ms',
-    langUsage: 'usage: {prefix}setlang <id|en> — current: {lang}',
+    menuRoleOwner: '👑 Owner',
+    menuRoleUser: '👤 User',
+    langUsage: 'usage: {prefix}setlang <code> — current: {lang} — e.g. {prefix}setlang ja',
     modeUsage: 'usage: {prefix}mode <public|self|private> — current: {mode}',
     modeSet: '✅ mode: {mode} — public: everyone · self: this account only · private: owners only',
     prefixUsage: 'usage: {prefix}prefix <..> — current: {prefixes} — e.g. {prefix}prefix ! / for multi, add none so bare works too ({prefix}prefix ! / none)',
@@ -158,8 +215,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     prefixNone: '(bare, no prefix)',
     limitUsage: 'usage: {prefix}limit <MB> — current: {limit}MB (default {def}, {min}–{max}) — e.g. {prefix}limit 150',
     limitSet: '✅ download limit: {limit}MB ({min}–{max})',
-    langSetEn: '✅ language set to English',
-    langSetId: '✅ bahasa diubah ke Indonesia',
+    langSet: '✅ language: {lang}',
     updateStart: '⏳ updating… brb ✨',
     updateNone: '✅ already up to date',
     updateConflict: '❌ update aborted — local changes conflict with GitHub (stash or commit first)',

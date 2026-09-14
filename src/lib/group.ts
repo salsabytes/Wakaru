@@ -1,6 +1,6 @@
 import type { GroupParticipant } from 'baileys'
 import { isOwner } from './config.ts'
-import { t } from './lang.ts'
+import { tx } from './lang.ts'
 
 type Meta = { participants: GroupParticipant[] }
 
@@ -46,15 +46,15 @@ export const isBotAdmin = async (ctx: CommandContext, met?: Meta): Promise<boole
 export const groupGuards = async (ctx: CommandContext): Promise<{ met: Meta } | undefined> => {
   const met = await ctx.sock.groupMetadata(ctx.chat).catch(() => undefined)
   if (!met) {
-    await ctx.reply(t('kickFailed', { msg: 'groupMetadata' }))
+    await ctx.reply(await tx('kickFailed', { msg: 'groupMetadata' }))
     return undefined
   }
   if (!isOwner(ctx.sender) && !ctx.isAdmin && !(await isAdmin(ctx, met))) {
-    await ctx.reply(t('kickAdminOnly'))
+    await ctx.reply(await tx('kickAdminOnly'))
     return undefined
   }
   if (!ctx.isBotAdmin && !(await isBotAdmin(ctx, met))) {
-    await ctx.reply(t('kickBotNotAdmin'))
+    await ctx.reply(await tx('kickBotNotAdmin'))
     return undefined
   }
   return { met }

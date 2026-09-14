@@ -2,7 +2,7 @@ import type { WAMessage } from 'baileys'
 import { download, searchYouTube, type YtResult } from '../../lib/scrapers/index.ts'
 import { oversizedDoc } from '../../lib/media.ts'
 import { withSlot, cooldownLeft } from '../../lib/queue.ts'
-import { t } from '../../lib/lang.ts'
+import { tx } from '../../lib/lang.ts'
 import { logger } from '../../lib/logger.ts'
 import type { SerializedMessage } from '../../lib/serialize.ts'
 import type { Sender } from '../../lib/sender.ts'
@@ -50,21 +50,21 @@ export async function handlePlayPick(
   if (!pick) return false
   if (m.button?.id === 'play:cancel') {
     dropPlay(m.chat, sender)
-    await send.text(t('playCancelled'))
+    await send.text(await tx('playCancelled'))
     return true
   }
   const choice = parseButtonPick(m.button?.id ?? '') ?? parsePick(m.text)
   if (!choice) {
     if (/^(batal|cancel|gajadi|gak jadi|nggak jadi)$/i.test(m.text.trim())) {
       dropPlay(m.chat, sender)
-      await send.text(t('playCancelled'))
+      await send.text(await tx('playCancelled'))
       return true // consumed — don't also feed the cancel word to the AI
     }
     return false // not a pick — let the message flow normally, no badPick spam
   }
   const hit = pick.results[choice.index]
   if (!hit) {
-    await send.text(t('outOfRange'))
+    await send.text(await tx('outOfRange'))
     return true
   }
   const mode = choice.mode
@@ -76,8 +76,8 @@ export async function handlePlayPick(
         { id: `play:${choice.index + 1}:mp4`, text: '🎬 MP4' },
         { id: 'play:cancel', text: '❌ Batal' },
       ],
-      t('pickFormat', { title: hit.title.slice(0, 80) }),
-      t('footer3min'),
+      await tx('pickFormat', { title: hit.title.slice(0, 80) }),
+      await tx('footer3min'),
     )
     return true
   }
@@ -100,7 +100,7 @@ export async function handlePlayPick(
   } catch (err) {
     logger.error('play download error:', err)
     await send.react('❌', msg.key).catch(() => {})
-    await send.text(t('playFailed', { msg: (err as Error).message.slice(0, 300) }))
+    await send.text(await tx('playFailed', { msg: (err as Error).message.slice(0, 300) }))
   }
   return true
 }
@@ -111,18 +111,18 @@ export default {
   aliases: ['yt', 'song'],
   run: async (ctx: CommandContext) => {
     const query = ctx.text.trim()
-    if (!query) return ctx.reply(t('playUsage', { prefix: ctx.prefix }))
+    if (!query) return ctx.reply(await tx('playUsage', { prefix: ctx.prefix }))
 
     const results = await searchYouTube(query)
-    if (!results.length) return ctx.reply(t('noResults'))
+    if (!results.length) return ctx.reply(await tx('noResults'))
     pending.set(`${ctx.chat}:${ctx.sender}`, { results, at: Date.now() })
 
     // quick_reply buttons (not single_select — that renders blank on iOS); body stays replyable as "1 mp3"
     const numbered = results.map((r, i) => `${i + 1}. ${r.title.slice(0, 60)}`).join('\n')
     await ctx.sendButtons(
       [{ id: 'play:cancel', text: '❌ Batal' }],
-      `${t('resultList', { query: query.slice(0, 80) })}\n${numbered}`,
-      t('listFooter'),
+      `${await tx('resultList', { query: query.slice(0, 80) })}\n${numbered}`,
+      await tx('listFooter'),
     )
   },
 }

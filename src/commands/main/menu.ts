@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { listCommands } from '../index.ts'
 import { isOwner } from '../../lib/config.ts'
-import { language, t, type Lang } from '../../lib/lang.ts'
+import { language, tx } from '../../lib/lang.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..', '..')
 
@@ -28,16 +28,17 @@ const catOrder = (cat: string): number => {
   return i === -1 ? CATEGORY_ORDER.length : i
 }
 
-const GREET: Record<Lang, string[]> = {
+const GREET: Record<string, string[]> = {
   id: ['Selamat pagi', 'Selamat siang', 'Selamat sore', 'Selamat malam'],
   en: ['Good morning', 'Good afternoon', 'Good evening', 'Good night'],
+  ja: ['おはよう', 'こんにちは', 'こんばんは', 'おやすみ'],
 }
 const greeting = (): string => {
   const h = new Date().getHours()
-  return GREET[language()][h < 11 ? 0 : h < 15 ? 1 : h < 18 ? 2 : 3]
+  const g = GREET[language()] ?? GREET.en
+  return g[h < 11 ? 0 : h < 15 ? 1 : h < 18 ? 2 : 3]
 }
 
-// soft rules inside ``` for monospace; 24 wide fits a phone screen
 const RULE = 24
 const rule = (label = ''): string =>
   label ? `── ${label} ${'─'.repeat(Math.max(0, RULE - label.length - 4))}` : '─'.repeat(RULE)
@@ -55,7 +56,7 @@ interface MenuData {
   commands: MenuCommand[]
 }
 
-export function renderMenu(d: MenuData): string {
+export async function renderMenu(d: MenuData): Promise<string> {
   const now = new Date()
   const day = now.toLocaleDateString('id-ID', { weekday: 'short' })
   const date = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
@@ -69,19 +70,19 @@ export function renderMenu(d: MenuData): string {
   }
 
   const who = d.pushName || (d.isOwner ? 'Owner' : 'Kak')
-  const role = d.isOwner ? '👑 Owner' : '👤 User'
+  const role = await tx(d.isOwner ? 'menuRoleOwner' : 'menuRoleUser')
   const categories = [...grouped.entries()].sort((a, b) => catOrder(a[0]) - catOrder(b[0]))
 
   const body = [
     `✦ ${META.name} · v${META.version}`,
     `👋 ${greeting()}, ${who}!`,
     `🕐 ${day}, ${date} · ${time}`,
-    `${role} · prefix: ${d.prefix || 'none (bare)'}`,
+    `${role} · prefix: ${d.prefix || await tx('prefixNone')}`,
     '',
     ...categories.flatMap(([category, items]) => [rule(catLabel(category)), ...items]),
     '',
-    t('menuStats', { n: d.commands.length, ms: d.elapsedMs }),
-    t('menuFooter', { prefix: d.prefix }),
+    await tx('menuStats', { n: d.commands.length, ms: d.elapsedMs }),
+    await tx('menuFooter', { prefix: d.prefix }),
   ].join('\n')
 
   return '```\n' + body + '\n```'
@@ -92,11 +93,10 @@ export default {
   desc: 'list all commands',
   aliases: ['help'],
   run: async (ctx: CommandContext) => {
-    // performance.now is monotonic — Date.now can jump on NTP sync
     const t0 = performance.now()
     const commands = await listCommands()
     await ctx.reply(
-      renderMenu({
+      await renderMenu({
         pushName: ctx.pushName,
         prefix: ctx.prefix,
         isOwner: isOwner(ctx.sender),
@@ -108,24 +108,26 @@ export default {
 } satisfies Command
 
 if (process.env.MENU_SELFTEST) {
-  const m = renderMenu({
-    pushName: 'Test',
-    prefix: '.',
-    isOwner: true,
-    elapsedMs: 42,
-    commands: [
-      { name: 'menu', category: 'main' },
-      { name: 'ytmp3', category: 'downloader' },
-    ],
-  })
-  const ok =
-    m.startsWith('```\n✦ WAKARU') &&
-    m.trimEnd().endsWith('```') &&
-    m.includes('── ✦ MAIN ') &&
-    m.includes('── ◈ DOWNLOADER ') &&
-    m.includes('✧ .ytmp3') &&
-    m.includes('42ms')
-  if (!ok) throw new Error('menu render fail')
-  console.log('menu self-check ok')
-  process.exit(0)
+  void (async () => {
+    const m = await renderMenu({
+      pushName: 'Test',
+      prefix: '.',
+      isOwner: true,
+      elapsedMs: 42,
+      commands: [
+        { name: 'menu', category: 'main' },
+        { name: 'ytmp3', category: 'downloader' },
+      ],
+    })
+    const ok =
+      m.startsWith('```\n✦ WAKARU') &&
+      m.trimEnd().endsWith('```') &&
+      m.includes('── ✦ MAIN ') &&
+      m.includes('── ◈ DOWNLOADER ') &&
+      m.includes('✧ .ytmp3') &&
+      m.includes('42ms')
+    if (!ok) throw new Error('menu render fail')
+    console.log('menu self-check ok')
+    process.exit(0)
+  })()
 }

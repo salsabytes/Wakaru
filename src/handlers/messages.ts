@@ -6,7 +6,7 @@ import { serializeMessage, type SerializedMessage } from '../lib/serialize.ts'
 import { makeSender, type Sender } from '../lib/sender.ts'
 import { withSlot, cooldownLeft } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
-import { t } from '../lib/lang.ts'
+import { tx } from '../lib/lang.ts'
 import { OWNERS, botBare, botMode, botPrefixes, isOwner, prefixBody, usedPrefix } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
@@ -86,6 +86,18 @@ type Parsed = { cmd: Awaited<ReturnType<typeof getCommand>>; queryText: string; 
 const BARE_WINDOW_MS = 60_000
 const bareSeen = new Map<string, number>()
 
+const aiFallback = async (m: SerializedMessage, sender: string, text: string): Promise<Parsed> => {
+  const isReplyToBot =
+    !!m.quoted?.sender &&
+    !!waka.user?.id &&
+    m.quoted.sender.split(':')[0].split('@')[0] === waka.user.id.split(':')[0].split('@')[0]
+  const isLink = /(?:https?:\/\/|www\.)/i.test(text)
+  const queryText = text.trim()
+  if (!isReplyToBot && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return { cmd: undefined, queryText, args: [] }
+  if (!queryText) return { cmd: undefined, queryText, args: [] }
+  return { cmd: await getCommand('ai'), queryText, args: queryText.split(/\s+/) }
+}
+
 const parseCommand = async (m: SerializedMessage, sender: string, text: string): Promise<Parsed> => {
   const direct = prefixBody(text)
   if (direct !== undefined) {
@@ -99,7 +111,8 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
         args: rest,
       }
     }
-    if (botPrefixes().length) return { cmd: undefined, queryText: '', args: [] }
+    // unknown word with a prefix (or bare attempt) — still let reply-to-bot and link follow-ups reach the AI
+    if (botPrefixes().length) return aiFallback(m, sender, text)
   }
   const noPrefix = (direct ?? text).trim()
   const guess = noPrefix.split(/\s+/)[0]?.toLowerCase() ?? ''
@@ -112,32 +125,24 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
     bareSeen.set(key, now)
     // prefixes only: same bare command twice in a row = deliberate, once = chat.
     // bare on (flag or empty list): fire right away — the owner asked for it.
-    if (!botBare() && botPrefixes().length && now - last > BARE_WINDOW_MS) return { cmd: undefined, queryText: '', args: [] }
+    if (!botBare() && botPrefixes().length && now - last > BARE_WINDOW_MS) return aiFallback(m, sender, text)
     const after = noPrefix.slice(guess.length).trim()
     return { cmd: bareCmd, queryText: after, args: after ? after.split(/\s+/) : [] }
   }
-  const isReplyToBot =
-    !!m.quoted?.sender &&
-    !!waka.user?.id &&
-    m.quoted.sender.split(':')[0].split('@')[0] === waka.user.id.split(':')[0].split('@')[0]
-  const isLink = /(?:https?:\/\/|www\.)/i.test(text)
-  const queryText = text.trim()
-  if (!isReplyToBot && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return { cmd: undefined, queryText, args: [] }
-  if (!queryText) return { cmd: undefined, queryText, args: [] }
-  return { cmd: await getCommand('ai'), queryText, args: queryText.split(/\s+/) }
+  return aiFallback(m, sender, text)
 }
 
 const blockedByCooldown = async (sender: string, cmd: Command, send: Sender): Promise<boolean> => {
   if (!cmd.cooldown || isOwner(sender)) return false
   const left = cooldownLeft(`${sender}:${cmd.name}`, cmd.cooldown)
   if (!left) return false
-  await send.text(t('cooldown', { s: left }))
+  await send.text(await tx('cooldown', { s: left }))
   return true
 }
 
 const blockedByOwner = async (ctx: CommandContext, cmd: Command): Promise<boolean> => {
   if (!cmd.ownerOnly || isOwner(ctx.sender)) return false
-  await ctx.reply(t(!OWNERS.length ? 'noOwners' : 'ownerOnly', { who: ctx.sender.split(/[@:]/)[0] }))
+  await ctx.reply(await tx(!OWNERS.length ? 'noOwners' : 'ownerOnly', { who: ctx.sender.split(/[@:]/)[0] }))
   return true
 }
 
@@ -149,7 +154,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   // only pick-shaped messages are consumed; anything else falls through below
   const pick = !usedPrefix(text) ? pendingPlay(m.chat, sender) : undefined
   if (pick && (await handlePlayPick(msg, m, sender, send))) return
-  if (m.button?.id.startsWith('play:')) return send.text(t('stalePlay'))
+  if (m.button?.id.startsWith('play:')) return send.text(await tx('stalePlay'))
 
   const { cmd, queryText, args } = await parseCommand(m, sender, text)
   if (!cmd) return
@@ -200,14 +205,14 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
 
   try {
     await withSlot(async () => {
-      if (cmd.groupOnly && !ctx.isGroup) return ctx.reply(t('groupOnly'))
-      if (cmd.adminOnly && !ctx.isOwner && !ctx.isAdmin) return ctx.reply(t('kickAdminOnly'))
-      if (cmd.botAdmin && !ctx.isBotAdmin) return ctx.reply(t('kickBotNotAdmin'))
+      if (cmd.groupOnly && !ctx.isGroup) return ctx.reply(await tx('groupOnly'))
+      if (cmd.adminOnly && !ctx.isOwner && !ctx.isAdmin) return ctx.reply(await tx('kickAdminOnly'))
+      if (cmd.botAdmin && !ctx.isBotAdmin) return ctx.reply(await tx('kickBotNotAdmin'))
       if (await blockedByOwner(ctx, cmd)) return
       await cmd.run(ctx)
     })
   } catch (err) {
     logger.error(`Command "${cmd.name}" error:`, err)
-    await ctx.reply(t('cmdFailed', { name: cmd.name, msg: String((err as Error)?.message ?? err).slice(0, 300) }))
+    await ctx.reply(await tx('cmdFailed', { name: cmd.name, msg: String((err as Error)?.message ?? err).slice(0, 300) }))
   }
 }

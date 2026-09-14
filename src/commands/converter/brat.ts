@@ -7,7 +7,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
-import { t } from '../../lib/lang.ts'
+import { tx } from '../../lib/lang.ts'
 
 const BIN = join(
   import.meta.dirname, '..', '..', '..', 'bin',
@@ -20,8 +20,8 @@ export default {
   cooldown: 5,
   run: async (ctx: CommandContext) => {
     const text = ctx.text.trim()
-    if (!text) return ctx.reply(t('bratUsage'))
-    if (!existsSync(BIN)) return ctx.reply(t('notBuilt'))
+    if (!text) return ctx.reply(await tx('bratUsage'))
+    if (!existsSync(BIN)) return ctx.reply(await tx('notBuilt'))
 
     const dir = await mkdtemp(join(tmpdir(), 'wakaru-brat-'))
     try {
@@ -30,7 +30,7 @@ export default {
       await ctx.sendSticker(await readFile(output))
     } catch (err) {
       logger.error('brat error:', err)
-      await ctx.reply(t('bratFailed'))
+      await ctx.reply(await tx('bratFailed'))
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

@@ -1,6 +1,6 @@
 import { downloadSpotify } from '../../lib/scrapers/index.ts'
 import { requireUrl, sendMedia } from '../../lib/media.ts'
-import { t } from '../../lib/lang.ts'
+import { tx } from '../../lib/lang.ts'
 
 export default {
   name: 'spotify',
@@ -10,7 +10,7 @@ export default {
   run: async (ctx: CommandContext) => {
     const url = await requireUrl(ctx, 'spotify', '<spotify track/album link>')
     if (!url) return
-    await ctx.reply(t('processing'))
+    await ctx.reply(await tx('processing'))
     const r = await downloadSpotify(url)
     await sendMedia(
       ctx,

@@ -1,5 +1,5 @@
 import { groupGuards } from '../../lib/group.ts'
-import { t } from '../../lib/lang.ts'
+import { tx } from '../../lib/lang.ts'
 
 export default {
   name: 'add',
@@ -24,7 +24,7 @@ export default {
           .filter((n) => n.length >= 8 && n.length <= 15),
       ),
     ]
-    if (!nums.length) return ctx.reply(t('addUsage', { prefix: ctx.prefix }))
+    if (!nums.length) return ctx.reply(await tx('addUsage', { prefix: ctx.prefix }))
     const g = await groupGuards(ctx)
     if (!g) return
     try {
@@ -32,13 +32,13 @@ export default {
       const res = await ctx.sock.groupParticipantsUpdate(ctx.chat, jids, 'add')
       const ok = res.filter((r) => r.status === '200')
       const failed = res.filter((r) => r.status !== '200')
-      if (ok.length) await ctx.reply(t('addDone', { n: ok.length }))
+      if (ok.length) await ctx.reply(await tx('addDone', { n: ok.length }))
       if (failed.length) {
         const detail = failed.map((r) => `${(r.jid ?? '').split('@')[0]}: ${r.status}`).join(', ')
-        await ctx.reply(t('addFailed', { msg: detail }))
+        await ctx.reply(await tx('addFailed', { msg: detail }))
       }
     } catch (err) {
-      await ctx.reply(t('addFailed', { msg: String((err as Error)?.message ?? err).slice(0, 200) }))
+      await ctx.reply(await tx('addFailed', { msg: String((err as Error)?.message ?? err).slice(0, 200) }))
     }
   },
 } satisfies Command
