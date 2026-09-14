@@ -347,6 +347,12 @@ Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch
 <details>
 <summary>Recent changes</summary>
 
+**v1.2.0**
+- `.prefix` command: custom prefix, multi-prefix (`.prefix ! /`), or bare no-prefix mode (`.prefix none`) — also settable via `"prefixes"` in `config.json`
+- Bare commands need a double-tap when prefixes are set (chat-safe); fire instantly in bare mode
+- Fix: `queryText` ate one char when a space follows the prefix (`. brat halo` → `t halo`)
+- README sync: Python AI sidecar in tech stack, full 21-command table, live project tree
+
 **v1.1.1**
 - `.mode` command: `public` (everyone) / `self` (bot account only) / `private` (owners only) reply gate, switchable live or via `config.json`
 - `.brat`: white brat-style meme sticker rendered by the Rust engine (Arial Narrow, blur, case-sensitive)
