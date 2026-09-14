@@ -3,6 +3,7 @@ import { downloadMediaMessage, getContentType, normalizeMessageContent } from 'b
 
 export interface MediaMeta {
   mtype: string
+  mimetype?: string
   chat: string
   sender: string
   text: string
@@ -15,6 +16,7 @@ export interface SerializedMessage {
   fromMe: boolean
   isGroup: boolean
   mtype: string
+  mimetype?: string
   text: string
   mentionedJid: string[]
   download: () => Promise<Buffer>
@@ -80,6 +82,7 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
     fromMe: !!msg.key?.fromMe,
     isGroup: chat.endsWith('@g.us'),
     mtype,
+    mimetype: content.mimetype,
     text,
     mentionedJid: ctxt?.mentionedJid ?? [],
     ...(button ? { button } : {}),
@@ -92,6 +95,7 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
     const qc = (q as any)?.[qtype] ?? {}
     s.quoted = {
       mtype: qtype,
+      mimetype: qc.mimetype,
       chat: ctxt.remoteJid ?? chat,
       sender: ctxt.participant ?? '',
       text: qc.text || qc.caption || '',

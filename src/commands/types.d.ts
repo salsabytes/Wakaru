@@ -29,6 +29,7 @@ declare global {
     isBotAdmin: boolean
     isOwner: boolean
     mtype: string
+    mimetype?: string
     mentionedJid: string[]
     download: () => Promise<Buffer>
 
@@ -49,4 +50,4 @@ declare global {
   }
 }
 
-export {}
+export {}

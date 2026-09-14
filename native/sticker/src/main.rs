@@ -1,3 +1,4 @@
+mod gif;
 mod video;
 
 use std::env;
@@ -68,6 +69,8 @@ fn main() -> ExitCode {
   let result = match catch_unwind(AssertUnwindSafe(|| {
     if is_mp4(&data) {
       video::convert_video(&data, &args[1])
+    } else if is_gif(&data) {
+      gif::convert_gif(&data, &args[1])
     } else {
       convert_image(&data, &args[1])
     }
@@ -260,6 +263,10 @@ mod tests {
 
 fn is_mp4(data: &[u8]) -> bool {
   data.len() >= 12 && &data[4..8] == b"ftyp"
+}
+
+fn is_gif(data: &[u8]) -> bool {
+  data.len() >= 6 && (&data[..6] == b"GIF87a" || &data[..6] == b"GIF89a")
 }
 
 // sticker (webp) -> png, animated takes frame 0 only

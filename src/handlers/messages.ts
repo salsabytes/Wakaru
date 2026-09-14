@@ -187,6 +187,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     isBotAdmin,
     isOwner: isOwner(sender),
     mtype: m.mtype,
+    mimetype: m.mimetype,
     mentionedJid: m.mentionedJid,
     download: m.download,
     button: m.button,

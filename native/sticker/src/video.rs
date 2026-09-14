@@ -127,13 +127,17 @@ fn avc_to_annex_b(sample: &[u8], length_size: u8, sps: &[Vec<u8>], pps: &[Vec<u8
 
 fn frame_to_512(rgb: &[u8], w: u32, h: u32) -> Option<RgbaImage> {
   let img = image::RgbImage::from_raw(w, h, rgb.to_vec())?;
+  Some(rgba_to_512(&image::DynamicImage::ImageRgb8(img).to_rgba8()))
+}
+
+pub(crate) fn rgba_to_512(img: &RgbaImage) -> RgbaImage {
+  let (w, h) = (img.width(), img.height());
   let scale = SIZE as f32 / w.max(h) as f32;
   let (nw, nh) = (((w as f32 * scale) as u32).max(1), ((h as f32 * scale) as u32).max(1));
-  let resized = image::DynamicImage::ImageRgb8(image::imageops::resize(&img, nw, nh, FilterType::Triangle))
-    .to_rgba8();
+  let resized = image::imageops::resize(img, nw, nh, FilterType::Triangle);
   let mut canvas = RgbaImage::from_pixel(SIZE, SIZE, image::Rgba([0, 0, 0, 0]));
   image::imageops::overlay(&mut canvas, &resized, ((SIZE - nw) / 2) as i64, ((SIZE - nh) / 2) as i64);
-  Some(canvas)
+  canvas
 }
 
 #[cfg(test)]
@@ -160,7 +164,7 @@ mod tests {
   }
 }
 
-fn write_animated(frames: &[RgbaImage], total_ms: u32, output: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub(crate) fn write_animated(frames: &[RgbaImage], total_ms: u32, output: &str) -> Result<(), Box<dyn std::error::Error>> {
   let total = total_ms.max(100);
   // keep fps as long as it fits 500KB, else drop quality first, then fps
   for (stride, quality) in [(1usize, 70.0f32), (1, 55.0), (2, 50.0), (3, 45.0), (4, 40.0), (6, 35.0), (8, 30.0)] {

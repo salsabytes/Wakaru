@@ -16,17 +16,20 @@ const BIN = join(
 )
 
 const isImageOrVideo = (t?: string) => t === 'imageMessage' || t === 'videoMessage'
+// GIFs sent as files arrive as documentMessage with mimetype image/gif
+const isGifDoc = (t?: string, mime?: string) => t === 'documentMessage' && mime === 'image/gif'
+const accepts = (t?: string, mime?: string) => isImageOrVideo(t) || isGifDoc(t, mime)
 
 export default {
   name: 'sticker',
-  desc: 'make a sticker from a quoted photo or video',
+  desc: 'make a sticker from a quoted photo, video, or gif',
   aliases: ['st'],
   cooldown: 5,
   run: async (ctx: CommandContext) => {
 
-    const media = isImageOrVideo(ctx.mtype)
+    const media = accepts(ctx.mtype, ctx.mimetype)
       ? { mtype: ctx.mtype, download: ctx.download }
-      : isImageOrVideo(ctx.quoted?.mtype)
+      : ctx.quoted && accepts(ctx.quoted.mtype, ctx.quoted.mimetype)
         ? ctx.quoted
         : undefined
     if (!media) return ctx.reply(await tx('stickerUsage'))
