@@ -45,7 +45,7 @@ it *do* things for you.
 ## ✨ Features
 
 - 🧠 **It gets you** — `.ai` chats naturally, can run any command on its own with `@run:`, and remembers each conversation
-- 🎬 **Plays with media** — pulls audio and video from links, searches YouTube by query, and makes stickers from photos & videos (plus `.brat` memes and `.toimg` sticker→photo)
+- 🎬 **Plays with media** — pulls audio and video from links, searches YouTube by query, and makes stickers from photos & videos (plus `.brat` memes, `.toimg` sticker→photo, `.toaudio` video→audio, `.hd` AI upscale)
 - 🧩 **Extensible** — register a command in `src/commands/index.ts` and it shows up in `.menu` automatically
 - 🔁 **Never leaves you hanging** — auto-reconnects with exponential backoff
 - 🔐 **Easy in** — log in with a QR code or a pairing code
@@ -67,6 +67,8 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.sticker` | `.st` | Quoted photo/video → 512×512 webp sticker (optional `.sticker <pack>|<author>` name) |
 | `.toimg` | `.toimage` | Quoted sticker → PNG image |
 | `.brat <text>` | — | White brat-style meme sticker from text |
+| `.toaudio` | `.tomp3`, `.tomp4a`, `.toaud` | Quoted video → m4a audio (extract, no re-encode) |
+| `.hd` | `.remini`, `.upscale` | Quoted photo → 2x AI upscale (iloveimg, Rust fallback) |
 | `.ytmp3 <url>` | `.ytm`, `.music` | Any video link → mp3 audio |
 | `.ytmp4 <url>` | `.ytv`, `.video` | Any video link → mp4 video |
 | `.play <query>` | `.yt`, `.song` | Search YouTube → tap a result → pick mp3/mp4 |
@@ -224,7 +226,7 @@ WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
 |---|---|---|
 | Runtime | **Bun** (canary) · Node ≥ 23.6 fallback | TypeScript runs directly — no build step, no `tsx` |
 | WhatsApp protocol | **Baileys** | The battle-tested Web API client |
-| Sticker engine | **Rust sidecar** | 512×512 webp, animated support, brat/toimg, all codecs compiled in |
+| Sticker engine | **Rust sidecar** | 512×512 webp, animated support, brat/toimg/hd, all codecs compiled in |
 | Audio engine | **Rust sidecar** | AAC-in-fMP4 remuxed to standard M4A for iOS, lossless |
 | AI brain | **Python sidecar** (`native/ai`, needs `python3` + `curl_cffi`) + Poolside fallback | chatgpt.com anonymous: fresh device + proof-of-work per request, no key, no login |
 | Scrapers | **Pure TypeScript** | No yt-dlp / ffmpeg — nothing to maintain |
@@ -249,7 +251,7 @@ src/
 │   ├── main/                # ai/ (prompt, tools, exchange), menu, mode, prefix, limit, setlang, update
 │   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook,
 │   │                        # pinterest, soundcloud, spotify, twitter
-│   ├── converter/           # sticker, toimg, brat
+│   ├── converter/           # sticker, toimg, brat, toaudio, hd
 │   └── group/               # kick, promote, demote, add (groupOnly + adminOnly + botAdmin)
 ├── lib/
 │   ├── scrapers/            # one module per platform + shared http/curl helpers
@@ -361,6 +363,8 @@ Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch
 <summary>Recent changes</summary>
 
 **Unreleased**
+- `.toaudio`: quoted video → m4a audio via the Rust engine (sample copy, no re-encode)
+- `.hd`: quoted photo → 2x AI upscale via iloveimg scraper, Rust sharpen fallback
 - Reply language is free-form: `.setlang <code>` takes any code with `data/lang/<code>.json` file cache and pivot fallback
 - Reply-to-bot and link follow-ups reach `.ai` even with bare mode on
 - `.ai` output is WhatsApp-safe: `[text](url)` flattened, `**bold**` → `*bold*`
@@ -371,7 +375,7 @@ Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch
 - `.prefix` command: custom prefix, multi-prefix (`.prefix ! /`), or bare no-prefix mode (`.prefix none`) — also settable via `"prefixes"` in `config.json`
 - Bare commands need a double-tap when prefixes are set (chat-safe); fire instantly in bare mode
 - Fix: `queryText` ate one char when a space follows the prefix (`. brat halo` → `t halo`)
-- README sync: Python AI sidecar in tech stack, full 24-command table, live project tree
+- README sync: Python AI sidecar in tech stack, full 26-command table, live project tree
 
 **v1.1.1**
 - `.mode` command: `public` (everyone) / `self` (bot account only) / `private` (owners only) reply gate, switchable live or via `config.json`

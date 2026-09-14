@@ -40,6 +40,19 @@ fn main() -> ExitCode {
       }
     };
   }
+  if args.first().is_some_and(|a| a == "hd") {
+    if args.len() != 3 {
+      eprintln!("usage: sticker hd <input> <output.png>");
+      return ExitCode::FAILURE;
+    }
+    return match hd_upscale(&args[1], &args[2]) {
+      Ok(()) => ExitCode::SUCCESS,
+      Err(e) => {
+        eprintln!("hd: {e}");
+        ExitCode::FAILURE
+      }
+    };
+  }
   // optional trailing pack/author → embedded as WhatsApp sticker EXIF metadata
   if args.len() != 2 && args.len() != 4 {
     eprintln!("usage: sticker <input> <output> [pack author]");
@@ -402,6 +415,17 @@ fn brat_to_webp(data: &[u8], output: &str) -> Result<(), Box<dyn std::error::Err
   let enc = webp::Encoder::from_rgba(rgba.as_raw(), DIM, DIM);
   let bytes = enc.encode(80.0);
   writer.write_all(&*bytes)?;
+  Ok(())
+}
+
+fn hd_upscale(input: &str, output: &str) -> Result<(), Box<dyn std::error::Error>> {
+  let img = image::load_from_memory(&fs::read(input)?)?.to_rgb8();
+  let (w, h) = (img.width(), img.height());
+  let scale = (2048.0 / w.max(h) as f32).min(2.0);
+  let (nw, nh) = ((w as f32 * scale) as u32, (h as f32 * scale) as u32);
+  let big = image::imageops::resize(&img, nw.max(1), nh.max(1), FilterType::Lanczos3);
+  let sharp = image::imageops::unsharpen(&big, 1.0, 80);
+  sharp.save(output)?;
   Ok(())
 }
 

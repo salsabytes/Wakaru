@@ -44,7 +44,7 @@ Node ≥ 23.6**、どの環境もワンライナーで導入。話しかける�
 ## ✨ 機能
 
 - 🧠 **話が通じる** — `.ai`は自然に会話し、`@run:`でコマンドを自走、会話ごとに記憶
-- 🎬 **メディア上手** — リンクから音声・動画を取得、YouTubeをクエリ検索、写真＆動画からステッカー作成（`.brat`ミームと`.toimg`ステッカー→画像付き）
+- 🎬 **メディア上手** — リンクから音声・動画を取得、YouTubeをクエリ検索、写真＆動画からステッカー作成（`.brat`ミーム、`.toimg`ステッカー→画像、`.toaudio`動画→音声、`.hd` AIアップスケール付き）
 - 🧩 **拡張しやすい** — `src/commands/index.ts`に登録すれば`.menu`に自動表示
 - 🔁 **落ちない** — 指数バックオフで自動再接続
 - 🔐 **簡単ログイン** — QRコード or ペアリングコード
@@ -65,6 +65,8 @@ Node ≥ 23.6**、どの環境もワンライナーで導入。話しかける�
 | `.sticker` | `.st` | 引用した写真・動画 → 512×512 webpステッカー（`.sticker <pack>\|<author>`で名付け可） |
 | `.toimg` | `.toimage` | 引用したステッカー → PNG画像 |
 | `.brat <text>` | — | テキストから白brat風ミームステッカー |
+| `.toaudio` | `.tomp3`、`.tomp4a`、`.toaud` | 引用した動画 → m4a音声（抽出、再エンコードなし） |
+| `.hd` | `.remini`、`.upscale` | 引用した写真 → 2x AIアップスケール（iloveimg、Rustフォールバック） |
 | `.ytmp3 <url>` | `.ytm`, `.music` | 任意の動画リンク → mp3音声 |
 | `.ytmp4 <url>` | `.ytv`, `.video` | 任意の動画リンク → mp4動画 |
 | `.play <query>` | `.yt`, `.song` | YouTube検索 → 結果をタップ → mp3/mp4選択 |
@@ -243,7 +245,7 @@ src/
 │   ├── main/                # ai/（prompt・tools・exchange）、menu、mode、prefix、limit、setlang、update
 │   ├── downloader/          # ytmp3、ytmp4、play、tiktok、instagram、facebook、
 │   │                        # pinterest、soundcloud、spotify、twitter
-│   ├── converter/           # sticker、toimg、brat
+│   ├── converter/           # sticker、toimg、brat、toaudio、hd
 │   └── group/               # kick、promote、demote、add
 ├── lib/
 │   ├── scrapers/            # プラットフォーム毎モジュール＋共通http/curlヘルパー
@@ -352,11 +354,15 @@ Wakaruは[セマンティックバージョニング](https://semver.org/)準拠
 <details>
 <summary>最近の変更</summary>
 
+**未リリース**
+- `.toaudio`：引用した動画 → Rustエンジンでm4a音声に（サンプルコピー、再エンコードなし）
+- `.hd`：引用した写真 → iloveimgスクレイパーで2x AIアップスケール、Rustシャープ化フォールバック
+
 **v1.2.0**
 - `.prefix`コマンド：カスタム接頭辞、複数接頭辞（`.prefix ! /`）、bareモード（`.prefix none`） — `config.json`の`"prefixes"`からも設定可
 - 接頭辞設定時のbareコマンドは2連続送信で発火（チャット誤爆防止）、bareモードでは即発火
 - 修正：接頭辞直後の空白で`queryText`が1文字食われる（`. brat halo` → `t halo`）
-- README同期：技術スタックにPython AIサイドカー、全21コマンド表、ライブのプロジェクトツリー
+- README同期：技術スタックにPython AIサイドカー、全26コマンド表、ライブのプロジェクトツリー
 
 **v1.1.1**
 - `.mode`コマンド：`public`（全員）／`self`（ボットアカウントのみ）／`private`（ownerのみ）返信ゲート、ライブ or `config.json`で切替

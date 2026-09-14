@@ -6,25 +6,37 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
   let args: Vec<String> = std::env::args().skip(1).collect();
-  if args.len() != 2 {
-    eprintln!("usage: audio <input.fmp4> <output.m4a>");
-    return ExitCode::FAILURE;
-  }
-  let data = match std::fs::read(&args[0]) {
-    Ok(d) => d,
-    Err(e) => {
-      eprintln!("audio: {e}");
-      return ExitCode::FAILURE;
+  // extract = audio track of a camera mp4 -> m4a; bare form = legacy ytmp3 remux
+  let (data, extract) = if args.len() == 3 && args[0] == "extract" {
+    match std::fs::read(&args[1]) {
+      Ok(d) => (d, true),
+      Err(e) => {
+        eprintln!("audio: {e}");
+        return ExitCode::FAILURE;
+      }
     }
+  } else if args.len() == 2 {
+    match std::fs::read(&args[0]) {
+      Ok(d) => (d, false),
+      Err(e) => {
+        eprintln!("audio: {e}");
+        return ExitCode::FAILURE;
+      }
+    }
+  } else {
+    eprintln!("usage: audio <input.fmp4> <output.m4a>");
+    eprintln!("       audio extract <input.mp4> <output.m4a>");
+    return ExitCode::FAILURE;
   };
-  let out = match remux(&data) {
+  let out = match if extract { extract_audio(&data) } else { remux(&data) } {
     Ok(o) => o,
     Err(e) => {
       eprintln!("audio: {e}");
       return ExitCode::FAILURE;
     }
   };
-  match std::fs::write(&args[1], &out) {
+  let dest = if extract { &args[2] } else { &args[1] };
+  match std::fs::write(dest, &out) {
     Ok(()) => ExitCode::SUCCESS,
     Err(e) => {
       eprintln!("audio: {e}");
@@ -287,6 +299,201 @@ fn remux(data: &[u8]) -> Result<Vec<u8>, String> {
     .position(|w| w == b"stco")
     .ok_or("stco not found in rebuilt moov")?;
   let stco_field = stco_at + 4 + 4 + 4; // past 'stco' + fullbox + entry_count
+  moov[stco_field..stco_field + 4].copy_from_slice(&(mdat_off as u32).to_be_bytes());
+
+  let mut out = Vec::with_capacity(mdat_off + mdat_data.len());
+  out.extend_from_slice(&ftyp);
+  out.extend_from_slice(&moov);
+  out.extend_from_slice(&((8 + mdat_data.len()) as u32).to_be_bytes());
+  out.extend_from_slice(b"mdat");
+  out.extend_from_slice(&mdat_data);
+
+  Ok(out)
+}
+
+// camera mp4 -> standalone m4a. samples copied, never decoded.
+fn extract_audio(data: &[u8]) -> Result<Vec<u8>, String> {
+  if data.len() < 8 || &data[4..8] != b"ftyp" {
+    return Err("not an MP4".into());
+  }
+  let top = children(data, 0, data.len());
+  let moov = find(&top, data, b"moov").ok_or("no moov box")?;
+  let moov_children = children(data, moov.data, moov.end);
+  let mvhd = find(&moov_children, data, b"mvhd").ok_or("no mvhd")?;
+  let mvhd_v = data[mvhd.data];
+  let mvhd_dur_off = if mvhd_v == 1 { 24 } else { 16 };
+
+  // first trak whose handler is sound
+  let mut audio: Option<Box_> = None;
+  for t in moov_children.iter().filter(|x| &data[x.start + 4..x.start + 8] == b"trak") {
+    let mdia = children(data, t.data, t.end)
+      .into_iter()
+      .find(|x| &data[x.start + 4..x.start + 8] == b"mdia");
+    if let Some(m) = mdia {
+      if let Some(h) = find(&children(data, m.data, m.end), data, b"hdlr") {
+        if &data[h.data + 8..h.data + 12] == b"soun" {
+          audio = Some(*t);
+          break;
+        }
+      }
+    }
+  }
+  let trak = audio.ok_or("no audio track")?;
+  let tkhd = children(data, trak.data, trak.end)
+    .into_iter()
+    .find(|x| &data[x.start + 4..x.start + 8] == b"tkhd")
+    .ok_or("no tkhd")?;
+  let mdia = children(data, trak.data, trak.end)
+    .into_iter()
+    .find(|x| &data[x.start + 4..x.start + 8] == b"mdia")
+    .ok_or("no mdia")?;
+  let mdia_children = children(data, mdia.data, mdia.end);
+  let mdhd = find(&mdia_children, data, b"mdhd").ok_or("no mdhd")?;
+  let mdhd_v = data[mdhd.data];
+  let mdhd_dur_off = if mdhd_v == 1 { 24 } else { 16 };
+  let minf = find(&mdia_children, data, b"minf").ok_or("no minf")?;
+  let minf_children = children(data, minf.data, minf.end);
+  let stbl = find(&minf_children, data, b"stbl").ok_or("no stbl")?;
+  let stbl_children = children(data, stbl.data, stbl.end);
+  let stbl_of = |k: &[u8; 4]| find(&stbl_children, data, k).ok_or(format!("no {}", String::from_utf8_lossy(k)));
+  let stsd = stbl_of(b"stsd")?;
+  if !data[stsd.data + 8..stsd.data + 16].windows(4).any(|w| w == b"mp4a") {
+    return Err("no mp4a audio sample entry".into());
+  }
+  let hdlr = find(&mdia_children, data, b"hdlr").ok_or("no hdlr")?;
+  let smhd = minf_children
+    .iter()
+    .copied()
+    .find(|x| &data[x.start + 4..x.start + 8] == b"smhd" || &data[x.start + 4..x.start + 8] == b"vmhd")
+    .ok_or("no media header")?;
+  let dinf = find(&minf_children, data, b"dinf").ok_or("no dinf")?;
+
+  // durations: expand stts runs
+  let stts_b = stbl_of(b"stts")?;
+  let mut durations: Vec<u32> = Vec::new();
+  let n_runs = u32_at(data, stts_b.data + 4) as usize;
+  let mut p = stts_b.data + 8;
+  for _ in 0..n_runs {
+    let (count, delta) = (u32_at(data, p), u32_at(data, p + 4));
+    p += 8;
+    durations.extend(std::iter::repeat(delta).take(count as usize));
+  }
+  // chunk layout: stsc entries + stco/co64 offsets
+  let stsc_b = stbl_of(b"stsc")?;
+  let mut sc_entries: Vec<(u32, u32)> = Vec::new();
+  let n_sc = u32_at(data, stsc_b.data + 4) as usize;
+  let mut p = stsc_b.data + 8;
+  for _ in 0..n_sc {
+    sc_entries.push((u32_at(data, p), u32_at(data, p + 4)));
+    p += 12;
+  }
+  let wide = stbl_of(b"co64").is_ok();
+  let co_b = if wide { stbl_of(b"co64")? } else { stbl_of(b"stco")? };
+  let n_chunks = u32_at(data, co_b.data + 4) as usize;
+  let mut chunk_off: Vec<u64> = Vec::with_capacity(n_chunks);
+  let mut p = co_b.data + 8;
+  for _ in 0..n_chunks {
+    chunk_off.push(if wide { let v = u64_at(data, p); p += 8; v } else { let v = u32_at(data, p) as u64; p += 4; v });
+  }
+  // sample sizes: stsz table (or uniform)
+  let stsz_b = stbl_of(b"stsz")?;
+  let uniform = u32_at(data, stsz_b.data + 4);
+  let n_samples = u32_at(data, stsz_b.data + 8) as usize;
+  let mut sizes: Vec<usize> = Vec::with_capacity(n_samples);
+  if uniform != 0 {
+    sizes.resize(n_samples, uniform as usize);
+  } else {
+    let mut p = stsz_b.data + 12;
+    for _ in 0..n_samples {
+      sizes.push(u32_at(data, p) as usize);
+      p += 4;
+    }
+  }
+  if durations.len() != n_samples || sizes.len() != n_samples {
+    return Err("sample table mismatch".into());
+  }
+  // walk chunks, slice bytes out of mdat
+  let mut samples: Vec<Sample> = Vec::with_capacity(n_samples);
+  let mut si = 0usize;
+  for (ci, &off) in chunk_off.iter().enumerate() {
+    let chunk_no = (ci + 1) as u32;
+    let mut per = 0u32;
+    for (first, n) in &sc_entries {
+      if *first <= chunk_no {
+        per = *n;
+      } else {
+        break;
+      }
+    }
+    let mut cursor = off as usize;
+    for _ in 0..per {
+      if si >= n_samples {
+        break;
+      }
+      let sz = sizes[si];
+      if sz == 0 || cursor + sz > data.len() {
+        return Err(format!("bad sample range at offset {cursor} (size {sz})"));
+      }
+      samples.push(Sample { bytes: data[cursor..cursor + sz].to_vec(), duration: durations[si] });
+      cursor += sz;
+      si += 1;
+    }
+  }
+  if samples.is_empty() {
+    return Err("no audio samples found".into());
+  }
+
+  let total_ts_u64: u64 = samples.iter().map(|s| s.duration as u64).sum();
+  let mvhd = patch_duration(data, mvhd, mvhd_dur_off, mvhd_v, total_ts_u64);
+  let tkhd_b = patch_duration(data, tkhd, if data[tkhd.data] == 1 { 24 } else { 16 }, data[tkhd.data], total_ts_u64);
+  let mdhd_b = patch_duration(data, mdhd, mdhd_dur_off, mdhd_v, total_ts_u64);
+
+  let stts = build_stts(&samples);
+  let stsc = {
+    let mut q = Vec::with_capacity(16);
+    q.extend_from_slice(&0u32.to_be_bytes());
+    q.extend_from_slice(&1u32.to_be_bytes());
+    q.extend_from_slice(&1u32.to_be_bytes());
+    q.extend_from_slice(&(samples.len() as u32).to_be_bytes());
+    q.extend_from_slice(&1u32.to_be_bytes());
+    box_payload(b"stsc", &q)
+  };
+  let mut stsz_p = Vec::with_capacity(12 + samples.len() * 4);
+  stsz_p.extend_from_slice(&0u32.to_be_bytes());
+  stsz_p.extend_from_slice(&0u32.to_be_bytes());
+  stsz_p.extend_from_slice(&(samples.len() as u32).to_be_bytes());
+  for s in &samples {
+    stsz_p.extend_from_slice(&(s.bytes.len() as u32).to_be_bytes());
+  }
+  let stsz = box_payload(b"stsz", &stsz_p);
+  let mut stco_p = Vec::with_capacity(16);
+  stco_p.extend_from_slice(&0u32.to_be_bytes());
+  stco_p.extend_from_slice(&1u32.to_be_bytes());
+  stco_p.extend_from_slice(&0u32.to_be_bytes());
+  let stco = box_payload(b"stco", &stco_p);
+
+  let stsd_b = data[stsd.start..stsd.end].to_vec();
+  let stbl = box_payload(b"stbl", &[&stsd_b[..], &stts[..], &stsc[..], &stsz[..], &stco[..]].concat());
+  let minf = box_payload(b"minf", &[&data[smhd.start..smhd.end][..], &data[dinf.start..dinf.end][..], &stbl[..]].concat());
+  let hdlr_b = data[hdlr.start..hdlr.end].to_vec();
+  let mdia = box_payload(b"mdia", &[&mdhd_b[..], &hdlr_b[..], &minf[..]].concat());
+  let trak = box_payload(b"trak", &[&tkhd_b[..], &mdia[..]].concat());
+  let mut moov = box_payload(b"moov", &[&mvhd[..], &trak[..]].concat());
+
+  let mut ftyp_p = Vec::with_capacity(20);
+  ftyp_p.extend_from_slice(b"M4A ");
+  ftyp_p.extend_from_slice(&0u32.to_be_bytes());
+  ftyp_p.extend_from_slice(b"M4A isommp42");
+  let ftyp = box_payload(b"ftyp", &ftyp_p);
+
+  let mdat_data: Vec<u8> = samples.iter().flat_map(|s| s.bytes.iter().copied()).collect();
+  let mdat_off = ftyp.len() + moov.len() + 8;
+
+  let stco_at = moov
+    .windows(4)
+    .position(|w| w == b"stco")
+    .ok_or("stco not found in rebuilt moov")?;
+  let stco_field = stco_at + 4 + 4 + 4;
   moov[stco_field..stco_field + 4].copy_from_slice(&(mdat_off as u32).to_be_bytes());
 
   let mut out = Vec::with_capacity(mdat_off + mdat_data.len());
