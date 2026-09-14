@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { botMaxDownloadMB } from '../config.ts'
 
 export const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
@@ -20,14 +21,12 @@ export const curl = (args: string[], timeout = 60_000): Promise<Buffer> =>
     })
   })
 
-// 30MB cap — WA limit is ~64MB; keeps low-end RAM in check (peak ≈2-3× file size)
-const DEFAULT_MAX_BYTES = 30 * 1024 * 1024
-
+// WA caps media around ~64MB; peak RAM while downloading ≈2-3× file size
 export const fetchBuffer = async (
   url: string,
   opts: { headers?: Record<string, string>; maxBytes?: number; timeout?: number } = {},
 ): Promise<Buffer> => {
-  const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES
+  const maxBytes = opts.maxBytes ?? botMaxDownloadMB() * 1024 * 1024
   const res = await fetch(url, { headers: opts.headers, signal: AbortSignal.timeout(opts.timeout ?? 300_000) })
   if (!res.ok) throw new Error(`download http ${res.status}`)
   const len = Number(res.headers.get('content-length'))

@@ -49,7 +49,7 @@ it *do* things for you.
 - 🔐 **Easy in** — log in with a QR code or a pairing code
 - 📱 **Runs on your phone** — first-class Termux support, no root needed
 - 🎨 **Prettily logged** — charmbracelet-style console output, clock-only timestamps
-- ⚡ **Fast & cheap** — every command runs in parallel (one global slot pool), per-user cooldown on heavy commands, 30 MB download cap, no self-hosted servers
+- ⚡ **Fast & cheap** — every command runs in parallel (one global slot pool), per-user cooldown on heavy commands, configurable download cap (100 MB default), no self-hosted servers
 
 ---
 
@@ -81,6 +81,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
 | `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |
 | `.prefix <chars\|none>` | — | Command prefixes, multi, or bare mode (owner only) |
+| `.limit <MB>` | — | Max media download size, 10–200 MB (owner only) |
 | `.update` | — | Pull latest code, rebuild, restart (owner only) |
 
 Multi-file results (IG carousels, Pinterest searches) are delivered to your
@@ -169,6 +170,7 @@ The bot's reply language lives in the same file:
   "language": "id",
   "mode": "public",
   "prefixes": ["."],
+  "maxDownloadMB": 100,
   "stickerPack": "Wakaru",
   "stickerAuthor": "buatan gweh"
 }
@@ -194,6 +196,10 @@ with `.prefix <chars>` (e.g. `.prefix !`, multi: `.prefix ! /`), or
 `.prefix none` for bare mode — commands fire without any prefix. With
 prefixes set, a bare command (`menu`) only fires when sent twice in a row;
 in bare mode it fires right away.
+
+`"maxDownloadMB"` caps media downloads (default 100, clamped 10–200).
+Switch it live with `.limit <MB>` — or ask `.ai`. Bigger files eat more
+RAM while downloading (≈2-3×), so keep it low on small phones.
 
 `"stickerPack"` / `"stickerAuthor"` are the default sticker name shown in
 WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
@@ -235,7 +241,7 @@ src/
 │   └── messages.ts          # upsert → drop rules → dispatch
 ├── commands/
 │   ├── index.ts             # static command registry (add imports + entries to register)
-│   ├── main/                # ai/ (prompt, tools, exchange), menu, mode, prefix, setlang, update
+│   ├── main/                # ai/ (prompt, tools, exchange), menu, mode, prefix, limit, setlang, update
 │   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook,
 │   │                        # pinterest, soundcloud, spotify, twitter
 │   ├── converter/           # sticker, toimg, brat

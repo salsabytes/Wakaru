@@ -90,6 +90,35 @@ export const setMode = (next: Mode): Mode => {
   return mode
 }
 
+export const MAX_MB_MIN = 10
+export const MAX_MB_MAX = 200
+export const MAX_MB_DEFAULT = 100
+
+const clampMb = (n: unknown): number => {
+  const v = Math.round(Number(n))
+  if (!Number.isFinite(v)) return MAX_MB_DEFAULT
+  return Math.min(MAX_MB_MAX, Math.max(MAX_MB_MIN, v))
+}
+
+let maxDownloadMB: number = (() => {
+  try {
+    const v = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).maxDownloadMB
+    return v === undefined ? MAX_MB_DEFAULT : clampMb(v)
+  } catch {
+    return MAX_MB_DEFAULT
+  }
+})()
+
+export const botMaxDownloadMB = (): number => maxDownloadMB
+
+export const setMaxDownloadMB = (next: unknown): number => {
+  maxDownloadMB = clampMb(next)
+  patchCfg((cfg) => {
+    cfg.maxDownloadMB = maxDownloadMB
+  })
+  return maxDownloadMB
+}
+
 // generic config.json string getter with a fallback (used for sticker pack/author etc.)
 export const cfg = (key: string, fallback: string): string => {
   if (!cfgCache) {
