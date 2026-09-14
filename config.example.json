@@ -1,0 +1,10 @@
+{
+  "owners": [],
+  "language": "id",
+  "mode": "public",
+  "prefixes": ["."],
+  "maxDownloadMB": 100,
+  "stickerPack": "Wakaru",
+  "stickerAuthor": "buatan gweh",
+  "updateChannel": "master"
+}

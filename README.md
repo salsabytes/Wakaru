@@ -158,9 +158,10 @@ itself**. On any failure it rolls back to the previous version.
 | `updateChannel` | `master` | `master` = follow the branch, `release` = follow the latest release tag |
 | `IG_SESSIONID` | — | Optional fallback IG session cookie for `.instagram` stories when snapsave is down (use a burner account) |
 
-**Owner commands (`.ai`):** create `config.json` (gitignored) at the project
-root and list phone numbers in `"owners"` — bare number (`628123...`) or
-full JID. An empty list disables owner commands.
+**Owner commands (`.ai`):** `config.json` (gitignored) is auto-created from
+`config.example.json` on first boot — just add your phone number to
+`"owners"` (bare number `628123...` or full JID). An empty list disables
+owner commands.
 
 The bot's reply language lives in the same file:
 

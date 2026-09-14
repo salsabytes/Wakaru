@@ -1,9 +1,19 @@
 
 
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = join(import.meta.dirname, '..', '..')
+
+try {
+  if (!existsSync(join(ROOT, 'config.json'))) {
+    const example = join(ROOT, 'config.example.json')
+    if (existsSync(example)) copyFileSync(example, join(ROOT, 'config.json'))
+    else writeFileSync(join(ROOT, 'config.json'), JSON.stringify({ owners: [] }, null, 2) + '\n')
+  }
+} catch {
+  // missing config just means defaults
+}
 
 export const OWNERS = (() => {
   try {
