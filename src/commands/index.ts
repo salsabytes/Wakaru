@@ -1,8 +1,6 @@
 import { readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
-export const PREFIX = '.'
-
 type Registered = Command & { category: string }
 
 const commands = new Map<string, Registered>()

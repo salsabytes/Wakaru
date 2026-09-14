@@ -76,7 +76,7 @@ export function renderMenu(d: MenuData): string {
     `✦ ${META.name} · v${META.version}`,
     `👋 ${greeting()}, ${who}!`,
     `🕐 ${day}, ${date} · ${time}`,
-    `${role} · prefix: ${d.prefix}`,
+    `${role} · prefix: ${d.prefix || 'none (bare)'}`,
     '',
     ...categories.flatMap(([category, items]) => [rule(catLabel(category)), ...items]),
     '',

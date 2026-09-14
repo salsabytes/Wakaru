@@ -34,16 +34,59 @@ let mode: Mode = (() => {
 
 export const botMode = (): Mode => mode
 
-export const setMode = (next: Mode): Mode => {
-  mode = next
+const cleanPrefixes = (src: unknown): string[] =>
+  (Array.isArray(src) ? src : [src])
+    .filter((p): p is string => typeof p === 'string' && p.length > 0 && !/\s/.test(p))
+    .slice(0, 5)
+
+let prefixes: string[] = (() => {
+  try {
+    const cfg = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')) as { prefixes?: unknown; prefix?: unknown }
+    return cleanPrefixes(Array.isArray(cfg.prefixes) ? cfg.prefixes : cfg.prefix !== undefined ? cfg.prefix : '.')
+  } catch {
+    return ['.']
+  }
+})()
+
+export const botPrefixes = (): string[] => prefixes
+
+const patchCfg = (mut: (cfg: Record<string, unknown>) => void): void => {
   try {
     const path = join(ROOT, 'config.json')
     const cfg = JSON.parse(readFileSync(path, 'utf8'))
-    cfg.mode = mode
+    mut(cfg)
     writeFileSync(path, JSON.stringify(cfg, null, 2) + '\n')
   } catch {
     // keep in-memory change
   }
+}
+
+export const setPrefixes = (next: unknown): string[] => {
+  prefixes = cleanPrefixes(next)
+  patchCfg((cfg) => {
+    cfg.prefixes = prefixes
+  })
+  return prefixes
+}
+
+// body after the (longest-match) prefix; undefined = no prefix used.
+// empty prefix list = bare mode: whole text is the body.
+export const prefixBody = (text: string): string | undefined => {
+  if (!prefixes.length) return text.trim()
+  const hit = prefixes
+    .filter((p) => text.startsWith(p))
+    .sort((a, b) => b.length - a.length)[0]
+  return hit === undefined ? undefined : text.slice(hit.length).trim()
+}
+
+// bare mode never counts as prefixed (so .play picks still work there)
+export const usedPrefix = (text: string): boolean => prefixes.length > 0 && prefixes.some((p) => text.startsWith(p))
+
+export const setMode = (next: Mode): Mode => {
+  mode = next
+  patchCfg((cfg) => {
+    cfg.mode = mode
+  })
   return mode
 }
 

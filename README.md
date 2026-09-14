@@ -78,6 +78,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.add <number>` | `.tambah` | Add members by phone number (group admins/owner only) |
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
 | `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |
+| `.prefix <chars\|none>` | — | Command prefixes, multi, or bare mode (owner only) |
 | `.update` | — | Pull latest code, rebuild, restart (owner only) |
 
 Multi-file results (IG carousels, Pinterest searches) are delivered to your
@@ -165,6 +166,7 @@ The bot's reply language lives in the same file:
   "owners": ["6281234567890"],
   "language": "id",
   "mode": "public",
+  "prefixes": ["."],
   "stickerPack": "Wakaru",
   "stickerAuthor": "buatan gweh"
 }
@@ -184,6 +186,12 @@ backend.
 `"mode"` accepts `public` (everyone, the default), `self` (only commands
 sent from the bot's own account), or `private` (owners only). Switch it
 live with `.mode` — or ask `.ai`.
+
+`"prefixes"` is the command prefix list (max 5, no spaces). Switch it live
+with `.prefix <chars>` (e.g. `.prefix !`, multi: `.prefix ! /`), or
+`.prefix none` for bare mode — commands fire without any prefix. With
+prefixes set, a bare command (`menu`) only fires when sent twice in a row;
+in bare mode it fires right away.
 
 `"stickerPack"` / `"stickerAuthor"` are the default sticker name shown in
 WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
@@ -225,7 +233,7 @@ src/
 │   └── messages.ts          # upsert → drop rules → dispatch
 ├── commands/
 │   ├── index.ts             # static command registry (add imports + entries to register)
-│   ├── main/                # ai/ (prompt, tools, exchange), menu, mode, setlang, update
+│   ├── main/                # ai/ (prompt, tools, exchange), menu, mode, prefix, setlang, update
 │   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook,
 │   │                        # pinterest, soundcloud, spotify, twitter
 │   ├── converter/           # sticker, toimg, brat

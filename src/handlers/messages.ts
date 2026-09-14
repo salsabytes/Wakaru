@@ -1,13 +1,13 @@
 import type { BaileysEventMap, WAMessage } from 'baileys'
 import { waka } from '../socket.ts'
 import { messageStore } from '../lib/store.ts'
-import { getCommand, PREFIX } from '../commands/index.ts'
+import { getCommand } from '../commands/index.ts'
 import { serializeMessage, type SerializedMessage } from '../lib/serialize.ts'
 import { makeSender, type Sender } from '../lib/sender.ts'
 import { withSlot, cooldownLeft } from '../lib/queue.ts'
 import { logger } from '../lib/logger.ts'
 import { t } from '../lib/lang.ts'
-import { OWNERS, botMode, isOwner } from '../lib/config.ts'
+import { OWNERS, botMode, botPrefixes, isOwner, prefixBody, usedPrefix } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 
@@ -81,15 +81,39 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
 
 type Parsed = { cmd: Awaited<ReturnType<typeof getCommand>>; queryText: string; args: string[] }
 
+// second identical bare command within the window = deliberate, not chat
+const BARE_WINDOW_MS = 60_000
+const bareSeen = new Map<string, number>()
+
 const parseCommand = async (m: SerializedMessage, sender: string, text: string): Promise<Parsed> => {
-  if (text.startsWith(PREFIX)) {
-    const body = text.slice(PREFIX.length).trim()
-    const [rawName, ...rest] = body.split(/\s+/)
-    return {
-      cmd: await getCommand(rawName.toLowerCase()),
-      queryText: body.slice(rawName.length).trim(),
-      args: rest,
+  const direct = prefixBody(text)
+  if (direct !== undefined) {
+    const [rawName, ...rest] = direct.split(/\s+/)
+    if (!rawName) return { cmd: undefined, queryText: '', args: [] }
+    const cmd = await getCommand(rawName.toLowerCase())
+    if (cmd) {
+      return {
+        cmd,
+        queryText: direct.slice(rawName.length).trim(),
+        args: rest,
+      }
     }
+    if (botPrefixes().length) return { cmd: undefined, queryText: '', args: [] }
+  }
+  const noPrefix = (direct ?? text).trim()
+  const guess = noPrefix.split(/\s+/)[0]?.toLowerCase() ?? ''
+  const bareCmd = await getCommand(guess)
+  if (bareCmd) {
+    const key = `${sender}:${bareCmd.name}`
+    const now = Date.now()
+    if (bareSeen.size > 2000) bareSeen.clear()
+    const last = bareSeen.get(key) ?? 0
+    bareSeen.set(key, now)
+    // prefixes set: same bare command twice in a row = deliberate, once = chat.
+    // bare mode (no prefixes): fire right away — the owner asked for it.
+    if (botPrefixes().length && now - last > BARE_WINDOW_MS) return { cmd: undefined, queryText: '', args: [] }
+    const after = noPrefix.slice(guess.length).trim()
+    return { cmd: bareCmd, queryText: after, args: after ? after.split(/\s+/) : [] }
   }
   const isReplyToBot =
     !!m.quoted?.sender &&
@@ -122,7 +146,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   const send = makeSender(waka, jid, msg)
 
   // only pick-shaped messages are consumed; anything else falls through below
-  const pick = !text.startsWith(PREFIX) ? pendingPlay(m.chat, sender) : undefined
+  const pick = !usedPrefix(text) ? pendingPlay(m.chat, sender) : undefined
   if (pick && (await handlePlayPick(msg, m, sender, send))) return
   if (m.button?.id.startsWith('play:')) return send.text(t('stalePlay'))
 
@@ -134,7 +158,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
 
   const ctx: CommandContext = {
     sock: waka,
-    prefix: PREFIX,
+    prefix: botPrefixes()[0] ?? '',
     args,
     text: queryText,
     chat: m.chat,
