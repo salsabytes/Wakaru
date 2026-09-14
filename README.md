@@ -24,8 +24,9 @@ command list you can grow yourself.
 
 Wakaru is a **self-hosted WhatsApp bot** built on
 [Baileys](https://github.com/whiskeysockets/Baileys) and TypeScript — no
-yt-dlp, no ffmpeg, no Python, no self-hosted servers. Everything resolves
-through pure-TS scrapers and one tiny Rust sidecar.
+yt-dlp, no ffmpeg, no self-hosted servers. Everything resolves
+through pure-TS scrapers, one tiny Rust sidecar, and one Python sidecar
+for the AI brain.
 
 One codebase, three runtimes: **Bun** on desktop, **Bun or Node ≥ 23.6** on
 Termux, and a one-line installer for every platform. Chat with it, or let
@@ -42,13 +43,13 @@ it *do* things for you.
 ## ✨ Features
 
 - 🧠 **It gets you** — `.ai` chats naturally, can run any command on its own with `@run:`, and remembers each conversation
-- 🎬 **Plays with media** — pulls audio and video from links, searches YouTube by query, and makes stickers from photos & videos
+- 🎬 **Plays with media** — pulls audio and video from links, searches YouTube by query, and makes stickers from photos & videos (plus `.brat` memes and `.toimg` sticker→photo)
 - 🧩 **Extensible** — register a command in `src/commands/index.ts` and it shows up in `.menu` automatically
 - 🔁 **Never leaves you hanging** — auto-reconnects with exponential backoff
 - 🔐 **Easy in** — log in with a QR code or a pairing code
 - 📱 **Runs on your phone** — first-class Termux support, no root needed
 - 🎨 **Prettily logged** — charmbracelet-style console output, clock-only timestamps
-- ⚡ **Fast & cheap** — every command runs in parallel (one global slot pool), per-user cooldown on heavy commands, 30 MB download cap, zero external services
+- ⚡ **Fast & cheap** — every command runs in parallel (one global slot pool), per-user cooldown on heavy commands, 30 MB download cap, no self-hosted servers
 
 ---
 
@@ -61,6 +62,8 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.ai <msg>` | — | Agentic chat; can run commands via `@run:`, remembers each sender |
 | `.menu` | `.help` | List every command |
 | `.sticker` | `.st` | Quoted photo/video → 512×512 webp sticker (optional `.sticker <pack>|<author>` name) |
+| `.toimg` | `.toimage` | Quoted sticker → PNG image |
+| `.brat <text>` | — | White brat-style meme sticker from text |
 | `.ytmp3 <url>` | `.ytm`, `.music` | Any video link → mp3 audio |
 | `.ytmp4 <url>` | `.ytv`, `.video` | Any video link → mp4 video |
 | `.play <query>` | `.yt`, `.song` | Search YouTube → tap a result → pick mp3/mp4 |
@@ -70,9 +73,12 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.pinterest <url\|query>` | `.pin`, `.pins` | Images from a pin link, or a search query |
 | `.soundcloud <url>` | `.sc` | SoundCloud track → audio (mp3), no watermark |
 | `.spotify <url>` | `.sp` | Spotify track/album → matched on YouTube → audio |
-| `.x <url>` | `.twitter`, `.tw` | X (Twitter) video, no watermark |
+| `.twitter <url>` | `.x`, `.tw`, `.twdl` | X (Twitter) video, no watermark |
+| `.kick` | `.tendang`, `.keluarkan` | Kick a member (tag or reply, group admins/owner only) |
+| `.add <number>` | `.tambah` | Add members by phone number (group admins/owner only) |
 | `.setlang <id\|en>` | `.lang`, `.bahasa` | Switch the bot's reply language (Indonesian/English) |
 | `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |
+| `.update` | — | Pull latest code, rebuild, restart (owner only) |
 
 Multi-file results (IG carousels, Pinterest searches) are delivered to your
 **private chat** so groups stay tidy.
@@ -189,7 +195,7 @@ WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
 
 <div align="center">
 
-[![Skills](https://skillicons.dev/icons?i=ts,bun,nodejs,rust,githubactions)](https://skillicons.dev)
+[![Skills](https://skillicons.dev/icons?i=ts,bun,nodejs,rust,py,githubactions)](https://skillicons.dev)
 
 </div>
 
@@ -197,8 +203,10 @@ WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
 |---|---|---|
 | Runtime | **Bun** (canary) · Node ≥ 23.6 fallback | TypeScript runs directly — no build step, no `tsx` |
 | WhatsApp protocol | **Baileys** | The battle-tested Web API client |
-| Sticker engine | **Rust sidecar** | 512×512 webp, animated support, all codecs compiled in |
-| Scrapers | **Pure TypeScript** | No yt-dlp / ffmpeg / Python — nothing to maintain |
+| Sticker engine | **Rust sidecar** | 512×512 webp, animated support, brat/toimg, all codecs compiled in |
+| Audio engine | **Rust sidecar** | AAC-in-fMP4 remuxed to standard M4A for iOS, lossless |
+| AI brain | **Python sidecar** (`native/ai`, needs `python3` + `curl_cffi`) + Poolside fallback | chatgpt.com anonymous: fresh device + proof-of-work per request, no key, no login |
+| Scrapers | **Pure TypeScript** | No yt-dlp / ffmpeg — nothing to maintain |
 | Logging | **pino** | Fast, structured, prettified |
 | CI | **GitHub Actions** | Real installs tested on Ubuntu, macOS, Windows + simulated Termux |
 
@@ -216,17 +224,24 @@ src/
 ├── handlers/
 │   └── messages.ts          # upsert → drop rules → dispatch
 ├── commands/
-│   ├── index.ts             # static command registry + types
-│   ├── main/                # ai/ (prompt, tools, exchange), menu, setlang
-│   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook, pinterest
-│   └── converter/sticker.ts
-└── lib/
-    ├── scrapers/            # one module per platform + shared http helpers
-    ├── queue.ts             # global slot pool + per-user cooldown
-    ├── serialize.ts         # WAMessage → flat SerializedMessage (incl. tap parsing)
-    ├── sender.ts            # reply/audio/video/sticker/react/list/buttons
-    ├── media.ts             # requireUrl, sendMedia (multi-file routing)
-    └── store · config · lang · llm · logger · aiHistory · factory · buttons
+│   ├── index.ts             # static command registry (add imports + entries to register)
+│   ├── main/                # ai/ (prompt, tools, exchange), menu, mode, setlang, update
+│   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook,
+│   │                        # pinterest, soundcloud, spotify, twitter
+│   ├── converter/           # sticker, toimg, brat
+│   └── group/               # kick, add
+├── lib/
+│   ├── scrapers/            # one module per platform + shared http/curl helpers
+│   ├── queue.ts             # global slot pool + per-user cooldown
+│   ├── serialize.ts         # WAMessage → flat SerializedMessage (incl. tap parsing)
+│   ├── sender.ts            # reply/audio/video/sticker/react/list/buttons
+│   ├── media.ts             # requireUrl, sendMedia (multi-file routing)
+│   └── store · config · lang · llm · logger · aiHistory · factory ·
+│       buttons · contributors · disk · updater
+└── ../native/
+    ├── sticker/             # Rust: webp engine (sticker/toimg/brat)
+    ├── audio/               # Rust: fMP4 → M4A remux for iOS
+    └── ai/                  # Python: chatgpt-anon sidecar (needs curl_cffi)
 ```
 
 </details>
@@ -299,7 +314,8 @@ repo — the folder is gitignored.
 
 Keep the phone awake with `termux-wake-lock`. Note that `.facebook`
 relies on the system `curl` — it works on Windows/Bun; on Linux hosts
-the fdown challenge may block it.
+some backends may block it. Share links (`facebook.com/share/…`) resolve
+via the fdown.world fallback.
 
 </details>
 
@@ -323,6 +339,13 @@ Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch
 <details>
 <summary>Recent changes</summary>
 
+**v1.1.1**
+- `.mode` command: `public` (everyone) / `self` (bot account only) / `private` (owners only) reply gate, switchable live or via `config.json`
+- `.brat`: white brat-style meme sticker rendered by the Rust engine (Arial Narrow, blur, case-sensitive)
+- `.toimg`: quoted sticker → PNG via the Rust engine
+- `.facebook` handles share links via fdown.world fallback (flow ported from AyGemuy/api-wudysoft v8)
+- Commands back on a static registry — registering = add import + entry in `src/commands/index.ts`
+
 **v1.1.0** — back to [semver](https://semver.org/) (the short-lived `YY.MM.R` releases were dropped; this is the same code, re-released cleanly)
 - iPhone audio fix: ytmp3's "mp3" is AAC in a fragmented MP4 (iOS refuses to play) — new `native/audio` Rust engine remuxes it to a standard M4A (lossless, no codec deps)
 - `.play` results now render everywhere: quick_reply buttons + numbered text (the old native-flow list was blank on iOS) — still replyable as `1 mp3`
@@ -332,7 +355,7 @@ Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch
 - Group management: `.kick @member` (tag or reply) and `.add <number>` (accepts `+62` formats, multiple numbers)
 - `.kick`/`.add` guarded: group admins/owner only, bot must be admin
 - LID→PN resolved once at the message boundary; mentions stay raw — commands match any jid form
-- Commands auto-discovered from `commands/` — new command = drop a file, no `index.ts` edits (category from folder name)
+- Commands auto-discovered from `commands/` — new command = register it in the static `index.ts` entries (category from folder name)
 - Sticker: fills the 512 canvas edge-to-edge with a transparent letterbox; 24 fps, 7 s cap, ≤500 KB ladder
 - Sticker EXIF rewritten to the JSON payload WhatsApp reads today (pack name shows again)
 - Windows: `sticker.exe` ships its MinGW DLLs — fixes the silent `code 53` crash on clean PATHs
