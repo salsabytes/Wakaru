@@ -79,6 +79,36 @@ async function viaFvidgo(rawUrl: string) {
   return { media, title: typeof desc === 'string' && desc ? desc.slice(0, 200) : undefined }
 }
 
+// fdown.world flow (source: AyGemuy/api-wudysoft v8): session cookie + codehap POST, ad links skipped
+export function fdownWorldLinks(html: string): string[] {
+  const hrefs = [...html.matchAll(/href="(\/download\.php[^"]+)"/g)].map((m) => m[1].replaceAll('&amp;', '&'))
+  return [...new Set(hrefs)].filter((h) => !h.includes('play.google'))
+}
+
+async function viaFdownWorld(rawUrl: string) {
+  const base = 'https://fdown.world'
+  const init = await fetch(base, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20_000) })
+  const cookies = (init.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+  const res = await fetch(`${base}/result.php`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      Origin: base,
+      Referer: `${base}/`,
+      Cookie: cookies,
+      'User-Agent': UA,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    body: new URLSearchParams({ codehap_link: rawUrl, codehap: 'true' }).toString(),
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!res.ok) throw new Error(`facebook: fdown.world http ${res.status}`)
+  const links = fdownWorldLinks(await res.text())
+  if (!links.length) throw new Error('facebook: no media found — link may be private or deleted')
+  const buf = await fetchBuffer(base + links[0], { headers: { 'User-Agent': UA, Referer: `${base}/` } })
+  return { media: [{ type: 'video' as const, buf }], title: undefined }
+}
+
 // fvdownloader.net — clean JSON, ~3s, handles reels. Last resort for videos fdown/fvidgo miss.
 export function parseFvdownloader(body: string): string {
   let json: any
@@ -118,6 +148,9 @@ export async function downloadFacebook(rawUrl: string): Promise<{ media: FbMedia
     return await viaFdown(rawUrl) // fastest, HD for plain video posts
   } catch {}
   try {
+    return await viaFdownWorld(rawUrl) // handles share links others miss
+  } catch {}
+  try {
     return await viaFvidgo(rawUrl) // photos (all of them) + videos, no session needed
   } catch {}
   return await viaFvdownloader(rawUrl) // last resort for videos
@@ -154,6 +187,8 @@ if (process.env.FB_SELFTEST) {
   if (parseFvdownloader('{"error":false,"downloadUrl":"https://video.example/x.mp4"}') !== 'https://video.example/x.mp4') {
     throw new Error('parseFvdownloader ok fail')
   }
+  const wl = fdownWorldLinks('<a href="/download.php?type=mp4&amp;link=abc">x</a><a href="/download.php?type=mp4&link=https%3A%2F%2Fplay.google.com%2Fx">ad</a>')
+  if (wl.length !== 1 || wl[0] !== '/download.php?type=mp4&link=abc') throw new Error('fdownWorldLinks fail')
   try {
     parseFvdownloader('{"error":true,"downloadUrl":null}')
     throw new Error('parseFvdownloader error fail')
