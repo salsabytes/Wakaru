@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
 import { tx } from '../../lib/lang.ts'
+import { isExpiredMedia } from '../../lib/media.ts'
 import { cfg } from '../../lib/config.ts'
 
 const BIN = join(
@@ -51,6 +52,7 @@ export default {
       await ctx.sendSticker(await readFile(output))
     } catch (err) {
       logger.error('sticker error:', err)
+      if (isExpiredMedia(err)) return ctx.reply(await tx('mediaExpired'))
       await ctx.reply(await tx('stickerFailed'))
     } finally {
       await rm(dir, { recursive: true, force: true })

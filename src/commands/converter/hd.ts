@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
 import { tx } from '../../lib/lang.ts'
+import { isExpiredMedia } from '../../lib/media.ts'
 import { upscaleImage } from '../../lib/scrapers/upscale.ts'
 
 const exec = promisify(execFile)
@@ -47,6 +48,7 @@ export default {
       await ctx.sendImage(await readFile(output))
     } catch (err) {
       logger.error('hd error:', err)
+      if (isExpiredMedia(err)) return ctx.reply(await tx('mediaExpired'))
       await ctx.reply(await tx('hdFailed'))
     } finally {
       await rm(dir, { recursive: true, force: true })

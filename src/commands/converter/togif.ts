@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
 import { tx } from '../../lib/lang.ts'
+import { isExpiredMedia } from '../../lib/media.ts'
 
 const exec = promisify(execFile)
 
@@ -39,6 +40,7 @@ export default {
       await ctx.sendGif(await readFile(output))
     } catch (err) {
       logger.error('togif error:', err)
+      if (isExpiredMedia(err)) return ctx.reply(await tx('mediaExpired'))
       await ctx.reply(await tx('togifFailed'))
     } finally {
       await rm(dir, { recursive: true, force: true })

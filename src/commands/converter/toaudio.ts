@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
 import { tx } from '../../lib/lang.ts'
+import { isExpiredMedia } from '../../lib/media.ts'
 
 const exec = promisify(execFile)
 
@@ -39,6 +40,7 @@ export default {
       await ctx.sendAudio(await readFile(output))
     } catch (err) {
       logger.error('toaudio error:', err)
+      if (isExpiredMedia(err)) return ctx.reply(await tx('mediaExpired'))
       await ctx.reply(await tx('toaudioFailed'))
     } finally {
       await rm(dir, { recursive: true, force: true })
