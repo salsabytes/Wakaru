@@ -7,5 +7,6 @@
   "maxDownloadMB": 100,
   "stickerPack": "Wakaru",
   "stickerAuthor": "buatan gweh",
-  "updateChannel": "master"
+  "updateChannel": "master",
+  "markOnline": true
 }

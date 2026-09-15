@@ -15,6 +15,7 @@ import {
   type WASocket,
 } from 'baileys'
 import { getMessage } from './lib/store.ts'
+import { botMarkOnline } from './lib/config.ts'
 import { flushAll } from './lib/disk.ts'
 import { logger } from './lib/logger.ts'
 
@@ -52,7 +53,7 @@ export async function connectToWhatsApp(
     logger: silentLog,
     getMessage,
     browser: Browsers.appropriate('Google Chrome'),
-    markOnlineOnConnect: true,
+    markOnlineOnConnect: botMarkOnline(),
     cachedGroupMetadata: async (jid) => {
       const cached = groupCache.get<GroupMetadata>(jid)
       if (cached) return cached

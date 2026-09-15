@@ -143,6 +143,19 @@ let maxDownloadMB: number = (() => {
 
 export const botMaxDownloadMB = (): number => maxDownloadMB
 
+// false = bot tampil offline, notif HP tetap bunyi (nomor utama).
+// default true biar perilaku upstream gak berubah. restart buat apply.
+let markOnline: boolean = (() => {
+  try {
+    const v = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).markOnline
+    return v === undefined ? true : !!v
+  } catch {
+    return true
+  }
+})()
+
+export const botMarkOnline = (): boolean => markOnline
+
 export const setMaxDownloadMB = (next: unknown): number => {
   maxDownloadMB = clampMb(next)
   patchCfg((cfg) => {
