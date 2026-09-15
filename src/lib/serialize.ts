@@ -72,15 +72,19 @@ const statusOf = (err: unknown): number | undefined => {
   return e?.output?.statusCode ?? (typeof e?.status === 'number' ? e.status : undefined)
 }
 
-// URL CDN basi (403) / media kehapus (404/410): minta URL fresh ke pengirim, retry sekali.
-// ponytail: retry gagal = throw asli, command reply "gagal" seperti biasa
+// URL CDN basi (403) / media kehapus (404/410) / host CDN mati (DNS error):
+// minta URL fresh ke pengirim, retry sekali.
+const netDead = (err: unknown): boolean => {
+  const c = (err as { code?: unknown })?.code
+  return c === 'ENOTFOUND' || c === 'EAI_AGAIN' || c === 'ETIMEDOUT' || c === 'ECONNRESET'
+}
 const withReupload = (msg: WAMessage, download: () => Promise<Buffer>): (() => Promise<Buffer>) => {
   return async () => {
     try {
       return await download()
     } catch (err) {
       const s = statusOf(err)
-      if (!waka || (s !== 403 && s !== 404 && s !== 410)) throw err
+      if (!waka || (s !== 403 && s !== 404 && s !== 410 && !netDead(err))) throw err
       const fresh = await waka.updateMediaMessage(msg)
       return downloadMediaMessage(fresh, 'buffer', {}) as unknown as Promise<Buffer>
     }

@@ -14,9 +14,11 @@ const requireUrl = async (ctx: CommandContext, name: string, usage: string): Pro
 export { requireUrl }
 
 export const isExpiredMedia = (err: unknown): boolean => {
-  const e = err as { output?: { statusCode?: number }; status?: unknown }
+  const e = err as { output?: { statusCode?: number }; status?: unknown; code?: unknown }
   const s = e?.output?.statusCode ?? (typeof e?.status === 'number' ? e.status : undefined)
-  return s === 403 || s === 404 || s === 410
+  if (s === 403 || s === 404 || s === 410) return true
+  const c = e?.code
+  return c === 'ENOTFOUND' || c === 'EAI_AGAIN' || c === 'ETIMEDOUT' || c === 'ECONNRESET'
 }
 
 const fmtDur = (sec: number): string => {
