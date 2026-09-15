@@ -31,7 +31,7 @@ const videoIdOf = (rawUrl: string): string | undefined => {
 
 // disk cache by video id — repeat requests (the norm in groups) skip convert+download
 const CACHE_DIR = join(import.meta.dirname, '..', '..', '..', 'bin', 'cache')
-const CACHE_MAX = 500 * 1024 * 1024
+const CACHE_MAX = 150 * 1024 * 1024
 
 const cacheGet = async (vid: string, ext: 'mp3' | 'mp4'): Promise<{ buf: Buffer; title: string } | null> => {
   try {
