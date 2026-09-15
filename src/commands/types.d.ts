@@ -41,6 +41,7 @@ declare global {
     sendSticker: (buffer: Buffer) => Promise<void>
     sendImage: (buffer: Buffer, caption?: string) => Promise<void>
     sendVideo: (buffer: Buffer, caption?: string) => Promise<void>
+    sendGif: (buffer: Buffer, caption?: string) => Promise<void>
     sendAudio: (buffer: Buffer, title?: string) => Promise<void>
     sendDocument: (buffer: Buffer, fileName: string, mimetype?: string) => Promise<void>
 

@@ -28,6 +28,19 @@ fn main() -> ExitCode {
       }
     };
   }
+  if args.first().is_some_and(|a| a == "togif") {
+    if args.len() != 3 {
+      eprintln!("usage: sticker togif <input.webp> <output.gif>");
+      return ExitCode::FAILURE;
+    }
+    return match webp_to_gif(&args[1], &args[2]) {
+      Ok(()) => ExitCode::SUCCESS,
+      Err(e) => {
+        eprintln!("togif: {e}");
+        ExitCode::FAILURE
+      }
+    };
+  }
   if args.first().is_some_and(|a| a == "brat") {
     if args.len() != 3 {
       eprintln!("usage: sticker brat <text> <output.webp>");
@@ -278,6 +291,36 @@ fn webp_to_png(input: &str, output: &str) -> Result<(), Box<dyn std::error::Erro
     None => webp::Decoder::new(&data).decode().map(|w| w.to_image()).ok_or("not a webp")?,
   };
   img.save(output)?;
+  Ok(())
+}
+
+// animated sticker (webp) -> gif, keeps per-frame delay, caps at 200 frames
+fn webp_to_gif(input: &str, output: &str) -> Result<(), Box<dyn std::error::Error>> {
+  use image::codecs::gif::{GifEncoder, Repeat};
+  use image::{Delay, Frame};
+  use webp_animation::Decoder;
+  let data = fs::read(input)?;
+  let decoder = Decoder::new(&data).map_err(|e| format!("not animated: {e:?}"))?;
+  let file = fs::File::create(output)?;
+  let mut enc = GifEncoder::new(file);
+  enc.set_repeat(Repeat::Infinite)?;
+  let mut prev = 0i32;
+  let mut n = 0;
+  for frame in decoder.into_iter() {
+    let ts = frame.timestamp();
+    let (fw, fh) = frame.dimensions();
+    let img = RgbaImage::from_raw(fw, fh, frame.data().to_vec()).ok_or("bad frame")?;
+    let delay = ((ts - prev).clamp(20, 2000) as u32).max(20);
+    prev = ts;
+    enc.encode_frame(Frame::from_parts(img, 0, 0, Delay::from_numer_denom_ms(delay, 1)))?;
+    n += 1;
+    if n >= 200 {
+      break;
+    }
+  }
+  if n == 0 {
+    return Err("no frames decoded".into());
+  }
   Ok(())
 }
 

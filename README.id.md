@@ -44,7 +44,7 @@ biarin dia *ngerjain* sesuatu buat kamu.
 ## ✨ Fitur
 
 - 🧠 **Nyambung** — `.ai` ngobrol natural, bisa jalanin command sendiri via `@run:`, dan ingat tiap percakapan
-- 🎬 **Jago media** — ambil audio dan video dari link, cari YouTube pakai kata kunci, dan bikin stiker dari foto & video (plus meme `.brat`, `.toimg` stiker→foto, `.toaudio` video→audio, `.hd` upscale AI)
+- 🎬 **Jago media** — ambil audio dan video dari link, cari YouTube pakai kata kunci, dan bikin stiker dari foto & video (plus meme `.brat`, `.toimg` stiker→foto, `.togif` stiker→gif, `.toaudio` video→audio, `.hd` upscale AI)
 - 🧩 **Gampang dikembangin** — daftarin command di `src/commands/index.ts` dan otomatis muncul di `.menu`
 - 🔁 **Anti ngilang** — reconnect otomatis dengan exponential backoff
 - 🔐 **Gampang masuk** — login pakai QR code atau pairing code
@@ -64,6 +64,7 @@ Kirim `.menu` di WhatsApp buat liat daftar live. Alias dalam kurung.
 | `.menu` | `.help` | List semua command |
 | `.sticker` | `.st` | Foto/video yang di-quote → stiker webp 512×512 (optional `.sticker <pack>\|<author>`) |
 | `.toimg` | `.toimage` | Stiker yang di-quote → gambar PNG |
+| `.togif` | `.tovideo`, `.togifs` | Stiker animasi → GIF |
 | `.brat <text>` | — | Stiker meme ala brat dari teks |
 | `.toaudio` | `.tomp3`, `.tomp4a`, `.toaud` | Video yang di-quote → audio m4a (extract, tanpa re-encode) |
 | `.hd` | `.remini`, `.upscale` | Foto yang di-quote → upscale AI 2x (iloveimg, fallback Rust) |
@@ -224,7 +225,7 @@ di WhatsApp — override per stiker pakai `.sticker <pack>|<author>` (mis.
 |---|---|---|
 | Runtime | **Bun** (canary) · fallback Node ≥ 23.6 | TypeScript jalan langsung — tanpa build step, tanpa `tsx` |
 | Protokol WhatsApp | **Baileys** | Client Web API yang teruji |
-| Engine stiker | **Sidecar Rust** | Webp 512×512, support animasi, brat/toimg, semua codec dikompilasi di dalam |
+| Engine stiker | **Sidecar Rust** | Webp 512×512, support animasi, brat/toimg/togif, semua codec dikompilasi di dalam |
 | Engine audio | **Sidecar Rust** | AAC-dalam-fMP4 diremux jadi M4A standar buat iOS, lossless |
 | Otak AI | **Sidecar Python** (`native/ai`, butuh `python3` + `curl_cffi`) + fallback Poolside | chatgpt.com anonim: device fresh + proof-of-work per request, tanpa key, tanpa login |
 | Scraper | **TypeScript murni** | Tanpa yt-dlp / ffmpeg — nggak ada yang perlu dirawat |
@@ -362,12 +363,13 @@ Wakaru ikut [Semantic Versioning](https://semver.org/) — `major.minor.patch`
 **Belum dirilis**
 - `.toaudio`: video yang di-quote → audio m4a via engine Rust (sample copy, tanpa re-encode)
 - `.hd`: foto yang di-quote → upscale AI 2x via scraper iloveimg, fallback sharpen Rust
+- `.togif`: stiker animasi → GIF via engine Rust (delay frame dipertahankan)
 
 **v1.2.0**
 - Command `.prefix`: prefix custom, multi-prefix (`.prefix ! /`), atau mode bare tanpa prefix (`.prefix none`) — juga bisa via `"prefixes"` di `config.json`
 - Command bare butuh double-tap kalau prefix diset (aman dari chat); langsung jalan di mode bare
 - Fix: `queryText` makan satu karakter kalau ada spasi setelah prefix (`. brat halo` → `t halo`)
-- Sync README: sidecar AI Python di tech stack, tabel 26 command full, tree proyek live
+- Sync README: sidecar AI Python di tech stack, tabel 27 command full, tree proyek live
 
 **v1.1.1**
 - Command `.mode`: gate balasan `public` (semua orang) / `self` (cuma akun bot) / `private` (owner aja), bisa live atau via `config.json`
