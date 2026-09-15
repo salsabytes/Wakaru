@@ -31,12 +31,3 @@ if [ -f target/release/wakaru-audio.exe ]; then
 else
   cp target/release/wakaru-audio "$ROOT/bin/audio" && chmod +x "$ROOT/bin/audio"
 fi
-
-# video: avcC level relabel H264 L5.x -> L4.2 (pure std, no DLLs needed)
-cd "$ROOT/native/video"
-cargo build --release
-if [ -f target/release/wakaru-video.exe ]; then
-  cp target/release/wakaru-video.exe "$ROOT/bin/video.exe"
-else
-  cp target/release/wakaru-video "$ROOT/bin/video" && chmod +x "$ROOT/bin/video"
-fi

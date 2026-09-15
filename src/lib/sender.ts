@@ -14,20 +14,17 @@ const AUDIO_BIN = join(
   process.platform === 'win32' ? 'audio.exe' : 'audio',
 )
 
-const VIDEO_BIN = join(
-  import.meta.dirname, '..', '..', 'bin',
-  process.platform === 'win32' ? 'video.exe' : 'video',
-)
-
-// TikTok serves H.264 High up to L5.2 / HEVC that WA's inline player refuses to
-// play (message arrives fine, tap-to-play does nothing). Codec boxes live in
-// moov — scan is confined there so mdat payload bytes can't false-positive.
-// ponytail: L4.2 ceiling is empirical; the video sidecar relabels L5.x→L4.2,
-// HEVC still falls back to raw (needs a real re-encode, not worth it yet).
-export const waInlineVideoOk = (buf: Buffer): boolean => {
+// TikTok serves 1080p60 H.264 High@L5.x that arrives fine but WA's inline
+// player won't play (verified Sep 2026: 1080x1920 L5.2 45MB fails even after
+// relabelling to L4.2, while 576x1240 L3.1 1.2MB plays — the gate isn't the
+// level label). Boxes are read from moov only so mdat payload can't
+// false-positive. Fail-open: unparseable → 'ok', never blocks a send.
+// ponytail: 720p/L4.0 ceiling is empirical from 2 samples; re-encode sidecar
+// if WA's actual limit gets mapped (needs H.264 encoder, not worth it yet).
+export const videoPlayability = (buf: Buffer): 'ok' | 'heavy' => {
   try {
-    let moov: Buffer | undefined
     let off = 0
+    let moov: Buffer | undefined
     while (off + 8 <= buf.length) {
       const size = buf.readUInt32BE(off)
       const name = buf.subarray(off + 4, off + 8).toString()
@@ -39,36 +36,31 @@ export const waInlineVideoOk = (buf: Buffer): boolean => {
       if (name === 'mdat') break
       off += size
     }
-    if (!moov) return true // fail-open: no moov (fragmented?) → keep current behavior
-    if (moov.includes(Buffer.from('hvc1')) || moov.includes(Buffer.from('hev1'))) return false
+    if (!moov) return 'ok'
+    if (moov.includes(Buffer.from('hvc1')) || moov.includes(Buffer.from('hev1'))) return 'heavy'
     const tag = Buffer.from('avcC')
     let i = moov.indexOf(tag)
     while (i > 0) {
-      if (moov[i + 7] > 0x2a) return false // above High@L4.2
+      if (moov[i + 7] > 0x28) return 'heavy' // above High@L4.0
       i = moov.indexOf(tag, i + 4)
     }
-    return true
+    // tkhd width/height are the last 8 bytes of each tkhd box (16.16 fixed).
+    // compared as total pixels so portrait video (e.g. 576x1240) isn't
+    // penalised for its tall side — 720p (921600px) is the ceiling.
+    const tkhd = Buffer.from('tkhd')
+    let t = moov.indexOf(tkhd)
+    while (t > 4) {
+      const size = moov.readUInt32BE(t - 4)
+      if (size >= 92 && t - 4 + size <= moov.length) {
+        const w = moov.readUInt32BE(t - 4 + size - 8) / 65536
+        const h = moov.readUInt32BE(t - 4 + size - 4) / 65536
+        if (w * h > 921600) return 'heavy'
+      }
+      t = moov.indexOf(tkhd, t + 4)
+    }
+    return 'ok'
   } catch {
-    return true // sniff never blocks a send
-  }
-}
-
-// H.264 High@L5.x (what TikTok serves for 1080p60) relabelled to L4.2 — byte
-// patch, milliseconds, zero quality loss. Binary missing/failed (HEVC, weird
-// boxes) → null and the raw buffer goes out (fail-open, never blocks a send).
-const patchVideoLevel = async (buffer: Buffer): Promise<Buffer | null> => {
-  if (waInlineVideoOk(buffer) || !existsSync(VIDEO_BIN)) return null
-  const dir = await mkdtemp(join(tmpdir(), 'wakaru-video-'))
-  try {
-    const input = join(dir, 'in.mp4')
-    const output = join(dir, 'out.mp4')
-    await writeFile(input, buffer)
-    await exec(VIDEO_BIN, [input, output], { timeout: 60_000 })
-    return await readFile(output)
-  } catch {
-    return null
-  } finally {
-    await rm(dir, { recursive: true, force: true })
+    return 'ok' // sniff never blocks a send
   }
 }
 
@@ -97,11 +89,7 @@ export const makeSender = (sock: WASocket, chat: string, quoted?: WAMessage) => 
     react: async (emoji: string, key?: WAMessageKey) => { await sock.sendMessage(chat, { react: { text: emoji, key } }) },
     sticker: async (buffer: Buffer) => { await send({ sticker: buffer }) },
     image: async (buffer: Buffer, caption?: string) => { await send({ image: buffer, caption }) },
-    video: async (buffer: Buffer, caption?: string) => {
-      const patched = await patchVideoLevel(buffer)
-      if (patched) buffer = patched
-      await send({ video: buffer, caption })
-    },
+    video: async (buffer: Buffer, caption?: string) => { await send({ video: buffer, caption }) },
     gif: async (buffer: Buffer, caption?: string) => { await send({ video: buffer, caption, mimetype: 'image/gif', gifPlayback: true }) },
     document: async (buffer: Buffer, fileName: string, mimetype = 'application/octet-stream') => { await send({ document: buffer, fileName, mimetype }) },
     // title is only for AI capture — WhatsApp audio has no visible caption

@@ -1,0 +1,4 @@
+# shell scripts must stay LF or they explode under sh/dash (CRLF = $'\r' errors)
+*.sh text eol=lf
+# windows batch files need CRLF
+*.bat text eol=crlf

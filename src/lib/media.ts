@@ -86,7 +86,7 @@ export interface OutMedia {
 const INLINE_MAX = 64 * 1024 * 1024
 const DOC_MAX = 2 * 1024 * 1024 * 1024
 
-const asDoc = (m: OutMedia): { buf: Buffer; name: string; mime: string } => {
+export const asDoc = (m: OutMedia): { buf: Buffer; name: string; mime: string } => {
   const base = (m.caption ?? m.type).replace(/[^\w\- ]+/g, '').trim().slice(0, 60) || m.type
   const mime = m.type === 'video' ? 'video/mp4' : m.type === 'audio' ? 'audio/mpeg' : 'image/jpeg'
   const ext = m.type === 'video' ? 'mp4' : m.type === 'audio' ? 'mp3' : 'jpg'
