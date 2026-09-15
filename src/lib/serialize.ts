@@ -125,7 +125,12 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
     const qtype = Object.keys(q)[0]
     const qc = (q as any)?.[qtype] ?? {}
     const qmsg = {
-      key: { id: ctxt.stanzaId, remoteJid: ctxt.remoteJid, participant: ctxt.participant },
+      key: {
+        id: ctxt.stanzaId,
+        remoteJid: ctxt.remoteJid ?? chat,
+        participant: ctxt.participant,
+        fromMe: !ctxt.participant && !!msg.key?.fromMe,
+      },
       message: q,
     } as WAMessage
     const qraw = () => downloadMediaMessage(qmsg, 'buffer', {}) as unknown as Promise<Buffer>
