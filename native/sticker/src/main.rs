@@ -412,19 +412,6 @@ fn brat_to_sticker(text: &str, output: &str) -> Result<(), Box<dyn std::error::E
   Ok(())
 }
 
-fn brat_to_webp(data: &[u8], output: &str) -> Result<(), Box<dyn std::error::Error>> {
-  let img = image::load_from_memory(data)?;
-  let (w, h) = img.dimensions();
-  assert_eq!((w, h), (DIM, DIM));
-  let rgba = img.to_rgba8();
-  let file = fs::File::create(output)?;
-  let mut writer = BufWriter::new(file);
-  let enc = webp::Encoder::from_rgba(rgba.as_raw(), DIM, DIM);
-  let bytes = enc.encode(80.0);
-  writer.write_all(&*bytes)?;
-  Ok(())
-}
-
 fn hd_upscale(input: &str, output: &str) -> Result<(), Box<dyn std::error::Error>> {
   let img = image::load_from_memory(&fs::read(input)?)?.to_rgb8();
   let (w, h) = (img.width(), img.height());
