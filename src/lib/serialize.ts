@@ -87,7 +87,7 @@ const withReupload = (msg: WAMessage, download: () => Promise<Buffer>): (() => P
       if (!waka || (s !== 403 && s !== 404 && s !== 410 && !netDead(err))) throw err
       const fresh = await Promise.race([
         waka.updateMediaMessage(msg),
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('reupload timeout')), 30_000)),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('reupload timeout')), 15_000)),
       ])
       return downloadMediaMessage(fresh, 'buffer', {}) as unknown as Promise<Buffer>
     }

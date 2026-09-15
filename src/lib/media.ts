@@ -14,7 +14,8 @@ const requireUrl = async (ctx: CommandContext, name: string, usage: string): Pro
 export { requireUrl }
 
 export const isExpiredMedia = (err: unknown): boolean => {
-  const e = err as { output?: { statusCode?: number }; status?: unknown; code?: unknown }
+  const e = err as { output?: { statusCode?: number }; status?: unknown; code?: unknown; message?: unknown }
+  if (typeof e?.message === 'string' && e.message.includes('reupload timeout')) return true
   const s = e?.output?.statusCode ?? (typeof e?.status === 'number' ? e.status : undefined)
   if (s === 403 || s === 404 || s === 410) return true
   const c = e?.code
