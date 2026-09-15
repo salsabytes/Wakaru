@@ -20,8 +20,9 @@ const CATEGORY_LABEL: Record<string, string> = {
   downloader: '◈ DOWNLOADER',
   group: '✤ GROUP',
   converter: '✤ CONVERTER',
+  owner: '👑 OWNER',
 }
-const CATEGORY_ORDER = ['main', 'downloader', 'group', 'converter']
+const CATEGORY_ORDER = ['main', 'downloader', 'group', 'converter', 'owner']
 const catLabel = (cat: string): string => CATEGORY_LABEL[cat] ?? cat.toUpperCase()
 const catOrder = (cat: string): number => {
   const i = CATEGORY_ORDER.indexOf(cat)
@@ -46,6 +47,7 @@ const rule = (label = ''): string =>
 interface MenuCommand {
   name: string
   category: string
+  ownerOnly?: boolean
 }
 
 interface MenuData {
@@ -62,11 +64,14 @@ export async function renderMenu(d: MenuData): Promise<string> {
   const date = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
   const time = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replaceAll('.', ':')
 
+// owner commands hide from regular users; owners see them in their own section
+  const visible = d.commands.filter((c) => d.isOwner || !c.ownerOnly)
   const grouped = new Map<string, string[]>()
-  for (const { name, category } of d.commands) {
-    const items = grouped.get(category) ?? []
+  for (const { name, category, ownerOnly } of visible) {
+    const key = d.isOwner && ownerOnly ? 'owner' : category
+    const items = grouped.get(key) ?? []
     items.push(`   ✧ ${d.prefix}${name}`)
-    grouped.set(category, items)
+    grouped.set(key, items)
   }
 
   const who = d.pushName || (d.isOwner ? 'Owner' : 'Kak')
@@ -81,7 +86,7 @@ export async function renderMenu(d: MenuData): Promise<string> {
     '',
     ...categories.flatMap(([category, items]) => [rule(catLabel(category)), ...items]),
     '',
-    await tx('menuStats', { n: d.commands.length, ms: d.elapsedMs }),
+    await tx('menuStats', { n: visible.length, ms: d.elapsedMs }),
     await tx('menuFooter', { prefix: d.prefix }),
   ].join('\n')
 
@@ -127,6 +132,32 @@ if (process.env.MENU_SELFTEST) {
       m.includes('✧ .ytmp3') &&
       m.includes('42ms')
     if (!ok) throw new Error('menu render fail')
+    const ownerView = await renderMenu({
+      pushName: 'Test',
+      prefix: '.',
+      isOwner: true,
+      elapsedMs: 42,
+      commands: [
+        { name: 'menu', category: 'main' },
+        { name: 'mode', category: 'main', ownerOnly: true },
+      ],
+    })
+    if (!ownerView.includes('OWNER ') || !ownerView.includes('.mode')) {
+      throw new Error('menu owner section fail')
+    }
+    const userView = await renderMenu({
+      pushName: 'Test',
+      prefix: '.',
+      isOwner: false,
+      elapsedMs: 42,
+      commands: [
+        { name: 'menu', category: 'main' },
+        { name: 'mode', category: 'main', ownerOnly: true },
+      ],
+    })
+    if (userView.includes('.mode') || userView.includes('OWNER')) {
+      throw new Error('menu owner hide fail')
+    }
     console.log('menu self-check ok')
     process.exit(0)
   })()

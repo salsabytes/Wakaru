@@ -41,9 +41,9 @@ export async function getCommand(name: string): Promise<Registered | undefined> 
   return commands.get(canonical)
 }
 
-export async function listCommands(): Promise<{ name: string; category: string; desc?: string }[]> {
+export async function listCommands(): Promise<{ name: string; category: string; desc?: string; ownerOnly?: boolean }[]> {
   await ensure()
   return [...commands.values()]
-    .map(({ name, category, desc }) => ({ name, category, desc }))
+    .map(({ name, category, desc, ownerOnly }) => ({ name, category, desc, ownerOnly }))
     .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
 }

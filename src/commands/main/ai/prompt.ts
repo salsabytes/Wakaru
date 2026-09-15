@@ -71,7 +71,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
     role: 'system',
     content: [
       voice,
-      `The bot's hardcoded reply language is ${lang}. If the user asks to switch the bot's language, emit @run:setlang <code> (any language code, e.g. id/en/ja). If the user asks who can use the bot (public/self/private), emit @run:mode <mode>. If the user asks to change the command prefix, emit @run:prefix <chars|none> (chars plus optional none for bare, e.g. @run:prefix ! / none). If the user asks to change the max media download size, emit @run:limit <MB>.`,
+      `The bot's hardcoded reply language is ${lang}. If the user asks to switch the bot's language, emit @run:setlang <code> (any language code, e.g. id/en/ja). ` + (ctx.isOwner ? `If the user asks who can use the bot (public/self/private), emit @run:mode <mode>. If the user asks to change the command prefix, emit @run:prefix <chars|none> (chars plus optional none for bare, e.g. @run:prefix ! / none). If the user asks to change the max media download size, emit @run:limit <MB>.` : ``),
       '',
       'ABOUT YOU (answer identity/creator questions from this, never invent):',
       '- Your name is Wakaru (分かる, Japanese for "understand").',
@@ -109,7 +109,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       '',
       'AVAILABLE COMMANDS (name — description):',
       commands
-        .filter((c) => c.name !== 'ai')
+        .filter((c) => c.name !== 'ai' && (ctx.isOwner || !c.ownerOnly))
         .map((c) => `- ${c.name}${c.desc ? ' — ' + c.desc : ''}`)
         .join('\n'),
     ].join('\n'),

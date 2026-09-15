@@ -95,7 +95,6 @@ const STRINGS: Record<string, Record<string, string>> = {
   id: {
     cooldown: 'sabar dulu {s} detik ya 😅',
     noOwners: 'no owners in config.json — owner commands disabled 🔒',
-    ownerOnly: 'owner only 🔒 (detected: {who})',
     stalePlay: 'pilihannya udah keburu basi 😅 ketik ulang `.play <judul>` dulu ya',
     cmdFailed: '❌ {name} failed: {msg}',
     aiUsage: 'usage: {prefix}ai <pesan> — mis. "sticker", "kick budi", atau ngobrol aja',
@@ -169,7 +168,6 @@ const STRINGS: Record<string, Record<string, string>> = {
   en: {
     cooldown: 'hold on {s} seconds 😅',
     noOwners: 'no owners in config.json — owner commands disabled 🔒',
-    ownerOnly: 'owner only 🔒 (detected: {who})',
     stalePlay: 'that pick already expired 😅 re-run `.play <title>` first',
     cmdFailed: '❌ {name} failed: {msg}',
     aiUsage: 'usage: {prefix}ai <message> — e.g. "sticker", "kick budi", or just chat',

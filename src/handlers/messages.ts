@@ -140,9 +140,10 @@ const blockedByCooldown = async (sender: string, cmd: Command, send: Sender): Pr
   return true
 }
 
+// unknown-to-users owner commands fail silent; empty owners = setup hint stays visible
 const blockedByOwner = async (ctx: CommandContext, cmd: Command): Promise<boolean> => {
   if (!cmd.ownerOnly || isOwner(ctx.sender)) return false
-  await ctx.reply(await tx(!OWNERS.length ? 'noOwners' : 'ownerOnly', { who: ctx.sender.split(/[@:]/)[0] }))
+  if (!OWNERS.length) await ctx.reply(await tx('noOwners'))
   return true
 }
 
