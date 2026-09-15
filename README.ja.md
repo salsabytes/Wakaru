@@ -82,6 +82,7 @@ Node ≥ 23.6**、どの環境もワンライナーで導入。話しかける�
 | `.demote` | `.turunkan` | 管理者をメンバーに降格（タグ or 返信、グループ管理者／ownerのみ） |
 | `.add <number>` | `.tambah` | 電話番号でメンバー追加（グループ管理者／ownerのみ） |
 | `.setlang <code>` | `.lang`, `.bahasa` | ボットの返信言語を切替、任意コード（`id`/`en`/`ja`/…） |
+| `.wiki <query>` | `.wikipedia`、`.wk` | ボット言語のWikipediaを検索＋記事リンク |
 | `.mode <public\|self\|private>` | `.self` | ボットの利用範囲：全員・このアカウントのみ・ownerのみ（ownerのみ） |
 | `.prefix <chars\|none>` | — | コマンド接頭辞、複数可、bareモード可（ownerのみ） |
 | `.limit <MB>` | — | メディアDL上限、10–2048MB（ownerのみ） |
@@ -355,6 +356,7 @@ Wakaruは[セマンティックバージョニング](https://semver.org/)準拠
 <summary>最近の変更</summary>
 
 **未リリース**
+- `.wiki`：ボット言語のWikipediaを検索（`ja` → ja.wikipedia.org、フォールバック`en`）＋記事リンク
 - `.toaudio`：引用した動画 → Rustエンジンでm4a音声に（サンプルコピー、再エンコードなし）
 - `.hd`：引用した写真 → iloveimgスクレイパーで2x AIアップスケール、Rustシャープ化フォールバック
 

@@ -84,6 +84,7 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.demote` | `.turunkan` | Demote admin(s) to member (tag or reply, group admins/owner only) |
 | `.add <number>` | `.tambah` | Add members by phone number (group admins/owner only) |
 | `.setlang <code>` | `.lang`, `.bahasa` | Switch the bot's reply language, any code (`id`/`en`/`ja`/…) |
+| `.wiki <query>` | `.wikipedia`, `.wk` | Search Wikipedia in the bot language + article link |
 | `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |
 | `.prefix <chars\|none>` | — | Command prefixes, multi, or bare mode (owner only) |
 | `.limit <MB>` | — | Max media download size, 10–2048 MB (owner only) |
@@ -363,6 +364,7 @@ Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch
 <summary>Recent changes</summary>
 
 **Unreleased**
+- `.wiki`: search Wikipedia in the bot language (`ja` → ja.wikipedia.org, fallback `en`) + article link
 - `.toaudio`: quoted video → m4a audio via the Rust engine (sample copy, no re-encode)
 - `.hd`: quoted photo → 2x AI upscale via iloveimg scraper, Rust sharpen fallback
 - Reply language is free-form: `.setlang <code>` takes any code with `data/lang/<code>.json` file cache and pivot fallback

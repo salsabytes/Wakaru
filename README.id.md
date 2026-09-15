@@ -82,6 +82,7 @@ Kirim `.menu` di WhatsApp buat liat daftar live. Alias dalam kurung.
 | `.demote` | `.turunkan` | Turunkan admin jadi member (tag atau reply, khusus admin grup/owner) |
 | `.add <number>` | `.tambah` | Tambah member pakai nomor HP (khusus admin grup/owner) |
 | `.setlang <code>` | `.lang`, `.bahasa` | Ganti bahasa balasan bot, kode bebas (`id`/`en`/`ja`/…) |
+| `.wiki <query>` | `.wikipedia`, `.wk` | Cari Wikipedia sesuai bahasa bot + link artikel |
 | `.mode <public\|self\|private>` | `.self` | Siapa yang bisa pakai bot: semua orang, akun ini aja, atau owner aja (khusus owner) |
 | `.prefix <chars\|none>` | — | Prefix command, multi, atau mode bare (khusus owner) |
 | `.limit <MB>` | — | Maksimal ukuran download media, 10–2048 MB (khusus owner) |
@@ -360,6 +361,7 @@ Wakaru ikut [Semantic Versioning](https://semver.org/) — `major.minor.patch`
 <summary>Perubahan terbaru</summary>
 
 **Belum dirilis**
+- `.wiki`: cari Wikipedia sesuai bahasa bot (`ja` → ja.wikipedia.org, fallback `en`) + link artikel
 - `.toaudio`: video yang di-quote → audio m4a via engine Rust (sample copy, tanpa re-encode)
 - `.hd`: foto yang di-quote → upscale AI 2x via scraper iloveimg, fallback sharpen Rust
 
