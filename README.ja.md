@@ -44,7 +44,7 @@ Node ≥ 23.6**、どの環境もワンライナーで導入。話しかける�
 ## ✨ 機能
 
 - 🧠 **話が通じる** — `.ai`は自然に会話し、`@run:`でコマンドを自走、会話ごとに記憶
-- 🎬 **メディア上手** — リンクから音声・動画を取得、YouTubeをクエリ検索、写真＆動画からステッカー作成（`.brat`ミーム、`.toimg`ステッカー→画像、`.togif`ステッカー→GIF、`.toaudio`動画→音声、`.hd` AIアップスケール付き）
+- 🎬 **メディア上手** — リンクから音声・動画を取得、YouTubeをクエリ検索、写真＆動画からステッカー作成（`.brat`ミーム、`.toimg`ステッカー→画像、`.toaudio`動画→音声、`.hd` AIアップスケール付き）
 - 🧩 **拡張しやすい** — `src/commands/index.ts`に登録すれば`.menu`に自動表示
 - 🔁 **落ちない** — 指数バックオフで自動再接続
 - 🔐 **簡単ログイン** — QRコード or ペアリングコード
@@ -64,7 +64,6 @@ Node ≥ 23.6**、どの環境もワンライナーで導入。話しかける�
 | `.menu` | `.help` | 全コマンド一覧 |
 | `.sticker` | `.st` | 引用した写真・動画 → 512×512 webpステッカー（`.sticker <pack>\|<author>`で名付け可） |
 | `.toimg` | `.toimage` | 引用したステッカー → PNG画像 |
-| `.togif` | `.tovideo`、`.togifs` | アニメステッカー → GIF |
 | `.brat <text>` | — | テキストから白brat風ミームステッカー |
 | `.toaudio` | `.tomp3`、`.tomp4a`、`.toaud` | 引用した動画 → m4a音声（抽出、再エンコードなし） |
 | `.hd` | `.remini`、`.upscale` | 引用した写真 → 2x AIアップスケール（iloveimg、Rustフォールバック） |
@@ -221,7 +220,7 @@ bare有効時は即発火。
 |---|---|---|
 | ランタイム | **Bun**（canary）· Node ≥ 23.6フォールバック | TypeScriptを直接実行 — ビルド不要、`tsx`不要 |
 | WhatsAppプロトコル | **Baileys** | 実績あるWeb APIクライアント |
-| ステッカーエンジン | **Rustサイドカー** | 512×512 webp、アニメ対応、brat/toimg/togif、全コーデック内蔵 |
+| ステッカーエンジン | **Rustサイドカー** | 512×512 webp、アニメ対応、brat/toimg/hd、全コーデック内蔵 |
 | オーディオエンジン | **Rustサイドカー** | iOS用にAAC-in-fMP4を標準M4Aへリマックス、ロスレス |
 | AI脳 | **Pythonサイドカー**（`native/ai`、`python3`＋`curl_cffi`必須）＋Poolsideフォールバック | chatgpt.com匿名：毎回fresh device＋proof-of-work、キー・ログイン不要 |
 | スクレイパー | **Pure TypeScript** | yt-dlp／ffmpegなし — 保守不要 |
@@ -358,7 +357,6 @@ Wakaruは[セマンティックバージョニング](https://semver.org/)準拠
 **未リリース**
 - `.toaudio`：引用した動画 → Rustエンジンでm4a音声に（サンプルコピー、再エンコードなし）
 - `.hd`：引用した写真 → iloveimgスクレイパーで2x AIアップスケール、Rustシャープ化フォールバック
-- `.togif`：アニメステッカー → GIF（Rustエンジン、フレーム遅延を保持）
 
 **v1.2.0**
 - `.prefix`コマンド：カスタム接頭辞、複数接頭辞（`.prefix ! /`）、bareモード（`.prefix none`） — `config.json`の`"prefixes"`からも設定可

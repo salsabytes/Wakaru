@@ -45,7 +45,7 @@ it *do* things for you.
 ## ✨ Features
 
 - 🧠 **It gets you** — `.ai` chats naturally, can run any command on its own with `@run:`, and remembers each conversation
-- 🎬 **Plays with media** — pulls audio and video from links, searches YouTube by query, and makes stickers from photos & videos (plus `.brat` memes, `.toimg` sticker→photo, `.togif` sticker→gif, `.toaudio` video→audio, `.hd` AI upscale)
+- 🎬 **Plays with media** — pulls audio and video from links, searches YouTube by query, and makes stickers from photos & videos (plus `.brat` memes, `.toimg` sticker→photo, `.toaudio` video→audio, `.hd` AI upscale)
 - 🧩 **Extensible** — register a command in `src/commands/index.ts` and it shows up in `.menu` automatically
 - 🔁 **Never leaves you hanging** — auto-reconnects with exponential backoff
 - 🔐 **Easy in** — log in with a QR code or a pairing code
@@ -66,7 +66,6 @@ Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
 | `.menu` | `.help` | List every command |
 | `.sticker` | `.st` | Quoted photo/video → 512×512 webp sticker (optional `.sticker <pack>|<author>` name) |
 | `.toimg` | `.toimage` | Quoted sticker → PNG image |
-| `.togif` | `.tovideo`, `.togifs` | Animated sticker → GIF |
 | `.brat <text>` | — | White brat-style meme sticker from text |
 | `.toaudio` | `.tomp3`, `.tomp4a`, `.toaud` | Quoted video → m4a audio (extract, no re-encode) |
 | `.hd` | `.remini`, `.upscale` | Quoted photo → 2x AI upscale (iloveimg, Rust fallback) |
@@ -227,7 +226,7 @@ WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
 |---|---|---|
 | Runtime | **Bun** (canary) · Node ≥ 23.6 fallback | TypeScript runs directly — no build step, no `tsx` |
 | WhatsApp protocol | **Baileys** | The battle-tested Web API client |
-| Sticker engine | **Rust sidecar** | 512×512 webp, animated support, brat/toimg/togif/hd, all codecs compiled in |
+| Sticker engine | **Rust sidecar** | 512×512 webp, animated support, brat/toimg/hd, all codecs compiled in |
 | Audio engine | **Rust sidecar** | AAC-in-fMP4 remuxed to standard M4A for iOS, lossless |
 | AI brain | **Python sidecar** (`native/ai`, needs `python3` + `curl_cffi`) + Poolside fallback | chatgpt.com anonymous: fresh device + proof-of-work per request, no key, no login |
 | Scrapers | **Pure TypeScript** | No yt-dlp / ffmpeg — nothing to maintain |
@@ -366,7 +365,6 @@ Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch
 **Unreleased**
 - `.toaudio`: quoted video → m4a audio via the Rust engine (sample copy, no re-encode)
 - `.hd`: quoted photo → 2x AI upscale via iloveimg scraper, Rust sharpen fallback
-- `.togif`: animated sticker → GIF via the Rust engine (keeps frame delays)
 - Reply language is free-form: `.setlang <code>` takes any code with `data/lang/<code>.json` file cache and pivot fallback
 - Reply-to-bot and link follow-ups reach `.ai` even with bare mode on
 - `.ai` output is WhatsApp-safe: `[text](url)` flattened, `**bold**` → `*bold*`
