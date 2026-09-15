@@ -13,6 +13,12 @@ const requireUrl = async (ctx: CommandContext, name: string, usage: string): Pro
 
 export { requireUrl }
 
+export const isExpiredMedia = (err: unknown): boolean => {
+  const e = err as { output?: { statusCode?: number }; status?: unknown }
+  const s = e?.output?.statusCode ?? (typeof e?.status === 'number' ? e.status : undefined)
+  return s === 403 || s === 404 || s === 410
+}
+
 const fmtDur = (sec: number): string => {
   const s = Math.max(0, Math.round(sec))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
