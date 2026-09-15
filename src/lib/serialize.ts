@@ -1,5 +1,6 @@
 import type { WAMessage } from 'baileys'
 import { downloadMediaMessage, getContentType, normalizeMessageContent } from 'baileys'
+import { logger } from './logger.ts'
 import { waka } from '../socket.ts'
 
 export interface MediaMeta {
@@ -83,6 +84,7 @@ const withReupload = (msg: WAMessage, download: () => Promise<Buffer>): (() => P
     try {
       return await download()
     } catch (err) {
+      logger.error('download failed, trying reupload:', (err as Error)?.message ?? err)
       const s = statusOf(err)
       if (!waka || (s !== 403 && s !== 404 && s !== 410 && !netDead(err))) throw err
       const fresh = await Promise.race([
