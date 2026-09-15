@@ -38,8 +38,33 @@ const typecheck = (bun: boolean): void => {
   else sh('npx', ['tsc', '--noEmit'], 180_000)
 }
 // sticker build failure only warns — bot works without it (matches install.sh); fatal only on fresh installs where bin/ is empty
+// on Windows bun can't resolve `bash` (Git/msys bash isn't on its PATH), so call bash.exe via explicit path
+const findBash = (): string | null => {
+  if (process.platform !== 'win32') return 'bash'
+  const candidates = [
+    join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
+    'C:\\msys64\\usr\\bin\\bash.exe',
+  ]
+  for (const c of candidates) if (existsSync(c)) return c
+  if (hasBin('bash')) return 'bash'
+  return null
+}
 const buildSticker = (bun: boolean): void => {
   try {
+    if (process.platform === 'win32') {
+      const bash = findBash()
+      if (!bash) {
+        logger.warn('sticker build skipped: bash not found (install Git for Windows or msys2)')
+        return
+      }
+      execFileSync(bash, [join(ROOT, 'native', 'build.sh')], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 600_000,
+      })
+      return
+    }
     if (bun) sh('bun', ['run', 'build:sticker'], 600_000)
     else sh('npm', ['run', 'build:sticker'], 600_000)
   } catch (err) {
@@ -108,7 +133,8 @@ export const runUpdate = (): UpdateResult => {
     const behind = Number(sh('git', ['rev-list', '--count', 'HEAD..origin/master']))
     if (behind === 0) return { status: 'none' }
     if (dirtyTree()) return { status: 'conflict' }
-    sh('git', ['pull', '--ff-only'])
+    // tree is clean here, so reset handles diverged branches too (pull --ff-only aborts on those)
+    sh('git', ['reset', '--hard', 'origin/master'])
     try {
       installDeps(bun)
       buildSticker(bun)
@@ -126,10 +152,11 @@ export const runUpdate = (): UpdateResult => {
   }
 }
 
-// detach a fresh copy of this process so the current one can exit; returns false if spawn fails
+// restart inside the SAME console: inherited stdio keeps the user's terminal,
+// detached + ignored stdio pops a separate (hidden) window on Windows
 export const relaunch = (): boolean => {
   try {
-    const child = spawn(process.execPath, process.argv.slice(1), { detached: true, stdio: 'ignore' })
+    const child = spawn(process.execPath, process.argv.slice(1), { cwd: ROOT, stdio: 'inherit' })
     child.unref()
     return true
   } catch {
