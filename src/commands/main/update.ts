@@ -10,7 +10,10 @@ export default {
     const res = runUpdate()
     if (res.status === 'updated') {
       await ctx.reply(await tx('updateDone', { head: res.head ?? '' }))
-      if (!relaunch()) await ctx.reply(await tx('updateRestartFail'))
+      if (!relaunch()) {
+        await ctx.reply(await tx('updateRestartFail'))
+        return
+      }
       setTimeout(() => process.exit(0), 500)
       return
     }
