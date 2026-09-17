@@ -110,7 +110,18 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
   const s: SerializedMessage = {
     chat,
     sender,
-    fromMe: !!msg.key?.fromMe,
+    fromMe: (() => {
+      if (!msg.key?.fromMe) return false
+      // In groups, validate by stripping device IDs from participant and comparing with bot ID
+      if (chat.endsWith('@g.us')) {
+        const botId = waka?.user?.id
+        if (!botId) return false
+        const participant = msg.key?.participant || ''
+        return participant.split(':')[0] === botId.split(':')[0]
+      }
+      // In DMs, trust key.fromMe as-is
+      return true
+    })(),
     isGroup: chat.endsWith('@g.us'),
     mtype,
     mimetype: content.mimetype,

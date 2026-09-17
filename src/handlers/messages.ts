@@ -60,7 +60,14 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
       const jid = msg.key?.remoteJid
       if (!jid || isStale(msg)) continue
       const m = await serialize(msg)
-      if (m.fromMe && botMode() !== 'self') continue
+      // Notify upsert = incoming messages only, so fromMe=true here is always the Baileys LID bug
+      if (m.fromMe && !m.isGroup) {
+        const botId = waka?.user?.id
+        if (botId && m.sender.split(':')[0] !== botId.split(':')[0]) {
+          m.fromMe = false
+        }
+      }
+      if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
       if (!m.button) continue
       logger.info(`🔘 ${jid} [append]: ${m.button.text || m.button.id}`)
       dispatch(msg, m, jid)
@@ -72,7 +79,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
     const jid = msg.key?.remoteJid
     if (!jid || isStale(msg)) continue
     const m = await serialize(msg)
-    if (m.fromMe && botMode() !== 'self') continue
+    if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
 
     if (!m.text && !m.button) continue
     logger.info(m.button ? `🔘 ${jid}: ${m.button.text || m.button.id}` : `📥 ${jid}: ${m.text}`)
@@ -148,7 +155,8 @@ const blockedByOwner = async (ctx: CommandContext, cmd: Command): Promise<boolea
 }
 
 async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string): Promise<void> {
-  const sender = m.sender
+  // When fromMe=true, sender is the chat partner's JID (not the bot's), so isOwner fails
+  const sender = m.fromMe ? (waka.user?.id ?? m.sender) : m.sender
   const text = m.text
   const send = makeSender(waka, jid, msg)
 
@@ -161,7 +169,8 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   if (!cmd) return
   if (await blockedByCooldown(sender, cmd, send)) return
   const mode = botMode()
-  if (mode !== 'public' && !m.fromMe && !isOwner(sender)) return
+  // DMs are inherently targeted at the bot, mode filter should ONLY apply in groups
+  if (m.isGroup && mode !== 'public' && !m.fromMe && !isOwner(sender)) return
 
   let isAdmin = false
   let isBotAdmin = false
