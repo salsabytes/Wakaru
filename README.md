@@ -2,39 +2,13 @@
 
 # ✨ Wakaru
 
-**分かる — *"to understand."***
-
-A tiny WhatsApp bot with an agentic brain. It talks back, pulls songs,
-saves videos, and turns your photos into stickers — all through one
-command list you can grow yourself.
+**分かる — *"to understand."* A tiny WhatsApp bot that talks back.**
 
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
-[![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7DD3FC?style=for-the-badge&logo=typescript&logoColor=0F172A)](https://www.typescriptlang.org/)
-[![Bun](https://img.shields.io/badge/Bun-1E293B?style=for-the-badge&logo=bun&logoColor=FDE68A)](https://bun.sh/)
-[![Rust](https://img.shields.io/badge/Rust%20sidecar-D97706?style=for-the-badge&logo=rust&logoColor=white)](native/sticker)
-[![CodeFactor](https://img.shields.io/codefactor/grade/github/salsabytes/wakaru/master?style=for-the-badge&logo=codefactor&logoColor=white&label=CodeFactor)](https://www.codefactor.io/repository/github/salsabytes/wakaru)
+[![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
 
 <p>🌐 <b>English</b> · <a href="README.id.md">Bahasa Indonesia</a> · <a href="README.ja.md">日本語</a></p>
-
-</div>
-
----
-
-## 🧠 What is Wakaru?
-
-Wakaru is a **self-hosted WhatsApp bot** built on
-[Baileys](https://github.com/whiskeysockets/Baileys) and TypeScript — no
-yt-dlp, no ffmpeg, no self-hosted servers. Everything resolves
-through pure-TS scrapers, one tiny Rust sidecar, and one Python sidecar
-for the AI brain.
-
-One codebase, three runtimes: **Bun** on desktop, **Bun or Node ≥ 23.6** on
-Termux, and a one-line installer for every platform. Chat with it, or let
-it *do* things for you.
-
-<div align="center">
 
 <img src="assets/wakaru-banner.gif" alt="Wakaru — anime banner" width="820" />
 
@@ -42,231 +16,116 @@ it *do* things for you.
 
 ---
 
-## ✨ Features
-
-- 🧠 **It gets you** — `.ai` chats naturally, can run any command on its own with `@run:`, and remembers each conversation
-- 🎬 **Plays with media** — pulls audio and video from links, searches YouTube by query, and makes stickers from photos & videos (plus `.brat` memes, `.toimg` sticker→photo, `.toaudio` video→audio, `.hd` AI upscale)
-- 🧩 **Extensible** — register a command in `src/commands/index.ts` and it shows up in `.menu` automatically
-- 🔁 **Never leaves you hanging** — auto-reconnects with exponential backoff
-- 🔐 **Easy in** — log in with a QR code or a pairing code
-- 📱 **Runs on your phone** — first-class Termux support, no root needed
-- 🌐 **Speaks your language** — free-form `.setlang` (`id`/`en`/`ja`/…) with file cache
-- 🎨 **Prettily logged** — charmbracelet-style console output, clock-only timestamps
-- ⚡ **Fast & cheap** — every command runs in parallel (one global slot pool), per-user cooldown on heavy commands, configurable download cap (100 MB default), no self-hosted servers
-
----
-
-## 📜 Commands
-
-Send `.menu` in WhatsApp to see the live list. Aliases in parentheses.
-
-| Command | Aliases | What it does |
-|---|---|---|
-| `.ai <msg>` | — | Agentic chat; can run commands via `@run:`, remembers each sender |
-| `.menu` | `.help` | List every command |
-| `.sticker` | `.st` | Quoted photo/video → 512×512 webp sticker (optional `.sticker <pack>|<author>` name) |
-| `.toimg` | `.toimage` | Quoted sticker → PNG image |
-| `.brat <text>` | — | White brat-style meme sticker from text |
-| `.toaudio` | `.tomp3`, `.tomp4a`, `.toaud` | Quoted video → m4a audio (extract, no re-encode) |
-| `.hd` | `.remini`, `.upscale` | Quoted photo → 2x AI upscale (iloveimg, Rust fallback) |
-| `.ytmp3 <url>` | `.ytm`, `.music` | Any video link → mp3 audio |
-| `.ytmp4 <url>` | `.ytv`, `.video` | Any video link → mp4 video |
-| `.play <query>` | `.yt`, `.song` | Search YouTube → tap a result → pick mp3/mp4 |
-| `.tiktok <url>` | `.tt`, `.ttdl` | TikTok video, no watermark |
-| `.instagram <url>` | `.ig`, `.igdl` | IG reels, videos, photos & carousels, no watermark |
-| `.facebook <url>` | `.fb`, `.fbdl` | Facebook video or photos |
-| `.pinterest <url\|query>` | `.pin`, `.pins` | Images from a pin link, or a search query |
-| `.soundcloud <url>` | `.sc` | SoundCloud track → audio (mp3), no watermark |
-| `.spotify <url>` | `.sp` | Spotify track/album → matched on YouTube → audio |
-| `.twitter <url>` | `.x`, `.tw`, `.twdl` | X (Twitter) video, no watermark |
-| `.kick` | `.tendang`, `.keluarkan` | Kick a member (tag or reply, group admins/owner only) |
-| `.promote` | `.angkat` | Promote member(s) to admin (tag or reply, group admins/owner only) |
-| `.demote` | `.turunkan` | Demote admin(s) to member (tag or reply, group admins/owner only) |
-| `.add <number>` | `.tambah` | Add members by phone number (group admins/owner only) |
-| `.setlang <code>` | `.lang`, `.bahasa` | Switch the bot's reply language, any code (`id`/`en`/`ja`/…) |
-| `.wiki <query>` | `.wikipedia`, `.wk` | Search Wikipedia in the bot language + article link |
-| `.mode <public\|self\|private>` | `.self` | Who can use the bot: everyone, this account only, or owners only (owner only) |
-| `.prefix <chars\|none>` | — | Command prefixes, multi, or bare mode (owner only) |
-| `.limit <MB>` | — | Max media download size, 10–2048 MB (owner only) |
-| `.update` | — | Pull latest code, rebuild, restart (owner only) |
-
-Multi-file results (IG carousels, Pinterest searches) are delivered to your
-**private chat** so groups stay tidy.
-
----
-
-## 🚀 Quick start
-
-### One-liner (any platform)
+## 🚀 Run it
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
 cd wakaru && bun run start
 ```
 
-The installer detects your platform, installs the runtime, dependencies,
-and builds the native sticker engine. Re-running it **keeps Bun on the
-latest canary automatically** (`bun upgrade --canary`).
+1. QR appears → scan it from WhatsApp (*Settings → Linked devices*)
+2. Done. Session is saved in `sessions/`
 
-### Windows
-
-Download [`install.bat`](install.bat), double-click it (or run it in
-`cmd`). It installs Git + Bun (via `winget`), clones the repo, installs
-dependencies, compiles the sticker engine, and starts the bot.
-
-### Manual (Bun)
+> Windows? Open [`install.bat`](install.bat) and double-click it.
 
 <details>
-<summary>Show manual setup</summary>
+<summary>Manual setup / pairing code</summary>
 
 ```bash
 git clone https://github.com/salsabytes/Wakaru.git
 cd Wakaru
 bun install
 bun run build:sticker   # one-time: compile the Rust sticker engine
-                        # (on Windows it also ships the MinGW DLLs next to the exe)
-
-bun run start            # scan the QR with your phone
-bun run start:pairing    # or use a pairing code
+bun run start           # or: bun run start:pairing
 ```
+
+Pairing code login: `bun run start:pairing` or set `PAIRING_CODE=1`.
 
 </details>
 
-### Logging in
+---
 
-1. Run the bot — a **QR code** appears in the terminal
-2. Open WhatsApp → *Settings → Linked devices → Link a device*
-3. Scan. Session is saved to `sessions/` and reused on restart
+## 💡 What it does
 
-Prefer a code? Run with `--use-pairing-code` or set `PAIRING_CODE=1`.
+- 🧠 `.ai` — chat + runs commands for you (`@run:`), remembers context
+- 🎬 Downloaders — YouTube, TikTok, IG, FB, Pinterest, SoundCloud, Spotify, X
+- 🖼️ Stickers & media — photo/video → sticker, sticker → photo, video → audio, AI upscale
+- 👥 Group tools — kick / promote / demote / add
+- 📱 Runs on Termux, no root. No yt-dlp, no ffmpeg
 
 ---
 
-## 🔄 Updating
+## 📜 Commands
 
-- Run **`.update`** (owner only) from WhatsApp — the bot backs up
-  `config.json` + `sessions/`, pulls the latest code, reinstalls
-dependencies, rebuilds the sticker engine, typechecks, and **restarts
-itself**. On any failure it rolls back to the previous version.
-- The bot also **checks for updates on every start** and logs when a new
-  one is available.
-- Channel: add `"updateChannel": "release"` to `config.json` to follow
-  the latest release tag instead of `master` (the default).
-
----
-
-## ⚙️ Configuration
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `SESSION_DIR` | `sessions` | Folder where the login session is stored |
-| `PAIRING_CODE` | — | Set to `1` to log in with a pairing code |
-| `updateChannel` | `master` | `master` = follow the branch, `release` = follow the latest release tag |
-| `IG_SESSIONID` | — | Optional fallback IG session cookie for `.instagram` stories when snapsave is down (use a burner account) |
-
-**Owner commands (`.ai`):** `config.json` (gitignored) is auto-created from
-`config.example.json` on first boot — just add your phone number to
-`"owners"` (bare number `628123...` or full JID). An empty list disables
-owner commands.
-
-The bot's reply language lives in the same file:
-
-```json
-{
-  "owners": ["6281234567890"],
-  "language": "id",
-  "mode": "public",
-  "prefixes": ["."],
-  "maxDownloadMB": 100,
-  "stickerPack": "Wakaru",
-  "stickerAuthor": "buatan gweh"
-}
-```
-
-`"language"` accepts any code — `id` (Indonesian, the default), `en`, `ja`, and more. Other codes read `data/lang/<code>.json` (a plain `{ key: translation }` file, `{placeholders}` intact); missing file or key falls back to English. Switch live with `.setlang` — or just ask `.ai`.
-
-The `.ai` brain chats through **chatgpt.com anonymous — free, zero setup**
-(`native/ai/chatgpt-anon.py` sidecar: fresh random device + proof-of-work per
-request, no API key, no login). Needs `python3` + `curl_cffi` (installed by
-`install.sh`); without them it falls back to Poolside. Chat memory lives in
-(`src/lib/aiHistory.ts`, per chat:sender, survives restarts), never on the
-backend.
-
-`"mode"` accepts `public` (everyone, the default), `self` (only commands
-sent from the bot's own account), or `private` (owners only). Switch it
-live with `.mode` — or ask `.ai`.
-
-`"prefixes"` is the command prefix list (max 5, no spaces). Switch it live
-with `.prefix <chars>` (e.g. `.prefix !`, multi: `.prefix ! /`). Add `none`
-to also accept bare commands alongside (`.prefix ! / none`) — or `none` alone for
-full bare mode. With prefixes only, a bare command (`menu`) only fires
-when sent twice in a row; with bare on it fires right away.
-Replies to the bot and link follow-ups always reach `.ai`, even in bare mode.
-
-`"maxDownloadMB"` caps media downloads (default 100, clamped 10–2048).
-Switch it live with `.limit <MB>` — or ask `.ai`. Bigger files eat more
-RAM while downloading (≈2-3×), so keep it low on small phones.
-Files over ~64MB can't play inline — the bot sends those as documents
-instead (up to 2GB, WhatsApp's hard cap).
-
-`"stickerPack"` / `"stickerAuthor"` are the default sticker name shown in
-WhatsApp — override per sticker with `.sticker <pack>|<author>` (e.g.
-`.sticker rawr|buatan gweh`).
-
----
-
-## 🧰 Tech stack
-
-<div align="center">
-
-[![Skills](https://skillicons.dev/icons?i=ts,bun,nodejs,rust,py,githubactions)](https://skillicons.dev)
-
-</div>
-
-| Layer | Choice | Why |
-|---|---|---|
-| Runtime | **Bun** (canary) · Node ≥ 23.6 fallback | TypeScript runs directly — no build step, no `tsx` |
-| WhatsApp protocol | **Baileys** | The battle-tested Web API client |
-| Sticker engine | **Rust sidecar** | 512×512 webp, animated support, brat/toimg/hd, all codecs compiled in |
-| Audio engine | **Rust sidecar** | AAC-in-fMP4 remuxed to standard M4A for iOS, lossless |
-| AI brain | **Python sidecar** (`native/ai`, needs `python3` + `curl_cffi`) + Poolside fallback | chatgpt.com anonymous: fresh device + proof-of-work per request, no key, no login |
-| Scrapers | **Pure TypeScript** | No yt-dlp / ffmpeg — nothing to maintain |
-| Logging | **pino** | Fast, structured, prettified |
-| CI | **GitHub Actions** | Real installs tested on Ubuntu, macOS, Windows + simulated Termux |
-
----
-
-## 📁 Project structure
+Send `.menu` in WhatsApp for the live list with aliases.
 
 <details>
-<summary>Show source layout</summary>
+<summary>Show all commands</summary>
 
+**Chat**
+`.ai` — agentic chat · `.menu` — list all · `.wiki` — Wikipedia search · `.setlang` — switch language
+
+**Stickers & media** (reply to a photo/video/sticker)
+`.sticker` — → sticker · `.toimg` — sticker → photo · `.brat` — text → meme sticker · `.toaudio` — video → audio · `.hd` — 2x AI upscale
+
+**Downloaders**
+`.play` — search YouTube → mp3/mp4 · `.ytmp3` / `.ytmp4` — link → audio/video
+`.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
+
+**Group** (admins/owner only)
+`.kick` · `.promote` · `.demote` · `.add`
+
+**Owner only**
+`.mode` (public/self/private) · `.prefix` · `.limit` (10–2048 MB) · `.update`
+
+Multi-file results (IG carousels, Pinterest) go to your **private chat**.
+
+</details>
+
+---
+
+## ⚙️ Config
+
+`config.json` is auto-created on first boot. Only thing you need:
+
+```json
+{ "owners": ["6281234567890"], "language": "id" }
 ```
-src/
-├── index.ts                 # entry: boot + signal handling
-├── socket.ts                # Baileys connection lifecycle (reconnect, QR, pairing)
-├── handlers/
-│   └── messages.ts          # upsert → drop rules → dispatch
-├── commands/
-│   ├── index.ts             # static command registry (add imports + entries to register)
-│   ├── main/                # ai/ (prompt, tools, exchange), menu, mode, prefix, limit, setlang, update
-│   ├── downloader/          # ytmp3, ytmp4, play, tiktok, instagram, facebook,
-│   │                        # pinterest, soundcloud, spotify, twitter
-│   ├── converter/           # sticker, toimg, brat, toaudio, hd
-│   └── group/               # kick, promote, demote, add (groupOnly + adminOnly + botAdmin)
-├── lib/
-│   ├── scrapers/            # one module per platform + shared http/curl helpers
-│   ├── queue.ts             # global slot pool + per-user cooldown
-│   ├── serialize.ts         # WAMessage → flat SerializedMessage (incl. tap parsing)
-│   ├── sender.ts            # reply/audio/video/sticker/react/list/buttons
-│   ├── media.ts             # requireUrl, sendMedia (multi-file routing)
-│   └── store · config · lang · llm · logger · aiHistory · factory ·
-│       buttons · contributors · disk · updater
-└── ../native/
-    ├── sticker/             # Rust: webp engine (sticker/toimg/brat)
-    ├── audio/               # Rust: fMP4 → M4A remux for iOS
-    └── ai/                  # Python: chatgpt-anon sidecar (needs curl_cffi)
-```
+
+Add your number → owner commands unlock. See [`config.example.json`](config.example.json) for everything (`mode`, `prefixes`, `maxDownloadMB`, `stickerPack`…).
+
+<details>
+<summary>Advanced</summary>
+
+- `.ai` brain: free, no key — Python sidecar (`native/ai`, needs `python3` + `curl_cffi`, installed by `install.sh`), Poolside fallback
+- Live from WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` — or just ask `.ai`
+- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `IG_SESSIONID` (burner-cookie fallback for IG stories)
+- Update: send `.update` from WhatsApp (backs up, pulls, rebuilds, restarts, rolls back on failure)
+
+</details>
+
+---
+
+## ❓ Stuck?
+
+<details>
+<summary>Two instances kick each other (440)?</summary>
+
+Never share one `sessions/` folder. One folder = one bot.
+
+</details>
+
+<details>
+<summary>Logged out?</summary>
+
+Delete `sessions/` and scan again.
+
+</details>
+
+<details>
+<summary>Termux goes to sleep?</summary>
+
+Run `termux-wake-lock`.
 
 </details>
 
@@ -274,150 +133,17 @@ src/
 
 ## 🤝 Contributing
 
-PRs are welcome! This is a small, lazy codebase — keep it that way.
+Small lazy codebase — keep it that way. Bug or idea? [Open an issue](https://github.com/salsabytes/Wakaru/issues). PRs welcome.
 
-- Found a bug? [Open an issue](https://github.com/salsabytes/Wakaru/issues)
-- Want a feature? Same place
-- Respect the [Code of Conduct](CODE_OF_CONDUCT.md)
+[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Releases](https://github.com/salsabytes/Wakaru/releases) · Built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Bun + Rust
+
+---
 
 <div align="center">
 
-[![Contributors](https://contrib.rocks/image?repo=salsabytes/Wakaru)](https://github.com/salsabytes/Wakaru/graphs/contributors)
+## ⭐ pls star
+
+Wakaru works for free and only asks for one thing in return: a star.<br>
+No star = the bot cries in `sessions/`. You wouldn't make a bot cry, right? 🥺
 
 </div>
-
----
-
-## 📄 License
-
-[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes)
-
----
-
-## ❓ FAQ
-
-<details>
-<summary>Can Bun run on Termux?</summary>
-
-**Yes.** Installers force Bun in via `npm install -g bun` (works on
-aarch64) and keep it on the latest canary. If that ever fails, the
-installer gracefully falls back to Node ≥ 23.6 — which also runs the
-TypeScript files directly.
-
-</details>
-
-<details>
-<summary>Why doesn't `npm install` pull in `sharp`?</summary>
-
-`sharp` (a peer of baileys) has no Android prebuilt — npm would try to
-compile libvips from source on Termux and fail the whole install. The
-repo's `.npmrc` sets `omit=peer`, so installs go through. Trade-off:
-baileys' link-preview thumbnails don't work; media features use the
-Rust sidecar instead.
-
-</details>
-
-<details>
-<summary>Can I run two instances?</summary>
-
-Never two instances sharing the same `sessions/` folder — they kick each
-other (`status 440`, `connectionReplaced`).
-
-</details>
-
-<details>
-<summary>I got logged out — what now?</summary>
-
-Delete `sessions/` and scan the QR again. Credentials never reach the
-repo — the folder is gitignored.
-
-</details>
-
-<details>
-<summary>Hosting on Termux — anything special?</summary>
-
-Keep the phone awake with `termux-wake-lock`. Note that `.facebook`
-relies on the system `curl` — it works on Windows/Bun; on Linux hosts
-some backends may block it. Share links (`facebook.com/share/…`) resolve
-via the fdown.world fallback.
-
-</details>
-
----
-
-## 🏷️ Versioning
-
-Wakaru follows [Semantic Versioning](https://semver.org/) — `major.minor.patch`
-(e.g. `1.1.0`).
-
-| Bump | When |
-|---|---|
-| `major` | Breaking changes |
-| `minor` | New features (`1.1.0`, `1.2.0`, …) |
-| `patch` | Bug fixes (`1.1.1`, `1.1.2`, …) |
-
----
-
-## 📦 Changelog
-
-<details>
-<summary>Recent changes</summary>
-
-**Unreleased**
-- `.wiki`: search Wikipedia in the bot language (`ja` → ja.wikipedia.org, fallback `en`) + article link
-- `.toaudio`: quoted video → m4a audio via the Rust engine (sample copy, no re-encode)
-- `.hd`: quoted photo → 2x AI upscale via iloveimg scraper, Rust sharpen fallback
-- Reply language is free-form: `.setlang <code>` takes any code with `data/lang/<code>.json` file cache and pivot fallback
-- Reply-to-bot and link follow-ups reach `.ai` even with bare mode on
-- `.ai` output is WhatsApp-safe: `[text](url)` flattened, `**bold**` → `*bold*`
-- Group commands are declarative (`groupOnly`/`adminOnly`/`botAdmin`)
-- README in English, Indonesian, and Japanese (full translations, cross-linked)
-
-**v1.2.0**
-- `.prefix` command: custom prefix, multi-prefix (`.prefix ! /`), or bare no-prefix mode (`.prefix none`) — also settable via `"prefixes"` in `config.json`
-- Bare commands need a double-tap when prefixes are set (chat-safe); fire instantly in bare mode
-- Fix: `queryText` ate one char when a space follows the prefix (`. brat halo` → `t halo`)
-- README sync: Python AI sidecar in tech stack, full 27-command table, live project tree
-
-**v1.1.1**
-- `.mode` command: `public` (everyone) / `self` (bot account only) / `private` (owners only) reply gate, switchable live or via `config.json`
-- `.brat`: white brat-style meme sticker rendered by the Rust engine (Arial Narrow, blur, case-sensitive)
-- `.toimg`: quoted sticker → PNG via the Rust engine
-- `.facebook` handles share links via fdown.world fallback (flow ported from AyGemuy/api-wudysoft v8)
-- Commands back on a static registry — registering = add import + entry in `src/commands/index.ts`
-
-**v1.1.0** — back to [semver](https://semver.org/) (the short-lived `YY.MM.R` releases were dropped; this is the same code, re-released cleanly)
-- iPhone audio fix: ytmp3's "mp3" is AAC in a fragmented MP4 (iOS refuses to play) — new `native/audio` Rust engine remuxes it to a standard M4A (lossless, no codec deps)
-- `.play` results now render everywhere: quick_reply buttons + numbered text (the old native-flow list was blank on iOS) — still replyable as `1 mp3`
-- `.play` cancel: `❌ Batal` button on the list & format pick, or type `batal`/`gajadi`/`cancel`; chatting about other things no longer gets spam replies
-- `.add` accepts `+62` with spaces/dashes
-- Boot log prints `Wakaru v<version> (<commit>)` so restarts are verifiable
-- Group management: `.kick @member` (tag or reply) and `.add <number>` (accepts `+62` formats, multiple numbers)
-- `.kick`/`.add` guarded: group admins/owner only, bot must be admin
-- LID→PN resolved once at the message boundary; mentions stay raw — commands match any jid form
-- Commands auto-discovered from `commands/` — new command = register it in the static `index.ts` entries (category from folder name)
-- Sticker: fills the 512 canvas edge-to-edge with a transparent letterbox; 24 fps, 7 s cap, ≤500 KB ladder
-- Sticker EXIF rewritten to the JSON payload WhatsApp reads today (pack name shows again)
-- Windows: `sticker.exe` ships its MinGW DLLs — fixes the silent `code 53` crash on clean PATHs
-
-**v1.0.0**
-- Multitasking: every command runs concurrently — one global slot pool, no per-command flags
-- Per-user 5 s cooldown on heavy commands (downloaders + sticker)
-- Media downloads capped at 30 MB (lower peak RAM)
-- AI reports real download results: title · duration · size
-- Reply language configurable via `config.json` / `.setlang` / `.ai`
-- Deep modularization: `lib/scrapers/*`, `socket.ts`, `ai/`, `queue` + `serialize` + `sender` + `media`
-- `.play` two-stage pick: search → tap result → MP3/MP4 buttons (native-flow list)
-- New downloaders: `.facebook` (HD) and `.pinterest` (pin link or search query)
-- Multi-file results now land in your private chat, not the group
-- Tap/button parsing unified — all interactive message shapes handled
-- Termux installer: forced Bun via npm, automatic canary upgrade, simulated-Termux CI
-
-**Earlier**
-- Performance pass: per-chat parallel queues, global concurrency caps, LID→PN cache, AI history TTL, ytmp3 cookie caching
-- Full Instagram downloader (reels, carousels, stories) with snapsave fallback
-- TikTok downloader without watermark (real titles, one-shot POST)
-- Agentic `.ai` with tool execution (`@run:`) and per-sender memory
-- Rust sticker engine with animated webp support
-
-</details>
