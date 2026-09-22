@@ -22,8 +22,27 @@ has() { command -v "$1" >/dev/null 2>&1; }
 # winget prompts for source/package agreements on first use — accept silently (CI-safe)
 winget_install() { winget install -e --accept-source-agreements --accept-package-agreements --id "$1"; }
 
+ver_ok() {
+  "$1" -e "const [m,p]=process.versions.node.split('.').map(Number); process.exit(m>23||(m===23&&p>=6)?0:1)" 2>/dev/null
+}
 node_ok() {
-  has node && node -e "const [m,p]=process.versions.node.split('.').map(Number); process.exit(m>23||(m===23&&p>=6)?0:1)" 2>/dev/null
+  has node && ver_ok node
+}
+
+# after a fresh install the shell may still resolve a stale/shadowed node
+# (e.g. CI runners keep an old node earlier in PATH) — re-hash and prefer
+# a good binary if several exist
+refresh_node() {
+  hash -r 2>/dev/null || true
+  node_ok && return 0
+  for cand in /usr/local/bin/node /usr/bin/node; do
+    if [ -x "$cand" ] && ver_ok "$cand"; then
+      export PATH="$(dirname "$cand"):$PATH"
+      hash -r 2>/dev/null || true
+      return 0
+    fi
+  done
+  return 1
 }
 
 printf "${PURPLE}${B}  ✨ Wakaru — one-shot installer${R}\n"
@@ -51,11 +70,12 @@ if node_ok; then
 else
   mute "installing Node 24 LTS..."
   if [ "$IS_TERMUX" = 1 ]; then
-    pkg update -y && pkg install -y nodejs-lts
+    pkg update -y || true
+    pkg install -y nodejs-lts || pkg install -y nodejs || true
   elif has winget; then
-    winget_install OpenJS.NodeJS.LTS
+    winget_install OpenJS.NodeJS.LTS || true
   elif has brew; then
-    brew install node
+    brew install node || true
   elif has apt-get; then
     curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - 2>/dev/null \
       || curl -fsSL https://deb.nodesource.com/setup_24.x | bash 2>/dev/null || true
@@ -63,6 +83,7 @@ else
   else
     skip "no supported installer — install Node >= 23.6 manually from https://nodejs.org"
   fi
+  refresh_node || true
   if node_ok; then ok "Node $(node -v) installed"
   else
     skip "Node >= 23.6 not found after install — install it manually from https://nodejs.org"

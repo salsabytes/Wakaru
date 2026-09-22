@@ -60,9 +60,22 @@ jobs:
           cat > "$HOME/.local/bin/pkg" <<'EOF'
           #!/bin/bash
           echo "pkg $* (simulated)" >> "$HOME/pkg.log"
+          touch "$HOME/.node-installed"
           exit 0
           EOF
           chmod +x "$HOME/.local/bin/pkg"
+          # mocked pkg can't install a real node — shadow `node` so it reads as
+          # too-old until pkg "installs" it, then delegates to the real binary
+          REAL_NODE="$(command -v node)"
+          cat > "$HOME/.local/bin/node" <<EOF
+          #!/bin/bash
+          if [ "\$1" = "-e" ]; then
+            [ -f "\$HOME/.node-installed" ] && exit 0 || exit 1
+          fi
+          exec "$REAL_NODE" "\$@"
+          EOF
+          chmod +x "$HOME/.local/bin/node"
+          rm -f "$HOME/.node-installed" "$HOME/pkg.log"
       - name: Run installer under simulated Termux
         shell: bash
         run: |
