@@ -36,7 +36,7 @@ body:
     id: runtime
     attributes:
       label: Runtime
-      description: Output of `bun --version` or `node -v`
+      description: Output of `node -v` (needs >= 23.6)
     validations:
       required: false
   - type: input

@@ -29,14 +29,8 @@ jobs:
           bash install.sh
           cd wakaru
           test -d node_modules
-          export PATH="$HOME/.bun/bin:$PATH"
-          if command -v bun >/dev/null 2>&1; then
-            bun run typecheck
-            AI_SELFTEST=1 bun src/commands/main/ai/index.ts
-          else
-            npx tsc --noEmit
-            AI_SELFTEST=1 node src/commands/main/ai/index.ts
-          fi
+          npm run typecheck
+          AI_SELFTEST=1 node src/commands/main/ai/index.ts
 
   # In-place path: run ./install.sh inside the repo
   inplace:

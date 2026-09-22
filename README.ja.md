@@ -20,7 +20,7 @@
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
-cd wakaru && bun run start
+cd wakaru && npm run start
 ```
 
 1. QRが表示 → WhatsApp（設定 → リンク済みデバイス）でスキャン
@@ -34,12 +34,12 @@ cd wakaru && bun run start
 ```bash
 git clone https://github.com/salsabytes/Wakaru.git
 cd Wakaru
-bun install
-bun run build:sticker   # 初回のみ：Rustステッカーエンジンをコンパイル
-bun run start           # or: bun run start:pairing
+npm install
+npm run build:sticker   # 初回のみ：Rustステッカーエンジンをコンパイル
+npm run start           # or: npm run start:pairing
 ```
 
-コードでログイン：`bun run start:pairing` or `PAIRING_CODE=1`を設定。
+コードでログイン：`npm run start:pairing` or `PAIRING_CODE=1`を設定。
 
 </details>
 
@@ -135,7 +135,7 @@ bun run start           # or: bun run start:pairing
 
 小さく怠惰なコードベース — そのままに。バグ・要望は[issueへ](https://github.com/salsabytes/Wakaru/issues)。PR歓迎。
 
-[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [リリース](https://github.com/salsabytes/Wakaru/releases) · [Baileys](https://github.com/whiskeysockets/Baileys)＋TypeScript＋Bun＋Rust
+[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [リリース](https://github.com/salsabytes/Wakaru/releases) · [Baileys](https://github.com/whiskeysockets/Baileys)＋TypeScript＋Node＋Rust
 
 ---
 

@@ -20,7 +20,7 @@
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
-cd wakaru && bun run start
+cd wakaru && npm run start
 ```
 
 1. QR appears → scan it from WhatsApp (*Settings → Linked devices*)
@@ -34,12 +34,12 @@ cd wakaru && bun run start
 ```bash
 git clone https://github.com/salsabytes/Wakaru.git
 cd Wakaru
-bun install
-bun run build:sticker   # one-time: compile the Rust sticker engine
-bun run start           # or: bun run start:pairing
+npm install
+npm run build:sticker   # one-time: compile the Rust sticker engine
+npm run start           # or: npm run start:pairing
 ```
 
-Pairing code login: `bun run start:pairing` or set `PAIRING_CODE=1`.
+Pairing code login: `npm run start:pairing` or set `PAIRING_CODE=1`.
 
 </details>
 
@@ -135,7 +135,7 @@ Run `termux-wake-lock`.
 
 Small lazy codebase — keep it that way. Bug or idea? [Open an issue](https://github.com/salsabytes/Wakaru/issues). PRs welcome.
 
-[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Releases](https://github.com/salsabytes/Wakaru/releases) · Built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Bun + Rust
+[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Releases](https://github.com/salsabytes/Wakaru/releases) · Built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Node + Rust
 
 ---
 

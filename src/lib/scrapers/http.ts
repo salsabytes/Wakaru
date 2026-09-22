@@ -12,7 +12,7 @@ export const getJson = async (url: string, headers: Record<string, string>): Pro
   }
 }
 
-// fdown CF-challenges node/bun's OpenSSL fingerprint but not Windows' Schannel curl — shell out to curl
+// fdown CF-challenges Node's OpenSSL fingerprint but not Windows' Schannel curl — shell out to curl
 export const curl = (args: string[], timeout = 60_000): Promise<Buffer> =>
   new Promise((resolve, reject) => {
     execFile('curl', args, { maxBuffer: 2 * 1024 * 1024 * 1024, timeout }, (err, stdout, stderr) => {

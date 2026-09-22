@@ -58,8 +58,8 @@ git checkout -b feat/add-twitter-downloader
 4. **Install dependencies and build the sticker engine** (once):
 
 ```bash
-bun install
-bun run build:sticker   # Rust sidecar — only needed for .sticker
+npm install
+npm run build:sticker   # Rust sidecar — only needed for .sticker
 ```
 
 5. **Make your changes**, then commit with a clear message (see commit conventions below):
@@ -91,7 +91,7 @@ git push -u origin feat/add-twitter-downloader
 
 This is a deliberately **small and lazy codebase** — keep it that way.
 
-- **Language:** TypeScript (run directly via Bun — no build step, no `tsx`).
+- **Language:** TypeScript (run directly via Node >= 23.6 — no build step, no `tsx`).
 - **Style:** 2-space indent, single quotes, trailing commas, semicolons — match the surrounding code.
 - **No new dependencies without a reason.** The ladder: stdlib → existing deps → then maybe something new. Ask first.
 - **Reuse what's here.** Helpers live in `src/lib/` (scrapers, queue, sender, media, lang…). If a pattern already exists a few files away, use it.
@@ -104,7 +104,7 @@ This is a deliberately **small and lazy codebase** — keep it that way.
 
 ```text
 feat: add twitter video downloader
-fix: keep going when bun upgrade fails
+fix: keep going when sticker build fails
 perf: cap media downloads at 30MB
 docs: add troubleshooting to FAQ
 refactor: split ytmp3 into smaller helpers
@@ -119,19 +119,19 @@ Run these from the repo root — they should all pass:
 
 ```bash
 # 1. Type check
-bun run typecheck
+npm run typecheck
 
 # 2. AI tool-parser self-test
-AI_SELFTEST=1 bun src/commands/main/ai/index.ts
+AI_SELFTEST=1 node src/commands/main/ai/index.ts
 
 # 3. Media duration/size parser self-test
-MEDIA_SELFTEST=1 bun src/lib/media.ts
+MEDIA_SELFTEST=1 node src/lib/media.ts
 
 # 4. If you touched native/sticker
-bun run build:sticker
+npm run build:sticker
 ```
 
-> **No Bun?** Use Node ≥ 23.6: `npx tsc --noEmit` instead of `bun run typecheck`.
+> Requires Node ≥ 23.6 (type-stripping, no build step).
 >
 > CI ([`.github/workflows/install.yml`](.github/workflows/install.yml))
 > verifies the one-line installer on Ubuntu, macOS, Windows, and a simulated
@@ -143,7 +143,7 @@ bun run build:sticker
 
 Before you hit "Create pull request", make sure:
 
-- [ ] `bun run typecheck` passes
+- [ ] `npm run typecheck` passes
 - [ ] Self-tests pass (`AI_SELFTEST=1 …`, `MEDIA_SELFTEST=1 …`)
 - [ ] Commit message follows Conventional Commits (`feat:`, `fix:`, …)
 - [ ] No new dependency added without explaining why in the PR
@@ -171,7 +171,7 @@ PRs that skip the checklist aren't rejected — we'll just ask nicely. 😄
 
 ### Environment
 - OS: <!-- e.g. Windows 11, Termux, Ubuntu 22.04 -->
-- Runtime: <!-- bun --version or node -v -->
+- Runtime: <!-- node -v (needs >= 23.6) -->
 - Wakaru version / commit: <!-- git describe --tags -->
 
 ### Logs

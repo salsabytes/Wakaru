@@ -27,18 +27,14 @@ const hasBin = (cmd: string): boolean => {
   }
 }
 
-const isBun = (): boolean =>
-  (process.execPath.split(/[\\/]/).pop() ?? '').toLowerCase().startsWith('bun') || hasBin('bun')
-
-const installDeps = (bun: boolean): void => {
-  sh(bun ? 'bun' : 'npm', ['install'], 300_000)
+const installDeps = (): void => {
+  sh('npm', ['install'], 300_000)
 }
-const typecheck = (bun: boolean): void => {
-  if (bun) sh('bun', ['run', 'typecheck'], 120_000)
-  else sh('npx', ['tsc', '--noEmit'], 180_000)
+const typecheck = (): void => {
+  sh('npx', ['tsc', '--noEmit'], 180_000)
 }
 // sticker build failure only warns — bot works without it (matches install.sh); fatal only on fresh installs where bin/ is empty
-// on Windows bun can't resolve `bash` (Git/msys bash isn't on its PATH), so call bash.exe via explicit path
+// on Windows npm can't always resolve `bash` (Git/msys bash isn't on PATH), so call bash.exe via explicit path
 const findBash = (): string | null => {
   if (process.platform !== 'win32') return 'bash'
   const candidates = [
@@ -49,7 +45,7 @@ const findBash = (): string | null => {
   if (hasBin('bash')) return 'bash'
   return null
 }
-const buildSticker = (bun: boolean): void => {
+const buildSticker = (): void => {
   try {
     if (process.platform === 'win32') {
       const bash = findBash()
@@ -65,8 +61,7 @@ const buildSticker = (bun: boolean): void => {
       })
       return
     }
-    if (bun) sh('bun', ['run', 'build:sticker'], 600_000)
-    else sh('npm', ['run', 'build:sticker'], 600_000)
+    sh('npm', ['run', 'build:sticker'], 600_000)
   } catch (err) {
     logger.warn('sticker build failed, continuing:', (err as Error).message)
   }
@@ -95,7 +90,6 @@ export type UpdateResult = {
 }
 
 export const runUpdate = (): UpdateResult => {
-  const bun = isBun()
   try {
     backup()
     const oldHead = sh('git', ['rev-parse', 'HEAD'])
@@ -116,12 +110,12 @@ export const runUpdate = (): UpdateResult => {
       if (dirtyTree()) return { status: 'conflict' }
       sh('git', ['checkout', latest])
       try {
-        installDeps(bun)
-        buildSticker(bun)
-        typecheck(bun)
+        installDeps()
+        buildSticker()
+        typecheck()
       } catch (err) {
         sh('git', ['checkout', oldHead])
-        installDeps(bun)
+        installDeps()
         restore()
         return { status: 'failed', msg: (err as Error).message }
       }
@@ -136,12 +130,12 @@ export const runUpdate = (): UpdateResult => {
     // tree is clean here, so reset handles diverged branches too (pull --ff-only aborts on those)
     sh('git', ['reset', '--hard', 'origin/master'])
     try {
-      installDeps(bun)
-      buildSticker(bun)
-      typecheck(bun)
+      installDeps()
+      buildSticker()
+      typecheck()
     } catch (err) {
       sh('git', ['reset', '--hard', oldHead])
-      installDeps(bun)
+      installDeps()
       restore()
       return { status: 'failed', msg: (err as Error).message }
     }

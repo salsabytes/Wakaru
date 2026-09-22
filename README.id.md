@@ -20,7 +20,7 @@
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
-cd wakaru && bun run start
+cd wakaru && npm run start
 ```
 
 1. QR muncul → scan dari WhatsApp (*Setelan → Perangkat tertaut*)
@@ -34,12 +34,12 @@ cd wakaru && bun run start
 ```bash
 git clone https://github.com/salsabytes/Wakaru.git
 cd Wakaru
-bun install
-bun run build:sticker   # sekali aja: compile engine stiker Rust
-bun run start           # atau: bun run start:pairing
+npm install
+npm run build:sticker   # sekali aja: compile engine stiker Rust
+npm run start           # atau: npm run start:pairing
 ```
 
-Login pakai kode: `bun run start:pairing` atau set `PAIRING_CODE=1`.
+Login pakai kode: `npm run start:pairing` atau set `PAIRING_CODE=1`.
 
 </details>
 
@@ -135,7 +135,7 @@ Jalanin `termux-wake-lock`.
 
 Codebase kecil yang malas — jaga tetap begitu. Nemu bug / punya ide? [Buka issue](https://github.com/salsabytes/Wakaru/issues). PR welcome.
 
-[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Rilis](https://github.com/salsabytes/Wakaru/releases) · Dibangun di atas [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Bun + Rust
+[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Rilis](https://github.com/salsabytes/Wakaru/releases) · Dibangun di atas [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Node + Rust
 
 ---
 

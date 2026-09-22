@@ -45,40 +45,29 @@ prereq() {
 prereq git
 prereq curl
 
-step "Runtime"
-use_bun=0
-if has bun; then
-  ok "Bun found — using it for the fastest installs"
-  use_bun=1
-elif node_ok; then
+step "Runtime (Node >= 23.6)"
+if node_ok; then
   ok "Node $(node -v) found"
 else
-  mute "installing a runtime..."
+  mute "installing Node 24 LTS..."
   if [ "$IS_TERMUX" = 1 ]; then
     pkg update -y && pkg install -y nodejs-lts
   elif has winget; then
-    winget_install Oven-sh.Bun
+    winget_install OpenJS.NodeJS.LTS
   elif has brew; then
-    brew install oven-sh/bun/bun
+    brew install node
+  elif has apt-get; then
+    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - 2>/dev/null \
+      || curl -fsSL https://deb.nodesource.com/setup_24.x | bash 2>/dev/null || true
+    (sudo apt-get install -y nodejs || apt-get install -y nodejs) 2>/dev/null || true
   else
-    curl -fsSL https://bun.sh/install | bash
-    export PATH="$HOME/.bun/bin:$PATH"
+    skip "no supported installer — install Node >= 23.6 manually from https://nodejs.org"
   fi
-  if has bun; then use_bun=1; ok "Bun installed"; else ok "runtime ready"; fi
-fi
-
-# Termux: force bun in too (npm -g works on aarch64); skip keeps Node if it fails
-if [ "$IS_TERMUX" = 1 ] && ! has bun; then
-  mute "forcing Bun into Termux via npm..."
-  npm install -g bun || skip "bun install failed — using Node"
-  if has bun; then use_bun=1; ok "Bun installed"; fi
-fi
-
-if [ "$use_bun" = 1 ]; then
-  step "Bun upgrade"
-  mute "running bun upgrade --canary..."
-  # brew/winget/npm-managed installs can refuse (EROFS) — the installed bun still works, keep going
-  bun upgrade --canary || skip "bun upgrade failed — continuing with installed bun"
+  if node_ok; then ok "Node $(node -v) installed"
+  else
+    skip "Node >= 23.6 not found after install — install it manually from https://nodejs.org"
+    exit 1
+  fi
 fi
 
 
@@ -103,7 +92,7 @@ else
 fi
 
 step "Dependencies"
-if [ "$use_bun" = 1 ]; then bun install; else npm install; fi
+npm install
 ok "dependencies installed"
 
 # .ai primary backend needs python3 + curl_cffi — missing pieces only
@@ -156,6 +145,6 @@ line
 printf "  ${PURPLE}${B}✨ All set — Wakaru is ready!${R}\n"
 mute "  next:"
 printf "    ${B}cd ${DIR}${R}\n"
-printf "    ${B}bun run start${R}          ${M}# or: node src/index.ts${R}\n"
-printf "    ${B}bun run start:pairing${R}  ${M}# pairing code instead of QR${R}\n"
-mute "  tip: bun is kept on the latest canary automatically (falls back to Node)"
+printf "    ${B}npm run start${R}          ${M}# or: node src/index.ts${R}\n"
+printf "    ${B}npm run start:pairing${R}  ${M}# pairing code instead of QR${R}\n"
+mute "  tip: needs Node >= 23.6 (type-stripping, no build step)"

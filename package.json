@@ -5,10 +5,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "bun src/index.ts",
-    "start:pairing": "bun src/index.ts --use-pairing-code",
+    "start": "node src/index.ts",
+    "start:pairing": "node src/index.ts --use-pairing-code",
     "build:sticker": "bash native/build.sh",
     "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=23.6"
   },
   "dependencies": {
     "@cacheable/node-cache": "^1.7.6",

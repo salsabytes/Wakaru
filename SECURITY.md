@@ -119,7 +119,7 @@ advisory and the Hall of Fame below (unless you prefer to stay anonymous).
 installers (`install.sh`, `install.bat`), and the Rust sticker engine.
 
 **Out of scope (by design):**
-- Vulnerabilities in **upstream dependencies** (Baileys, Bun, Node) — report
+- Vulnerabilities in **upstream dependencies** (Baileys, Node) — report
   those to their respective projects.
 - **Phishing/social-engineering** of the bot's operator.
 - **Denial-of-service via spam** of the public commands — that's what the
