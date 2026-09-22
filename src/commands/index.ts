@@ -1,5 +1,6 @@
 import { readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 type Registered = Command & { category: string }
 
@@ -24,7 +25,7 @@ function walk(dir: string): string[] {
 const load = async (): Promise<void> => {
   for (const file of walk(ROOT)) {
     if (file === join(ROOT, 'index.ts')) continue
-    const mod = (await import(file)) as { default?: Command }
+    const mod = (await import(pathToFileURL(file).href)) as { default?: Command }
     const cmd = mod.default
     if (!cmd?.name || typeof cmd.run !== 'function') continue // helpers (prompt.ts, tools.ts) auto-skip
     const canonical = cmd.name.toLowerCase()
