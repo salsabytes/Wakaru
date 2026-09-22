@@ -88,8 +88,10 @@ const DOC_MAX = 2 * 1024 * 1024 * 1024
 
 export const asDoc = (m: OutMedia): { buf: Buffer; name: string; mime: string } => {
   const base = (m.caption ?? m.type).replace(/[^\w\- ]+/g, '').trim().slice(0, 60) || m.type
-  const mime = m.type === 'video' ? 'video/mp4' : m.type === 'audio' ? 'audio/mpeg' : 'image/jpeg'
-  const ext = m.type === 'video' ? 'mp4' : m.type === 'audio' ? 'mp3' : 'jpg'
+  // audio may be progressive m4a (ftyp) or legacy mp3 — sniff, don't assume
+  const mp4 = m.type === 'audio' && m.buf.subarray(4, 8).toString() === 'ftyp'
+  const mime = m.type === 'video' ? 'video/mp4' : m.type === 'audio' ? (mp4 ? 'audio/mp4' : 'audio/mpeg') : 'image/jpeg'
+  const ext = m.type === 'video' ? 'mp4' : m.type === 'audio' ? (mp4 ? 'm4a' : 'mp3') : 'jpg'
   return { buf: m.buf, name: `${base}.${ext}`, mime }
 }
 

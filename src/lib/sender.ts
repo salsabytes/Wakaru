@@ -64,9 +64,13 @@ export const videoPlayability = (buf: Buffer): 'ok' | 'heavy' => {
   }
 }
 
-// ytmp3.mobi's "mp3" is AAC in a fragmented MP4 (ftyp brand), which iOS WhatsApp refuses to play — remux to a standard M4A via the native binary when available
+// fragmented MP4 audio (ftyp brand + moof boxes) is refused by iOS WhatsApp —
+// remux to a standard M4A via the native binary when available. Progressive
+// M4A (e.g. wakafy direct, moov but no moof) plays fine as-is, so skip the
+// spawn entirely for those.
 const remuxM4A = async (buffer: Buffer): Promise<Buffer | null> => {
-  if (buffer.subarray(4, 8).toString() !== 'ftyp' || !existsSync(AUDIO_BIN)) return null
+  if (buffer.subarray(4, 8).toString() !== 'ftyp' || !buffer.includes(Buffer.from('moof'))) return null
+  if (!existsSync(AUDIO_BIN)) return null
   const dir = await mkdtemp(join(tmpdir(), 'wakaru-audio-'))
   try {
     const input = join(dir, 'in.m4a')
