@@ -2,6 +2,32 @@ import { readFile, writeFile, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { UA, getJson, fetchBuffer } from './http.ts'
 
+// audio = wakafy API only; mobi below is video-only legacy
+
+const WAKAFY_YTMP3 = 'https://api.wakafy.store/v1/media/ytmp3'
+
+// free public key while the API is beta — override via WAKAFY_API_KEY
+async function wakafyAudio(rawUrl: string): Promise<{ buf: Buffer; title: string }> {
+  const key = process.env.WAKAFY_API_KEY || '@waka:alpha'
+  let title = rawUrl
+  const buf = await fetchBuffer(`${WAKAFY_YTMP3}?url=${encodeURIComponent(rawUrl)}`, {
+    headers: { Authorization: `Bearer ${key}`, 'User-Agent': UA },
+    onHeaders: (h) => {
+      const name = h.get('x-media-title') ?? h.get('content-disposition')?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i)?.[1]
+      if (name) {
+        try {
+          title = decodeURIComponent(name).replace(/\.mp3$/i, '')
+        } catch {
+          title = name.replace(/\.mp3$/i, '')
+        }
+      }
+    },
+  })
+  return { buf, title }
+}
+
+// legacy mobi — video only, until wakafy ships video
+
 const YTMP3_HOME = 'https://id.ytmp3.mobi/'
 const YTMP3_HOST = 'a.ymcdn.org'
 const YTMP3_COOKIE_TTL = 5 * 60 * 1000
@@ -41,13 +67,13 @@ const cacheGet = async (vid: string, ext: 'mp3' | 'mp4'): Promise<{ buf: Buffer;
     ])
     return { buf, title }
   } catch {
-    return null // partial/corrupt file → just re-download
+    return null
   }
 }
 
 const cachePut = async (vid: string, ext: 'mp3' | 'mp4', buf: Buffer, title: string) => {
   await mkdir(CACHE_DIR, { recursive: true })
-  // wipe-on-overflow, no LRU — cache is a perf nicety, not a feature
+  // over cap → wipe all (no LRU, cache is just a nicety)
   try {
     const files = await readdir(CACHE_DIR)
     let total = 0
@@ -135,8 +161,18 @@ export async function download(url: string, mode: 'audio' | 'video') {
     const hit = await cacheGet(vid, ext)
     if (hit) return hit
   }
-  const got = await ytmp3Mobi(url, mode === 'audio' ? 'mp3' : 'mp4')
-  const buf = await fetchBuffer(got.url, { headers: { 'User-Agent': UA } })
-  if (vid) await cachePut(vid, ext, buf, got.title).catch(() => {})
-  return { buf, title: got.title } as const
+  // wakafy only serves ytmp3 so far — video still goes through ytmp3.mobi
+  let buf: Buffer
+  let title: string
+  if (mode === 'audio') {
+    const got = await wakafyAudio(url)
+    buf = got.buf
+    title = got.title
+  } else {
+    const got = await ytmp3Mobi(url, 'mp4')
+    buf = await fetchBuffer(got.url, { headers: { 'User-Agent': UA } })
+    title = got.title
+  }
+  if (vid) await cachePut(vid, ext, buf, title).catch(() => {})
+  return { buf, title } as const
 }

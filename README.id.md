@@ -99,7 +99,7 @@ Tambah nomormu → command owner kebuka. Sisanya liat [`config.example.json`](co
 
 - Otak `.ai`: gratis, tanpa key — sidecar Python (`native/ai`, butuh `python3` + `curl_cffi`, diinstal `install.sh`), fallback Poolside
 - Live dari WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` — atau tinggal minta `.ai`
-- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `IG_SESSIONID` (cookie burner cadangan buat stories IG)
+- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (opsional — key gratis sudah bawaan selama API masih beta), `IG_SESSIONID` (cookie burner cadangan buat stories IG)
 - Update: kirim `.update` dari WhatsApp (backup, pull, rebuild, restart, rollback kalau gagal)
 
 </details>

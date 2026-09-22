@@ -99,7 +99,7 @@ bun run start           # or: bun run start:pairing
 
 - `.ai`脳：無料・キー不要 — Pythonサイドカー（`native/ai`、`python3`＋`curl_cffi`が必要、`install.sh`が導入）、Poolsideフォールバック
 - WhatsAppからライブ変更：`.setlang`、`.mode`、`.prefix`、`.limit` — or `.ai`に頼むだけ
-- Env：`SESSION_DIR`（既定`sessions`）、`PAIRING_CODE=1`、`IG_SESSIONID`（IGストーリー用予備cookie）
+- Env：`SESSION_DIR`（既定`sessions`）、`PAIRING_CODE=1`、`WAKAFY_API_KEY`（任意 — ベータ中はフリーキー内蔵）、`IG_SESSIONID`（IGストーリー用予備cookie）
 - 更新：WhatsAppから`.update`（バックアップ→取得→再構築→再起動、失敗時はロールバック）
 
 </details>

@@ -24,15 +24,19 @@ export const curl = (args: string[], timeout = 60_000): Promise<Buffer> =>
 // WA caps media around ~64MB; peak RAM while downloading ≈2-3× file size
 export const fetchBuffer = async (
   url: string,
-  opts: { headers?: Record<string, string>; maxBytes?: number; timeout?: number } = {},
+  opts: { headers?: Record<string, string>; maxBytes?: number; timeout?: number; onHeaders?: (h: Headers) => void } = {},
 ): Promise<Buffer> => {
   const maxBytes = opts.maxBytes ?? botMaxDownloadMB() * 1024 * 1024
   const res = await fetch(url, { headers: opts.headers, signal: AbortSignal.timeout(opts.timeout ?? 300_000) })
-  if (!res.ok) throw new Error(`download http ${res.status}`)
+  if (!res.ok) {
+    const snippet = await res.text().then((t) => t.slice(0, 200)).catch(() => '')
+    throw new Error(`download http ${res.status}${snippet ? `: ${snippet}` : ''}`)
+  }
+  opts.onHeaders?.(res.headers)
   const len = Number(res.headers.get('content-length'))
   if (Number.isFinite(len) && len > maxBytes) throw new Error(`file too large (${Math.round(len / 1e6)}MB > ${maxBytes / 1e6}MB max)`)
   if (!res.body) return Buffer.from(await res.arrayBuffer())
-  // streaming read — cap tetap berlaku walau server gak ngasih content-length
+  // streaming read
   const reader = res.body.getReader()
   const chunks: Uint8Array[] = []
   let total = 0
@@ -46,5 +50,7 @@ export const fetchBuffer = async (
     }
     chunks.push(value)
   }
-  return Buffer.concat(chunks)
+  const buf = Buffer.concat(chunks)
+  if (Number.isFinite(len) && len > 0 && buf.length < len) throw new Error(`download truncated (${buf.length}/${len} bytes)`)
+  return buf
 }

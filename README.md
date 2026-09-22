@@ -99,7 +99,7 @@ Add your number → owner commands unlock. See [`config.example.json`](config.ex
 
 - `.ai` brain: free, no key — Python sidecar (`native/ai`, needs `python3` + `curl_cffi`, installed by `install.sh`), Poolside fallback
 - Live from WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` — or just ask `.ai`
-- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `IG_SESSIONID` (burner-cookie fallback for IG stories)
+- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (optional — free key built in while the API is in beta), `IG_SESSIONID` (burner-cookie fallback for IG stories)
 - Update: send `.update` from WhatsApp (backs up, pulls, rebuilds, restarts, rolls back on failure)
 
 </details>
