@@ -1,9 +1,9 @@
 import { readFile, writeFile, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { wakafyDownload } from './wakafy.ts'
+import { wakafy } from './wakafy.ts'
 
-const wakafyAudio = (rawUrl: string) => wakafyDownload('/v1/media/ytmp3', rawUrl, { strip: /\.(mp3|m4a|webm|opus)$/i })
-const wakafyVideo = (rawUrl: string) => wakafyDownload('/v1/media/ytmp4', rawUrl, { strip: /\.mp4$/i })
+const wakafyAudio = (rawUrl: string) => wakafy.file('/v1/media/ytmp3', { url: rawUrl }, { strip: /\.(mp3|m4a|webm|opus)$/i })
+const wakafyVideo = (rawUrl: string) => wakafy.file('/v1/media/ytmp4', { url: rawUrl }, { strip: /\.mp4$/i })
 
 const videoIdOf = (rawUrl: string): string | undefined => {
   const m = rawUrl.match(/youtu\.be\/([A-Za-z0-9_-]{11})|shorts\/([A-Za-z0-9_-]{11})|(?:embed|live)\/([A-Za-z0-9_-]{11})|[?&]v=([A-Za-z0-9_-]{11})/)
