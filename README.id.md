@@ -71,7 +71,7 @@ Kirim `.menu` di WhatsApp buat liat daftar live + alias.
 
 **Downloader**
 `.play` — cari YouTube → mp3/mp4 · `.ytmp3` / `.ytmp4` — link → audio/video
-`.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
+`.tiktok` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **Grup** (khusus admin/owner)
 `.kick` · `.promote` · `.demote` · `.add`

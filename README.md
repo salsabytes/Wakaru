@@ -71,7 +71,7 @@ Send `.menu` in WhatsApp for the live list with aliases.
 
 **Downloaders**
 `.play` — search YouTube → mp3/mp4 · `.ytmp3` / `.ytmp4` — link → audio/video
-`.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
+`.tiktok` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **Group** (admins/owner only)
 `.kick` · `.promote` · `.demote` · `.add`

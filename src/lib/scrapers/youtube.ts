@@ -1,4 +1,4 @@
-import { UA } from './http.ts'
+import { UA } from '../http.ts'
 
 export interface YtResult {
   id: string

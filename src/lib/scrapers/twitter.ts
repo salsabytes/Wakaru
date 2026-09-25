@@ -1,4 +1,4 @@
-import { UA, fetchBuffer } from './http.ts'
+import { UA, fetchBuffer } from '../http.ts'
 
 const statusOf = (rawUrl: string): string | undefined => rawUrl.match(/status\/(\d{5,})/)?.[1]
 

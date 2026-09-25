@@ -1,5 +1,6 @@
 import type { WAMessage } from 'baileys'
-import { download, searchYouTube, type YtResult } from '../../lib/scrapers/index.ts'
+import { searchYouTube, type YtResult } from '../../lib/scrapers/index.ts'
+import { downloadYouTube } from '../../lib/youtube-dl.ts'
 import { oversizedDoc } from '../../lib/media.ts'
 import { withSlot, cooldownLeft } from '../../lib/queue.ts'
 import { tx } from '../../lib/lang.ts'
@@ -90,7 +91,7 @@ export async function handlePlayPick(
   await send.react('⏳', msg.key).catch(() => {})
   try {
     await withSlot(async () => {
-      const media = await download(`https://youtu.be/${hit.id}`, mode)
+      const media = await downloadYouTube(`https://youtu.be/${hit.id}`, mode)
       const doc = oversizedDoc({ type: mode === 'audio' ? 'audio' : 'video', buf: media.buf, caption: hit.title })
       if (doc) await send.document(doc.buf, doc.name, doc.mime)
       else if (mode === 'audio') await send.audio(media.buf)

@@ -1,4 +1,4 @@
-import { UA, fetchBuffer } from './http.ts'
+import { UA, fetchBuffer } from '../http.ts'
 
 const PINTEREST = 'https://www.pinterest.com/'
 

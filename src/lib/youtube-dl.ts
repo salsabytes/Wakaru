@@ -11,7 +11,7 @@ const videoIdOf = (rawUrl: string): string | undefined => {
 }
 
 // disk cache by video id — repeat requests (the norm in groups) skip the download
-const CACHE_DIR = join(import.meta.dirname, '..', '..', '..', 'bin', 'cache')
+const CACHE_DIR = join(import.meta.dirname, '..', '..', 'bin', 'cache')
 const CACHE_MAX = 150 * 1024 * 1024
 
 const cacheGet = async (vid: string, ext: 'mp3' | 'm4a' | 'mp4'): Promise<{ buf: Buffer; title: string } | null> => {
@@ -47,7 +47,7 @@ const cachePut = async (vid: string, ext: 'mp3' | 'm4a' | 'mp4', buf: Buffer, ti
   }
 }
 
-export async function download(url: string, mode: 'audio' | 'video') {
+export async function downloadYouTube(url: string, mode: 'audio' | 'video') {
   // audio comes from wakafy as direct m4a now (mp3 only via ?format=mp3) —
   // key the cache by the real format so stale transcoded .mp3 entries
   // from before the flip are never served again

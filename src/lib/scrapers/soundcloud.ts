@@ -1,4 +1,4 @@
-import { UA, fetchBuffer } from './http.ts'
+import { UA, fetchBuffer } from '../http.ts'
 
 // client_id is embedded in the page hydration JSON (apiClient.id) — scraped once, cached with a TTL
 let scClientId: { id: string; at: number } | null = null

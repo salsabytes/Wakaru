@@ -156,7 +156,7 @@ export const wakafy = {
 }
 
 // connectivity + key check in one command:
-//   WAKAFY_SELFTEST=1 node src/lib/scrapers/wakafy.ts
+//   WAKAFY_SELFTEST=1 node src/lib/wakafy.ts
 if (process.env.WAKAFY_SELFTEST) {
   const custom = !!process.env.WAKAFY_API_KEY
   const ok = await wakafy.ping()

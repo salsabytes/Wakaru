@@ -1,4 +1,4 @@
-import { download } from './scrapers/index.ts'
+import { downloadYouTube } from './youtube-dl.ts'
 import { oversizedDoc, requireUrl } from './media.ts'
 import { tx } from './lang.ts'
 
@@ -18,7 +18,7 @@ export function makeDownloader(o: {
       const url = await requireUrl(ctx, o.name, o.usage)
       if (!url) return
       await ctx.reply(await tx('processing'))
-      const r = await download(url, o.mode)
+      const r = await downloadYouTube(url, o.mode)
       const doc = oversizedDoc({ type: o.mode === 'audio' ? 'audio' : 'video', buf: r.buf, caption: r.title })
       if (doc) await ctx.sendDocument(doc.buf, doc.name, doc.mime)
       else if (o.mode === 'audio') await ctx.sendAudio(r.buf, r.title)

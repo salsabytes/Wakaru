@@ -1,4 +1,4 @@
-import { UA } from './http.ts'
+import { UA } from '../http.ts'
 
 const PAGE = 'https://www.iloveimg.com/upscale-image'
 

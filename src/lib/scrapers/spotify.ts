@@ -1,5 +1,5 @@
-import { UA } from './http.ts'
-import { download } from './ytmp3.ts'
+import { UA } from '../http.ts'
+import { downloadYouTube } from '../youtube-dl.ts'
 import { searchYouTube } from './youtube.ts'
 
 // Spotify is DRM — the full track can't be scraped. We read public metadata (title +
@@ -56,7 +56,7 @@ const trackAudio = async (title: string, artist: string): Promise<Buffer> => {
   const results = await searchYouTube(`"${title}" ${artist}`)
   const first = results[0]
   if (!first) throw new Error(`spotify: no YouTube match for "${title}"`)
-  const got = await download(`https://youtu.be/${first.id}`, 'audio')
+  const got = await downloadYouTube(`https://youtu.be/${first.id}`, 'audio')
   return got.buf
 }
 

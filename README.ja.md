@@ -71,7 +71,7 @@ npm run start           # or: npm run start:pairing
 
 **ダウンローダー**
 `.play` — YouTube検索→mp3/mp4 · `.ytmp3` / `.ytmp4` — リンク→音声・動画
-`.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
+`.tiktok` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **グループ**（管理者／ownerのみ）
 `.kick` · `.promote` · `.demote` · `.add`

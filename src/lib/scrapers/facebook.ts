@@ -1,5 +1,5 @@
 import { constants, publicEncrypt } from 'node:crypto'
-import { UA, curl, fetchBuffer } from './http.ts'
+import { UA, curl, fetchBuffer } from '../http.ts'
 
 const FDOWN = 'https://fdown.net/'
 

@@ -1,4 +1,4 @@
-import { UA } from './scrapers/http.ts'
+import { UA } from './http.ts'
 
 export interface WikiResult {
   title: string
