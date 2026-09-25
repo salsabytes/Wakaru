@@ -7,6 +7,7 @@
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
 [![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WXk69eF4A)
 
 <p>🌐 <b>English</b> · <a href="README.id.md">Bahasa Indonesia</a> · <a href="README.ja.md">日本語</a></p>
 
@@ -99,7 +100,7 @@ Add your number → owner commands unlock. See [`config.example.json`](config.ex
 
 - `.ai` brain: free, no key — Python sidecar (`native/ai`, needs `python3` + `curl_cffi`, installed by `install.sh`), Poolside fallback
 - Live from WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` — or just ask `.ai`
-- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (optional — free key built in while the API is in beta), `IG_SESSIONID` (burner-cookie fallback for IG stories)
+- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (optional — free key built in while the API is in beta)
 - Update: send `.update` from WhatsApp (backs up, pulls, rebuilds, restarts, rolls back on failure)
 
 </details>
@@ -133,7 +134,7 @@ Run `termux-wake-lock`.
 
 ## 🤝 Contributing
 
-Small lazy codebase — keep it that way. Bug or idea? [Open an issue](https://github.com/salsabytes/Wakaru/issues). PRs welcome.
+Small lazy codebase — keep it that way. Bug or idea? [Open an issue](https://github.com/salsabytes/Wakaru/issues). PRs welcome. Questions? Hang out on [Discord](https://discord.gg/WXk69eF4A).
 
 [MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Releases](https://github.com/salsabytes/Wakaru/releases) · Built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Node + Rust
 

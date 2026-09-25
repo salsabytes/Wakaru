@@ -7,6 +7,7 @@
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
 [![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WXk69eF4A)
 
 <p>🌐 <a href="README.md">English</a> · <a href="README.id.md">Bahasa Indonesia</a> · <b>日本語</b></p>
 
@@ -99,7 +100,7 @@ npm run start           # or: npm run start:pairing
 
 - `.ai`脳：無料・キー不要 — Pythonサイドカー（`native/ai`、`python3`＋`curl_cffi`が必要、`install.sh`が導入）、Poolsideフォールバック
 - WhatsAppからライブ変更：`.setlang`、`.mode`、`.prefix`、`.limit` — or `.ai`に頼むだけ
-- Env：`SESSION_DIR`（既定`sessions`）、`PAIRING_CODE=1`、`WAKAFY_API_KEY`（任意 — ベータ中はフリーキー内蔵）、`IG_SESSIONID`（IGストーリー用予備cookie）
+- Env：`SESSION_DIR`（既定`sessions`）、`PAIRING_CODE=1`、`WAKAFY_API_KEY`（任意 — ベータ中はフリーキー内蔵）
 - 更新：WhatsAppから`.update`（バックアップ→取得→再構築→再起動、失敗時はロールバック）
 
 </details>
@@ -133,7 +134,7 @@ npm run start           # or: npm run start:pairing
 
 ## 🤝 コントリビュート
 
-小さく怠惰なコードベース — そのままに。バグ・要望は[issueへ](https://github.com/salsabytes/Wakaru/issues)。PR歓迎。
+小さく怠惰なコードベース — そのままに。バグ・要望は[issueへ](https://github.com/salsabytes/Wakaru/issues)。PR歓迎。質問は[Discordへ](https://discord.gg/WXk69eF4A)。
 
 [MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [リリース](https://github.com/salsabytes/Wakaru/releases) · [Baileys](https://github.com/whiskeysockets/Baileys)＋TypeScript＋Node＋Rust
 

@@ -7,6 +7,7 @@
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
 [![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WXk69eF4A)
 
 <p>🌐 <a href="README.md">English</a> · <b>Bahasa Indonesia</b> · <a href="README.ja.md">日本語</a></p>
 
@@ -99,7 +100,7 @@ Tambah nomormu → command owner kebuka. Sisanya liat [`config.example.json`](co
 
 - Otak `.ai`: gratis, tanpa key — sidecar Python (`native/ai`, butuh `python3` + `curl_cffi`, diinstal `install.sh`), fallback Poolside
 - Live dari WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` — atau tinggal minta `.ai`
-- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (opsional — key gratis sudah bawaan selama API masih beta), `IG_SESSIONID` (cookie burner cadangan buat stories IG)
+- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (opsional — key gratis sudah bawaan selama API masih beta)
 - Update: kirim `.update` dari WhatsApp (backup, pull, rebuild, restart, rollback kalau gagal)
 
 </details>
@@ -133,7 +134,7 @@ Jalanin `termux-wake-lock`.
 
 ## 🤝 Kontribusi
 
-Codebase kecil yang malas — jaga tetap begitu. Nemu bug / punya ide? [Buka issue](https://github.com/salsabytes/Wakaru/issues). PR welcome.
+Codebase kecil yang malas — jaga tetap begitu. Nemu bug / punya ide? [Buka issue](https://github.com/salsabytes/Wakaru/issues). PR welcome. Mau nanya-nanya? Mampir ke [Discord](https://discord.gg/WXk69eF4A).
 
 [MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Rilis](https://github.com/salsabytes/Wakaru/releases) · Dibangun di atas [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Node + Rust
 
