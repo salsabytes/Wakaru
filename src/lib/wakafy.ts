@@ -15,6 +15,10 @@ export interface WakafyMeta {
   kind?: string
   items?: WakafyItem[]
   error?: string
+  // single-file shortcut some endpoints return instead of items[]
+  // (fb share links: {direct:true, direct_url, kind:"video", title})
+  direct?: boolean
+  direct_url?: string
 }
 
 export type WakafyMedia = { type: 'video' | 'image' | 'audio'; buf: Buffer }
@@ -119,7 +123,11 @@ export const wakafy = {
     const meta = await this.json<WakafyMeta>(path, { url: rawUrl, direct: '1', meta: '1' }, { timeout: opts.timeout })
     // unavailable entries (private items etc.) carry a reason, not a link
     const items = meta.items?.filter((it) => it.status === 'ok' && it.cdn_url) ?? []
-    if (!items.length) throw new Error(`${label}: ${meta.items?.[0]?.reason ?? meta.error ?? 'no media in response'}`)
+    // single-file shortcut: some endpoints answer {direct_url} instead of {items[]}
+    if (!items.length && meta.direct_url) {
+      items.push({ index: 0, kind: meta.kind ?? 'video', status: 'ok', cdn_url: meta.direct_url })
+    }
+    if (!items.length) throw new Error(`${label}: ${meta.items?.[0]?.reason ?? meta.error ?? JSON.stringify(meta).slice(0, 300)}`)
     const title = (meta.title || rawUrl).slice(0, 500)
     const concurrency = opts.concurrency ?? 4
     const maxTotal = (opts.maxTotalMB ?? 40) * 1024 * 1024

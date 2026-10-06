@@ -1,8 +1,5 @@
 export { searchYouTube, type YtResult } from './youtube.ts'
 export { downloadTikTok } from './tiktok.ts'
-export { downloadFacebook } from './facebook.ts'
-export { downloadPinterest, type PinOut } from './pinterest.ts'
-export { downloadTwitter } from './twitter.ts'
 export { downloadSoundCloud } from './soundcloud.ts'
 export { downloadSpotify } from './spotify.ts'
 export { upscaleImage } from './upscale.ts'

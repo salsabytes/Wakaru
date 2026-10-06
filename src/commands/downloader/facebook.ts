@@ -1,4 +1,4 @@
-import { downloadFacebook } from '../../lib/scrapers/index.ts'
+import { wakafy } from '../../lib/wakafy.ts'
 import { requireUrl, sendMedia } from '../../lib/media.ts'
 
 export default {
@@ -9,7 +9,8 @@ export default {
   run: async (ctx: CommandContext) => {
     const url = await requireUrl(ctx, 'facebook', '<facebook link>')
     if (!url) return
-    const r = await downloadFacebook(url)
+    // the whole FB flow in one call: resolve via wakafy direct+meta, pull items straight from CDN
+    const r = await wakafy.media('/v1/media/fbdl', url, { label: 'facebook' })
     await sendMedia(
       ctx,
       r.media.map((m, i) => ({ type: m.type, buf: m.buf, caption: i === 0 ? r.title : undefined })),
