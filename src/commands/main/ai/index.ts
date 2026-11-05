@@ -1,11 +1,13 @@
 import { askLLM, type ChatMsg } from '../../../lib/llm.ts'
 import { tx } from '../../../lib/lang.ts'
 import { getAiHistory, saveAiHistory } from '../../../lib/aiHistory.ts'
-import { buildSystem } from './prompt.ts'
+import { AI_FREE, buildSystem } from './prompt.ts'
 import { parseRuns, runTool } from './tools.ts'
 
+const MAX_ROUNDS = AI_FREE ? 5 : 2
+
 const runExchange = async (msgs: ChatMsg[], ctx: CommandContext): Promise<string> => {
-  for (let round = 0; round < 2; round++) {
+  for (let round = 0; round < MAX_ROUNDS; round++) {
     let reply: string
     try {
       reply = (await askLLM(msgs)).trim()
@@ -21,8 +23,11 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext): Promise<string
     const results: string[] = []
     for (const r of runs) results.push(await runTool(r, ctx))
     msgs.push({ role: 'assistant', content: reply })
-    msgs.push({ role: 'user', content: `tool results:\n${results.join('\n')}\nReply to the user in ONE short message.` })
-    if (round === 1) return results.join('\n')
+    const resultPrompt = AI_FREE
+      ? `tool results:\n${results.join('\n')}\nReply to the user naturally.`
+      : `tool results:\n${results.join('\n')}\nReply to the user in ONE short message.`
+    msgs.push({ role: 'user', content: resultPrompt })
+    if (round === MAX_ROUNDS - 1) return results.join('\n')
   }
   return ''
 }

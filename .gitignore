@@ -5,6 +5,7 @@ logs/
 .backup/
 *.log
 native/*/target/
+native/ai/.sentinel.json
 bin/
 
 config.json

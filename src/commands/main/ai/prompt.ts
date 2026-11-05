@@ -1,11 +1,15 @@
 import type { ChatMsg } from '../../../lib/llm.ts'
 import { language, langName } from '../../../lib/lang.ts'
+import { cfg } from '../../../lib/config.ts'
 import { listCommands } from '../../index.ts'
 import { recentByChat } from '../../../lib/store.ts'
 import { textOfMessage } from '../../../lib/serialize.ts'
 import { fetchContributors } from '../../../lib/contributors.ts'
 
 const PARTICIPANT_MAX = 20
+// WAKARU_AI_FREE=1 (or "aiFree":"1" in config.json) drops the fixed persona
+// and style rules; the model gets a minimal prompt and more tool rounds.
+export const AI_FREE = process.env.WAKARU_AI_FREE === '1' || cfg('aiFree', '') === '1'
 // groupMetadata can hang on a flaky connection — cap it so the reply never waits on member names
 const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([p.then((v): T | null => v), new Promise<T | null>((r) => setTimeout(() => r(null), ms))])
@@ -55,6 +59,42 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
     year: 'numeric',
   })
   const lang = language()
+  if (AI_FREE) {
+    const commandList = commands
+      .filter((c) => c.name !== 'ai' && (ctx.isOwner || !c.ownerOnly))
+      .map((c) => `- ${c.name}${c.desc ? ' — ' + c.desc : ''}`)
+      .join('\n')
+    const ownerLine = ctx.isOwner
+      ? 'Owner-only commands: @run:setlang <code>, @run:mode <mode>, @run:prefix <chars|none>, @run:limit <MB>.'
+      : ''
+    return {
+      role: 'system',
+      content: [
+        'You are Wakaru, a WhatsApp bot built with Baileys + TypeScript.',
+        '- Repo: github.com/salsabytes/Wakaru — open source, MIT license.',
+        '- Creator: Salsabila R. (github.com/salsabytes); WhatsApp 088218292156.',
+        `- Contributors: ${contributors}.`,
+        `Today is ${today}. The bot's configured language is ${lang}, but you are free to reply in whatever language and tone fits the user. Do not force a persona.`,
+        '',
+        'YOU CAN DO THINGS by emitting marker lines, ONE per command:',
+        '@run:<command> <args>',
+        'You may emit multiple markers; results come back, then answer in one message.',
+        'Never invent results — report exactly what came back; if a command errored, tell the real error.',
+        'If a command needs a jid/link you cannot get, ask the user — do not guess or fabricate.',
+        'If no command fits, just answer directly.',
+        'Examples: "cari lagu X" -> @run:play X; "download <link>" -> @run:ytmp3 <link>; "foto ini jadi stiker" -> @run:sticker.',
+        ownerLine,
+        '',
+        'WhatsApp formatting: *bold* with ONE star (never **double**), _italic_, ~strikethrough~; paste bare URLs, never Markdown links.',
+        '',
+        'CONTEXT:',
+        context,
+        '',
+        'AVAILABLE COMMANDS (name — description):',
+        commandList,
+      ].join('\n'),
+    }
+  }
   const voice =
     lang === 'en'
       ? 'You are Wakaru — a cute, smart, warm girl who types like one. Playful, a little imut, sharp and helpful. Reply in English with a light, cute tone — NEVER Indonesian slang (no "kak", "yaampun", "gitu loh", "banget", "nih"). Be concise.'

@@ -5,6 +5,8 @@
   "prefixes": ["."],
   "bare": false,
   "maxDownloadMB": 100,
+  "aiModel": "gpt-6",
+  "aiFree": "off",
   "stickerPack": "Wakaru",
   "stickerAuthor": "buatan gweh",
   "updateChannel": "master",

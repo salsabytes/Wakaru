@@ -1,55 +1,165 @@
 import { cfg } from './config.ts'
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 
 export type ChatMsg = { role: string; content: string }
 
-// Flatten the exchange into one prompt — the anon backend has no memory,
-// history lives on our side and rides along as plain text.
-const flatten = (messages: ChatMsg[]): string =>
-  messages
-    .map((m) => {
-      const body = m.content.trim()
-      if (!body) return ''
-      const role = m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user'
-      return `${role}: ${body}`
-    })
-    .filter(Boolean)
-    .join('\n\n')
-
 const ROOT = join(import.meta.dirname, '..', '..')
 const GPT_SIDECAR = join(ROOT, 'native', 'ai', 'chatgpt-anon.py')
+// gpt-6 is GPT-6 on the anonymous catalog. Override with env/config.
+const AI_MODEL = process.env.WAKARU_AI_MODEL || cfg('aiModel', 'gpt-6')
+const TIMEOUT = 120_000
 
-// Primary backend: anonymous chatgpt.com via the python sidecar.
-// Prompt goes in through stdin so long chats never hit argv limits.
-async function gptChat(messages: ChatMsg[]): Promise<string> {
-  const prompt = flatten(messages)
-  if (!prompt) throw new Error('gptanon: empty prompt')
-  const out = await new Promise<string>((resolve, reject) => {
-    const child = spawn('python3', [GPT_SIDECAR], { timeout: 70_000 })
+const cleanMessages = (messages: ChatMsg[]): ChatMsg[] =>
+  messages
+    .filter((m) => m.content?.trim())
+    .map((m) => ({
+      role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content.trim(),
+    }))
+
+// --- persistent sidecar daemon -------------------------------------------
+// One python process, one warm sentinel token, per-worker sessions. Falls
+// back to a one-shot spawn if the daemon dies.
+type Pending = { resolve: (s: string) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
+
+let daemon: ChildProcess | null = null
+let buffer = ''
+let seq = 0
+const pending = new Map<number, Pending>()
+
+const failAll = (err: Error): void => {
+  for (const p of pending.values()) {
+    clearTimeout(p.timer)
+    p.reject(err)
+  }
+  pending.clear()
+  buffer = ''
+  daemon = null
+}
+
+const startDaemon = (): ChildProcess => {
+  const child = spawn('python3', [GPT_SIDECAR, '--serve'], { stdio: ['pipe', 'pipe', 'pipe'] })
+  child.stdout!.setEncoding('utf8')
+  child.stderr!.setEncoding('utf8')
+  child.stdout!.on('data', (chunk: string) => {
+    buffer += chunk
+    let nl: number
+    while ((nl = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, nl).trim()
+      buffer = buffer.slice(nl + 1)
+      if (!line) continue
+      let msg: { id?: number; text?: string; error?: string }
+      try {
+        msg = JSON.parse(line) as typeof msg
+      } catch {
+        continue
+      }
+      const p = pending.get(Number(msg.id))
+      if (!p) continue
+      pending.delete(Number(msg.id))
+      clearTimeout(p.timer)
+      if (msg.error) p.reject(new Error(`gptanon: ${msg.error}`))
+      else p.resolve(String(msg.text ?? ''))
+    }
+  })
+  // drain stderr so a chatty child never blocks on a full pipe
+  child.stderr!.on('data', () => {})
+  child.on('error', (err) => {
+    if (daemon === child) failAll(new Error(`gptanon: spawn ${err.message.slice(0, 200)}`))
+  })
+  child.on('close', (code) => {
+    if (daemon === child) failAll(new Error(`gptanon: daemon exit ${code ?? '?'}`))
+  })
+  daemon = child
+  return child
+}
+
+const gptDaemon = (messages: ChatMsg[]): Promise<string> => {
+  const child = daemon ?? startDaemon()
+  const id = ++seq
+  return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pending.delete(id)
+      reject(new Error('gptanon: timeout'))
+    }, TIMEOUT)
+    pending.set(id, { resolve, reject, timer })
+    const payload = JSON.stringify({ id, messages, model: AI_MODEL }) + '\n'
+    try {
+      child.stdin!.write(payload, (err) => {
+        if (!err) return
+        pending.delete(id)
+        clearTimeout(timer)
+        reject(new Error(`gptanon: stdin ${err.message.slice(0, 200)}`))
+      })
+    } catch (err) {
+      pending.delete(id)
+      clearTimeout(timer)
+      reject(new Error(`gptanon: stdin ${(err as Error).message.slice(0, 200)}`))
+    }
+  })
+}
+
+// last-resort one-shot (daemon unavailable / crashed)
+const gptOnce = (messages: ChatMsg[]): Promise<string> => {
+  const payload = JSON.stringify({ messages, model: AI_MODEL })
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn('python3', [GPT_SIDECAR], { timeout: TIMEOUT })
     let stdout = ''
     let stderr = ''
-    child.stdout.on('data', (d) => { stdout += String(d) })
-    child.stderr.on('data', (d) => { stderr += String(d) })
+    child.stdout.on('data', (d) => {
+      stdout += String(d)
+    })
+    child.stderr.on('data', (d) => {
+      stderr += String(d)
+    })
     child.on('error', (err) => reject(new Error(`gptanon: spawn ${err.message.slice(0, 200)}`)))
     child.on('close', (code) => {
-      // exit 10 = our bug (empty prompt), 11-12 = edge/landing, 13-16 = backend stages
       if (code !== 0) reject(new Error(`gptanon: exit ${code} — ${stderr.trim().slice(0, 300) || 'no stderr'}`))
       else resolve(stdout)
     })
-    child.stdin.end(prompt)
+    child.stdin.end(payload)
   })
-  const text = out.trim()
-  if (!text) throw new Error('gptanon: exit 0 empty response')
-  return text
 }
+
+const daemonDead = (msg: string): boolean => /daemon exit|spawn|stdin/i.test(msg)
+
+async function gptChat(messages: ChatMsg[]): Promise<string> {
+  const msgs = cleanMessages(messages)
+  if (!msgs.length) throw new Error('gptanon: empty prompt')
+  try {
+    const text = (await gptDaemon(msgs)).trim()
+    if (!text) throw new Error('gptanon: empty response')
+    return text
+  } catch (err) {
+    const msg = (err as Error).message
+    if (!daemonDead(msg)) throw err
+    try {
+      daemon?.kill()
+    } catch {
+      // already gone
+    }
+    failAll(new Error(msg))
+    const text = (await gptOnce(msgs)).trim()
+    if (!text) throw new Error('gptanon: empty response')
+    return text
+  }
+}
+
+process.once('exit', () => {
+  try {
+    daemon?.kill()
+  } catch {
+    // already gone
+  }
+})
 
 // Transient hiccups (edge wobble, backend 5xx, timeouts) deserve one more
 // shot before giving up — the poolside fallback stays as last resort.
 // Structural errors (our bug, changed page format) skip straight to fallback.
 const gptTransient = (msg: string): boolean =>
-  /exit 1[1-7]|HTTP 5\d\d|timeout|ECONN|ETIMEDOUT|EAI_AGAIN|socket hang up|conduit|Unusual activity|429/i.test(msg) &&
-  !/empty prompt|no data-build/.test(msg)
+  /HTTP 5\d\d|429|timeout|ECONN|ETIMEDOUT|EAI_AGAIN|socket hang up|Unusual activity|daemon exit|spawn/i.test(msg) &&
+  !/empty prompt|no such/i.test(msg)
 
 const POOL_BASE = (process.env.POOLSIDE_BASE_URL || cfg('poolsideBaseUrl', 'https://inference.poolside.ai/v1')).replace(/\/$/, '')
 const POOL_MODEL = process.env.POOLSIDE_MODEL || cfg('poolsideModel', 'poolside/laguna-s-2.1')
@@ -64,14 +174,9 @@ async function poolChat(messages: ChatMsg[]): Promise<string> {
     headers: { Authorization: `Bearer ${poolKey()}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: POOL_MODEL,
-      messages: messages
-        .filter((m) => m.content?.trim())
-        .map((m) => ({
-          role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
-          content: m.content.trim(),
-        })),
+      messages: cleanMessages(messages),
     }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(TIMEOUT),
   })
   if (!res.ok) {
     const txt = await res.text().catch(() => '')
@@ -83,7 +188,7 @@ async function poolChat(messages: ChatMsg[]): Promise<string> {
   return out
 }
 
-// Chain: sidecar first (one retry for hiccups), poolside pool last.
+// Chain: local sidecar (one retry for hiccups), poolside last.
 export async function askLLM(messages: ChatMsg[]): Promise<string> {
   let lastErr: unknown
   for (let attempt = 0; attempt < 2; attempt++) {
