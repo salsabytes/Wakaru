@@ -1,7 +1,10 @@
 import { askLLM, type ChatMsg } from '../../../lib/llm.ts'
 import { tx } from '../../../lib/lang.ts'
+import { logger } from '../../../lib/logger.ts'
+import { sendRichParts } from '../../../lib/richmsg.ts'
 import { getAiHistory, saveAiHistory } from '../../../lib/aiHistory.ts'
 import { AI_FREE, buildSystem } from './prompt.ts'
+import { hasRich, parseRich, richToText, waText } from './rich.ts'
 import { parseRuns, runTool } from './tools.ts'
 
 const MAX_ROUNDS = AI_FREE ? 5 : 2
@@ -21,7 +24,17 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext): Promise<string
     const runs = parseRuns(reply)
     if (!runs.length) return reply
     const results: string[] = []
-    for (const r of runs) results.push(await runTool(r, ctx))
+    let sent = false
+    let failed = false
+    for (const r of runs) {
+      const out = await runTool(r, ctx)
+      results.push(out.text)
+      sent ||= out.sent
+      failed ||= out.failed
+    }
+    // a command already replied in the chat (e.g. play's number picker) — any AI text
+    // now would be a second copy of the same thing, so stop here and say nothing.
+    if (sent && !failed) return ''
     msgs.push({ role: 'assistant', content: reply })
     const resultPrompt = AI_FREE
       ? `tool results:\n${results.join('\n')}\nReply to the user naturally.`
@@ -51,13 +64,27 @@ export default {
       finalText = `❌ ${(err as Error).message}`
     }
 
-    saveAiHistory(histKey, query, finalText)
     // LLMs always emit Markdown **bold** — WhatsApp only renders *single*,
-    // so double stars show up as literal asterisks. Normalize before sending.
-    // Same for [text](url) links — WA shows them raw, so flatten to text + url.
-    const waSafe = finalText
-      .replace(/\[(.+?)\]\((https?:[^)\s]+)\)/g, '$1 $2')
-      .replace(/\*\*(.+?)\*\*/g, '*$1')
+    // so double stars show up as literal asterisks. Same for [text](url) links.
+    // parseRich does that normalisation itself, on text and table cells only: a
+    // code block has to reach the card byte-for-byte, so it takes the RAW reply.
+    const waSafe = waText(finalText)
+    if (!waSafe.trim()) return
+
+    // A table or a fenced code block becomes ONE native rich message (markdown
+    // text + GenATableUXPrimitive / GenAICodeUXPrimitive): Android, Web and
+    // iPhone render it from a single relay. Plain answers stay a chat bubble.
+    const parts = parseRich(finalText)
+    if (hasRich(parts)) {
+      try {
+        await sendRichParts(ctx.sock, ctx.chat, parts, { title: 'Wakaru' })
+        return
+      } catch (err) {
+        logger.warn('ai rich send failed, plain fallback:', err)
+        await ctx.reply(richToText(parts))
+        return
+      }
+    }
     await ctx.reply(waSafe)
   },
 }
