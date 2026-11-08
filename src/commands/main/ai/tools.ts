@@ -16,14 +16,20 @@ export const parseRuns = (text: string) =>
     args: (m[2] ?? '').trim(),
   }))
 
-export const runTool = async (r: { name: string; args: string }, ctx: CommandContext): Promise<string> => {
-  if (r.name === 'ai') return '[ai] denied — no self-recursion'
+// `sent` = the command already posted something visible in the chat, so an extra AI
+// summary would duplicate it; `failed` = nothing was shown, so the AI should explain.
+export type ToolResult = { text: string; sent: boolean; failed: boolean }
+
+const failed = (text: string): ToolResult => ({ text, sent: false, failed: true })
+
+export const runTool = async (r: { name: string; args: string }, ctx: CommandContext): Promise<ToolResult> => {
+  if (r.name === 'ai') return failed('[ai] denied — no self-recursion')
   const cmd = await getCommand(r.name)
-  if (!cmd) return `[${r.name}] no such command`
-  if (cmd.groupOnly && !ctx.isGroup) return `[${r.name}] denied — groups only`
-  if (cmd.adminOnly && !ctx.isOwner && !ctx.isAdmin) return `[${r.name}] denied — group admins only`
-  if (cmd.botAdmin && !ctx.isBotAdmin) return `[${r.name}] denied — bot is not an admin`
-  if (cmd.ownerOnly && !isOwner(ctx.sender)) return `[${r.name}] denied — owner only`
+  if (!cmd) return failed(`[${r.name}] no such command`)
+  if (cmd.groupOnly && !ctx.isGroup) return failed(`[${r.name}] denied — groups only`)
+  if (cmd.adminOnly && !ctx.isOwner && !ctx.isAdmin) return failed(`[${r.name}] denied — group admins only`)
+  if (cmd.botAdmin && !ctx.isBotAdmin) return failed(`[${r.name}] denied — bot is not an admin`)
+  if (cmd.ownerOnly && !isOwner(ctx.sender)) return failed(`[${r.name}] denied — owner only`)
   try {
     const captured: string[] = []
     const sub: CommandContext = {
@@ -55,8 +61,12 @@ export const runTool = async (r: { name: string; args: string }, ctx: CommandCon
       sendSticker: async (b) => { captured.push(mediaMeta('sticker', b)); await ctx.sendSticker(b) },
     }
     await cmd.run(sub)
-    return `[${r.name}]${captured.length ? ' ' + captured.join(' | ') : ' (ok)'}`
+    return {
+      text: `[${r.name}]${captured.length ? ' ' + captured.join(' | ') : ' (ok)'}`,
+      sent: captured.length > 0,
+      failed: false,
+    }
   } catch (err) {
-    return `[${r.name}] errored: ${(err as Error).message}`
+    return failed(`[${r.name}] errored: ${(err as Error).message}`)
   }
 }
