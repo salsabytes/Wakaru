@@ -112,6 +112,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     pickFormat: 'pilih format buat *{title}*',
     footer3min: '3 menit aja ya 😉',
     playFailed: '❌ play failed: {msg}',
+    playUnavailable:
+      '😖 sumbernya nggak bisa kasih file itu sekarang. Daftar hasilnya masih aktif — balas nomor lain ya, mis. *2 mp3*.',
     stickerUsage: 'reply ke foto/video/gif, atau kirim langsung pake .sticker 🛸 — nama pack optional: .sticker <pack>|<author> (mis. .sticker rawr|buatan gweh)',
     toimgUsage: 'reply sticker, atau kirim sticker pake caption .toimg 🖼️',
     toimgFailed: 'toimg gagal 😢 — stickernya mungkin rusak atau formatnya aneh',
@@ -185,6 +187,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     pickFormat: 'pick a format for *{title}*',
     footer3min: '3 minutes only 😉',
     playFailed: '❌ play failed: {msg}',
+    playUnavailable:
+      '😖 the source can\'t serve that file right now. The result list is still active — reply with another number, e.g. *2 mp3*.',
     stickerUsage: 'reply to a photo/video/gif, or send one directly with .sticker 🛸 — optional pack name: .sticker <pack>|<author> (e.g. .sticker rawr|made by me)',
     toimgUsage: 'reply to a sticker, or send a sticker with .toimg caption 🖼️',
     toimgFailed: 'toimg failed 😢 — that sticker may be corrupt or an odd format',

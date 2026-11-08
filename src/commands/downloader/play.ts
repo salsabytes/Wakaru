@@ -100,8 +100,29 @@ export async function handlePlayPick(
     await send.react('✅', msg.key).catch(() => {})
   } catch (err) {
     logger.error('play download error:', err)
+    // the search stays alive so a source-side failure doesn't force a new search —
+    // the user can just reply with another number ("2 mp3")
+    pending.set(`${m.chat}:${sender}`, { results: pick.results, at: Date.now() })
     await send.react('❌', msg.key).catch(() => {})
-    await send.text(await tx('playFailed', { msg: (err as Error).message.slice(0, 300) }))
+    const why = (err as Error).message
+    // 422 "video tidak tersedia" is the source refusing, not a real error to dump raw
+    const unavailable = /tidak tersedia|no disponible|not available|unsupported|422/i.test(why)
+    if (unavailable && mode === 'audio') {
+      // the video route is a separate pipeline and often still works — offer it
+      // instead of leaving the user with nothing
+      await send.buttons(
+        [
+          { id: `play:${choice.index + 1}:mp4`, text: '🎬 Coba MP4' },
+          { id: 'play:cancel', text: '❌ Batal' },
+        ],
+        await tx('playUnavailable'),
+        await tx('footer3min'),
+      )
+      return true
+    }
+    await send.text(
+      unavailable ? await tx('playUnavailable') : await tx('playFailed', { msg: why.slice(0, 300) }),
+    )
   }
   return true
 }

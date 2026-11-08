@@ -5,8 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node src/index.ts",
-    "start:pairing": "node src/index.ts --use-pairing-code",
+    "start": "node native/ensure-audio.mjs && node src/index.ts",
+    "start:pairing": "node native/ensure-audio.mjs && node src/index.ts --use-pairing-code",
     "build:sticker": "bash native/build.sh",
     "typecheck": "tsc --noEmit"
   },
