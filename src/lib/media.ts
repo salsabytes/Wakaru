@@ -1,5 +1,6 @@
 import { makeSender, type Sender } from './sender.ts'
 import { tx } from './lang.ts'
+import { sendCarousel } from './buttons.ts'
 
 const requireUrl = async (ctx: CommandContext, name: string, usage: string): Promise<string | undefined> => {
   const url = ctx.text.trim()
@@ -121,4 +122,24 @@ export async function sendMedia(ctx: CommandContext, media: OutMedia[]): Promise
     throw err
   }
   if (dm) await ctx.reply(await tx('sentToDm', { n: media.length }))
+}
+
+// show 2-10 image items as a carousel card; fall back to normal media for singles, videos, mixed types, or >10
+export async function sendMediaOrCarousel(
+  ctx: CommandContext,
+  r: { title: string; media: { type: OutMedia['type']; buf: Buffer; url?: string }[] },
+): Promise<void> {
+  const images = r.media.length >= 2 && r.media.length <= 10 && r.media.every((m) => m.type === 'image' && m.url) ? r.media : null
+  if (images) {
+    await sendCarousel(ctx.sock, ctx.chat, {
+      text: r.title,
+      cards: images.map((m, i) => ({
+        image: m.buf,
+        body: `📷 ${i + 1}/${images.length}`,
+        buttons: [{ text: 'Download', url: m.url! }],
+      })),
+    })
+    return
+  }
+  await sendMedia(ctx, r.media.map((m, i) => ({ type: m.type, buf: m.buf, caption: i === 0 ? r.title : undefined })))
 }

@@ -164,6 +164,9 @@ export const setMaxDownloadMB = (next: unknown): number => {
   return maxDownloadMB
 }
 
+// "original group" invite link/code shown from the menu (config.json key: group)
+export const botOriginalGroup = (): string => cfg('group', '')
+
 // generic config.json string getter with a fallback (used for sticker pack/author etc.)
 export const cfg = (key: string, fallback: string): string => {
   if (!cfgCache) {

@@ -410,8 +410,8 @@ export function buildRichContent(
 ): RichExContent {
   const page = String(html ?? '')
   const sections: Record<string, unknown>[] = [
-    textSection(htmlToMarkdown(page) || ' '),
     htmlSection(page, opts.height),
+    textSection(htmlToMarkdown(page) || ' '),
   ]
   const submessages: RichSubMessage[] = chunkText(htmlToText(page) || ' ').map((messageText) => ({
     messageType: 2,
@@ -446,26 +446,28 @@ export function buildRichParts(parts: RichPart[], opts: RichExOptions = {}): Ric
 /** Mixed: HTML card in `sections` + native parts in `submessages`. Mostly Android-focused. */
 export function buildRichMulti(html: string, parts: RichPart[], opts: RichExOptions = {}): RichExContent {
   const sections: Record<string, unknown>[] = [htmlSection(String(html ?? ''), opts.height)]
-  if (opts.mirrorText) sections.push(textSection(opts.mirrorText))
+  const mirrored: Record<string, unknown>[] = []
+  if (opts.mirrorText) mirrored.push(textSection(opts.mirrorText))
   const submessages: RichSubMessage[] = []
   for (const part of parts) {
     if (part.type === 'text') {
       submessages.push({ messageType: 2, messageText: part.text })
-      if (opts.mirrorSections === true) sections.push(textSection(part.text))
+      if (opts.mirrorSections === true) mirrored.push(textSection(part.text))
       continue
     }
     if (part.type === 'code') {
       submessages.push(codeSubMessage(part))
-      if (opts.mirrorSections === true) sections.push(codeSection(part))
+      if (opts.mirrorSections === true) mirrored.push(codeSection(part))
       continue
     }
     const table = tableSubMessage(part)
     if (table) submessages.push(table)
     if (opts.mirrorSections === true) {
       const section = tableSection(part)
-      if (section) sections.push(section)
+      if (section) mirrored.push(section)
     }
   }
+  sections.push(...mirrored)
   return finishRich(sections, submessages, opts)
 }
 
@@ -561,6 +563,19 @@ export function sendHtml(
     { ...opts, withEdit: opts.withEdit !== false },
     htmlToText(html),
   )
+}
+
+/** Send an HTML card then (optionally) a text bubble in that order; returns the HTML msg id. */
+export async function sendHtmlThenText(
+  sock: WASocket,
+  jid: string,
+  html: string,
+  text: string,
+  opts: RichExOptions = {},
+): Promise<string | undefined> {
+  const id = await sendHtml(sock, jid, html, { ...opts, fallback: false })
+  if (text) await sock.sendMessage(jid, { text })
+  return id
 }
 
 /** Send native rich parts (text/table/code). Works on Android, Web, and iPhone. */

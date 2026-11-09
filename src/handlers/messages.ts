@@ -10,6 +10,7 @@ import { tx } from '../lib/lang.ts'
 import { OWNERS, botBare, botMode, botPrefixes, isOwner, prefixBody, usedPrefix } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
+import { pendingF100, handleF100Answer } from '../commands/game/family100.ts'
 import { participantMaps } from '../lib/group.ts'
 
 // commands run concurrently (globally slot-capped) so a slow downloader never blocks other chats
@@ -164,6 +165,10 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   const pick = !usedPrefix(text) ? pendingPlay(m.chat, sender) : undefined
   if (pick && (await handlePlayPick(msg, m, sender, send))) return
   if (m.button?.id.startsWith('play:')) return send.text(await tx('stalePlay'))
+
+  if (pendingF100(m.chat) && !m.fromMe && !usedPrefix(text) && text.trim()) {
+    if (await handleF100Answer({ sock: waka, chat: m.chat, reply: send.text }, sender, text, msg.pushName ?? undefined)) return
+  }
 
   const { cmd, queryText, args } = await parseCommand(m, sender, text)
   if (!cmd) return

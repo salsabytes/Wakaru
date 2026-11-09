@@ -45,7 +45,7 @@ declare global {
     sendAudio: (buffer: Buffer, title?: string) => Promise<void>
     sendDocument: (buffer: Buffer, fileName: string, mimetype?: string) => Promise<void>
 
-    sendButtons: (buttons: { id: string; text: string }[], text: string, footer?: string) => Promise<void>
+    sendButtons: (buttons: { id?: string; text: string; url?: string }[], text: string, footer?: string) => Promise<void>
 
     sendList: (o: ListContent) => Promise<void>
   }

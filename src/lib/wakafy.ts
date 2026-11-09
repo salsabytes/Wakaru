@@ -21,7 +21,10 @@ export interface WakafyMeta {
   direct_url?: string
 }
 
-export type WakafyMedia = { type: 'video' | 'image' | 'audio'; buf: Buffer }
+export type WakafyMedia = { type: 'video' | 'image' | 'audio'; buf: Buffer; url: string }
+export type WakafyLink = { type: WakafyMedia['type']; url: string }
+
+const mediaType = (kind?: string): WakafyMedia['type'] => (kind === 'audio' ? 'audio' : kind === 'video' ? 'video' : 'image')
 
 // tiny SDK for our own API — auth, errors, and titles handled once here,
 // callers just pick json (metadata), file (bytes), or media (link → files)
@@ -136,7 +139,8 @@ export const wakafy = {
     for (let i = 0; i < items.length; i += concurrency) {
       const batch = await Promise.allSettled(
         items.slice(i, i + concurrency).map(async (it) => ({
-          type: (it.kind === 'audio' ? 'audio' : it.kind === 'video' ? 'video' : 'image') as WakafyMedia['type'],
+          type: mediaType(it.kind),
+          url: it.cdn_url!,
           // CDN links need no auth — no server hop (! is safe: filtered for cdn_url above)
           buf: await fetchBuffer(it.cdn_url!, { headers: { 'User-Agent': UA } }),
         })),
@@ -150,6 +154,25 @@ export const wakafy = {
     }
     if (!media.length) throw new Error(`${label}: download failed`)
     return { title, media }
+  },
+
+  // resolve CDN links without downloading; used when WhatsApp/Baileys fetches the image (e.g. carousel)
+  async links(
+    path: string,
+    rawUrl: string,
+    opts: { label?: string; timeout?: number } = {},
+  ): Promise<{ title: string; media: WakafyLink[] }> {
+    const label = opts.label ?? 'media'
+    const meta = await this.json<WakafyMeta>(path, { url: rawUrl, direct: '1', meta: '1' }, { timeout: opts.timeout })
+    const items = meta.items?.filter((it) => it.status === 'ok' && it.cdn_url) ?? []
+    if (!items.length && meta.direct_url) {
+      items.push({ index: 0, kind: meta.kind ?? 'video', status: 'ok', cdn_url: meta.direct_url })
+    }
+    if (!items.length) throw new Error(`${label}: ${meta.items?.[0]?.reason ?? meta.error ?? JSON.stringify(meta).slice(0, 300)}`)
+    return {
+      title: (meta.title || rawUrl).slice(0, 500),
+      media: items.map((it) => ({ type: mediaType(it.kind), url: it.cdn_url! })),
+    }
   },
 
   // no-auth liveness check — first thing to run when switching bases

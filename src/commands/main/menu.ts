@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { listCommands } from '../index.ts'
-import { isOwner } from '../../lib/config.ts'
+import { botOriginalGroup, isOwner, OWNERS } from '../../lib/config.ts'
 import { language, tx } from '../../lib/lang.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..', '..')
@@ -93,6 +93,23 @@ export async function renderMenu(d: MenuData): Promise<string> {
   return '```\n' + body + '\n```'
 }
 
+const groupUrl = (raw: string): string | undefined => {
+  const v = raw.trim()
+  if (!v) return undefined
+  if (/^https?:\/\//i.test(v)) return v
+  if (v.includes('@g.us')) return undefined // a JID can't be opened from a URL button
+  return `https://chat.whatsapp.com/${v.replace(/^\/+/, '')}`
+}
+
+// interactive redirect buttons: owner WhatsApp (config owners[0]) + original group (config group)
+export async function menuLinks(): Promise<{ text: string; url: string }[]> {
+  const out: { text: string; url: string }[] = []
+  if (OWNERS[0]) out.push({ text: await tx('menuOwnerLink'), url: `https://wa.me/${OWNERS[0]}` })
+  const group = groupUrl(botOriginalGroup())
+  if (group) out.push({ text: await tx('menuGroupLink'), url: group })
+  return out
+}
+
 export default {
   name: 'menu',
   desc: 'list all commands',
@@ -100,15 +117,21 @@ export default {
   run: async (ctx: CommandContext) => {
     const t0 = performance.now()
     const commands = await listCommands()
-    await ctx.reply(
-      await renderMenu({
-        pushName: ctx.pushName,
-        prefix: ctx.prefix,
-        isOwner: isOwner(ctx.sender),
-        elapsedMs: Math.round(performance.now() - t0),
-        commands,
-      }),
-    )
+    const menu = await renderMenu({
+      pushName: ctx.pushName,
+      prefix: ctx.prefix,
+      isOwner: isOwner(ctx.sender),
+      elapsedMs: Math.round(performance.now() - t0),
+      commands,
+    })
+    const links = await menuLinks()
+    // one bubble: the interactive body can't render ``` fences, so drop them and attach the
+    // redirect buttons to the same message. no links = plain code-block reply as before.
+    if (!links.length) return await ctx.reply(menu)
+    const body = menu.replace(/^```\n/, '').replace(/\n```$/, '').slice(0, 1024)
+    await ctx.sendButtons(links, body).catch(async () => {
+      await ctx.reply(menu)
+    })
   },
 } satisfies Command
 

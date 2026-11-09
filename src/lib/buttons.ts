@@ -1,8 +1,10 @@
-import { proto, generateWAMessageFromContent, isJidGroup, type WASocket, type BinaryNode } from 'baileys'
+import { proto, generateWAMessageFromContent, prepareWAMessageMedia, isJidGroup, type WASocket, type BinaryNode } from 'baileys'
 
 export interface Button {
-  id: string
+  id?: string
   text: string
+  // when set, the button opens the link (cta_url) instead of replying (quick_reply)
+  url?: string
 }
 
 export interface ButtonsContent {
@@ -29,6 +31,30 @@ export interface ListContent {
   footer?: string
   sections: ListSection[]
 }
+
+export interface CarouselCard {
+  image: string | Buffer
+  title?: string
+  body?: string
+  footer?: string
+  buttons?: Button[]
+}
+
+export interface CarouselContent {
+  text: string
+  cards: CarouselCard[]
+}
+
+const nativeButton = (b: Button) =>
+  b.url
+    ? {
+        name: 'cta_url',
+        buttonParamsJson: JSON.stringify({ display_text: b.text, url: b.url, merchant_url: b.url }),
+      }
+    : {
+        name: 'quick_reply',
+        buttonParamsJson: JSON.stringify({ display_text: b.text, id: b.id ?? '' }),
+      }
 
 // biz attrs must match the battle-tested shape — empty attrs render buttons but some clients never wire taps
 async function relayInteractive(sock: WASocket, jid: string, interactiveMessage: proto.Message.IInteractiveMessage) {
@@ -62,10 +88,37 @@ export async function sendButtons(sock: WASocket, jid: string, c: ButtonsContent
     body: { text: c.text },
     ...(c.footer ? { footer: { text: c.footer } } : {}),
     nativeFlowMessage: {
-      buttons: c.buttons.map((b) => ({
-        name: 'quick_reply',
-        buttonParamsJson: JSON.stringify({ display_text: b.text, id: b.id }),
-      })),
+      buttons: c.buttons.map(nativeButton),
+    },
+  })
+  return relayInteractive(sock, jid, interactiveMessage)
+}
+
+// upload each image and relay as a scrollable card carousel (2-10 image cards)
+export async function sendCarousel(sock: WASocket, jid: string, c: CarouselContent) {
+  const built = await Promise.allSettled(
+    c.cards.slice(0, 10).map(async (card) => {
+      const media = await prepareWAMessageMedia(
+        { image: typeof card.image === 'string' ? { url: card.image } : card.image },
+        { upload: sock.waUploadToServer },
+      )
+      return proto.Message.InteractiveMessage.create({
+        header: { title: card.title, hasMediaAttachment: true, imageMessage: media.imageMessage },
+        ...(card.body ? { body: { text: card.body } } : {}),
+        ...(card.footer ? { footer: { text: card.footer } } : {}),
+        ...(card.buttons?.length ? { nativeFlowMessage: { buttons: card.buttons.map(nativeButton) } } : {}),
+      })
+    }),
+  )
+  const cards = built.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+  if (!cards.length) throw new Error('carousel: no card media uploaded')
+
+  const interactiveMessage = proto.Message.InteractiveMessage.create({
+    body: { text: c.text },
+    carouselMessage: {
+      cards,
+      messageVersion: 1,
+      carouselCardType: proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.HSCROLL_CARDS,
     },
   })
   return relayInteractive(sock, jid, interactiveMessage)
