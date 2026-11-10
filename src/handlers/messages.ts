@@ -9,6 +9,7 @@ import { logger } from '../lib/logger.ts'
 import { tx } from '../lib/lang.ts'
 import { OWNERS, botBare, botMode, botPrefixes, isOwner, prefixBody, usedPrefix } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/aiHistory.ts'
+import { rememberAiMedia } from '../lib/aiMediaMemory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 import { pendingF100, handleF100Answer } from '../commands/game/family100.ts'
 import { participantMaps } from '../lib/group.ts'
@@ -82,8 +83,13 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
     const m = await serialize(msg)
     if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
 
-    if (!m.text && !m.button) continue
-    logger.info(m.button ? `🔘 ${jid}: ${m.button.text || m.button.id}` : `📥 ${jid}: ${m.text}`)
+    const sender = m.fromMe ? (waka.user?.id ?? m.sender) : m.sender
+    // Media-only message (no text/button): stash it so `.ai` can use it later
+    if (!m.text && !m.button) {
+      void rememberAiMedia(m, sender).catch((err) => logger.warn('ai media remember error:', err))
+      continue
+    }
+    logger.info(m.button ? `dY"~ ${jid}: ${m.button.text || m.button.id}` : `dY"� ${jid}: ${m.text}`)
     dispatch(msg, m, jid)
   }
 }

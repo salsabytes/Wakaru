@@ -6,9 +6,9 @@ import { recentByChat } from '../../../lib/store.ts'
 import { textOfMessage } from '../../../lib/serialize.ts'
 import { fetchContributors } from '../../../lib/contributors.ts'
 
-const PARTICIPANT_MAX = 20
-// WAKARU_AI_FREE=1 (or "aiFree":"1" in config.json) drops the fixed persona
-// and style rules; the model gets a minimal prompt and more tool rounds.
+const PARTICIPANT_MAX = 80 // cap group member list so prompts stay small
+// WAKARU_AI_FREE=1 (or "aiFree":"1" in config.json) drops fixed persona/style
+// and gives the model a minimal prompt with more tool rounds.
 export const AI_FREE = process.env.WAKARU_AI_FREE === '1' || cfg('aiFree', '') === '1'
 // groupMetadata can hang on a flaky connection — cap it so the reply never waits on member names
 const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
@@ -16,20 +16,24 @@ const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
 
 async function buildContext(ctx: CommandContext): Promise<string> {
   const lines = [`chat: ${ctx.chat}`, `sender: ${ctx.sender}`, ctx.isGroup ? 'chat type: group' : 'chat type: private']
-  if (ctx.pushName) lines.push(`sender's WhatsApp profile name (pushname): ${ctx.pushName}`)
+  if (ctx.pushName) lines.push(`sender pushname: ${ctx.pushName}`)
   if (ctx.mtype !== 'conversation') lines.push(`user's message has media (${ctx.mtype}) — media commands like sticker can use it`)
   if (ctx.quoted?.text) lines.push(`user is replying to: "${ctx.quoted.text.slice(0, 200)}"`)
   if (ctx.isGroup) {
     try {
       const meta = await withTimeout(ctx.sock.groupMetadata(ctx.chat), 3_000)
       if (!meta) return lines.join('\n')
-      const me = meta.participants.find((p) => p.id.split(':')[0] === ctx.sender.split(':')[0])
-      if (me?.notify) lines.push(`current sender's name in this group: ${me.notify}`)
+      const me = meta.participants.find((p) => p.id.split(/[:@]/)[0] === ctx.sender.split(/[:@]/)[0])
+      if (me?.notify) lines.push(`current sender name in group: ${me.notify}`)
       const members = meta.participants
         .slice(0, PARTICIPANT_MAX)
-        .map((p) => `${p.notify || p.id.split('@')[0]} -> ${p.id}`)
+        .map((p) => {
+          const num = p.id.split(/[:@]/)[0]
+          const name = p.notify || p.name || num
+          return `${name} | ${num} | ${p.id}`
+        })
         .join('\n')
-      if (members) lines.push(`group members (name -> jid, for kick/promote/etc):\n${members}`)
+      if (members) lines.push(`group members (name | number | id). To tag someone write @number in your message:\n${members}`)
     } catch {
 
     }
@@ -94,7 +98,8 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
         'For code, ALWAYS use a fenced block with the language tag (```js, ```py, ```sql ...): it renders as a native code card with a copy action.',
         'Keep code short and runnable; explain in the text around it, never inside the fence.',
         '',
-        'WhatsApp formatting: *bold* with ONE star (never **double**), _italic_, ~strikethrough~; paste bare URLs, never Markdown links.',
+        'WhatsApp formatting: *bold* with ONE star (never **double**), _italic_, ~strikethrough~; paste bare URLs, never Markdown links. You can tag/mention group members by writing @number (use the number from group members context) and you may tag multiple people naturally when relevant.',
+        'Never talk about the mechanics of attachments: do not say "upload", "uploaded", "attachment", "file sent", or count how many files/images were attached. Treat everything in the conversation as something you simply remember or see, and say it naturally (e.g. "the 4 images I remember").',
         '',
         'CONTEXT:',
         context,
@@ -150,6 +155,8 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       '- Light emoji/kaomoji at most once per message.',
       '- WhatsApp formatting only: *bold* with ONE star, never **double** — same for _italic_ and ~strikethrough~.',
       '- Never use Markdown links [text](url) — WhatsApp shows them raw. Paste the bare URL instead.',
+      '- You can tag/mention people in groups by writing @number (from group members in CONTEXT). Use it naturally when talking about someone, you may tag multiple people.',
+      '- Never talk about the mechanics of attachments: do not say "upload", "uploaded", "attachment", "file sent", or count how many files/images were attached. Treat everything in the conversation as something you simply remember or see, and say it naturally (e.g. "the 4 images I remember").',
       '',
       'RICH OUTPUT — you can send a real table inside your reply (native, Android + Web + iPhone):',
       '@table optional title',

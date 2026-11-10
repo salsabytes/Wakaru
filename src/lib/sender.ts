@@ -88,8 +88,34 @@ const remuxM4A = async (buffer: Buffer): Promise<Buffer | null> => {
 export const makeSender = (sock: WASocket, chat: string, quoted?: WAMessage) => {
   const opts = quoted ? { quoted } : undefined
   const send = (content: Parameters<typeof sock.sendMessage>[1]) => sock.sendMessage(chat, content, opts)
+  // Find @numbers in text and map them to correct JIDs (LID-safe for groups)
+  const mentionsOf = async (text: string): Promise<string[]> => {
+    const nums = [...text.matchAll(/@(\d{5,})/g)].map((m) => m[1])
+    if (!nums.length) return []
+    const pn = (n: string) => `${n}@s.whatsapp.net`
+    if (!chat.endsWith('@g.us')) return [...new Set(nums.map(pn))]
+    const met = await Promise.race([
+      sock.groupMetadata(chat).catch(() => undefined),
+      new Promise<undefined>((r) => setTimeout(() => r(undefined), 3_000)),
+    ])
+    if (!met) return [...new Set(nums.map(pn))]
+    const lidMode = String(met.addressingMode) === 'lid'
+    const byNumber = new Map<string, string>()
+    for (const p of met.participants) {
+      const jid = lidMode || p.id.endsWith('@lid')
+        ? (p.lid ?? (p.id.endsWith('@lid') ? p.id : (p.phoneNumber ?? p.id)))
+        : (p.phoneNumber ?? p.id)
+      for (const n of [p.id, p.lid, p.phoneNumber]) {
+        if (n) byNumber.set(n.split(/[:@]/)[0], jid)
+      }
+    }
+    return [...new Set(nums.map((n) => byNumber.get(n) ?? pn(n)))]
+  }
   return {
-    text: async (text: string) => { await send({ text }) },
+    text: async (text: string) => {
+      const mentions = await mentionsOf(text)
+      await send(mentions.length ? { text, mentions } : { text })
+    },
     react: async (emoji: string, key?: WAMessageKey) => { await sock.sendMessage(chat, { react: { text: emoji, key } }) },
     sticker: async (buffer: Buffer) => { await send({ sticker: buffer }) },
     image: async (buffer: Buffer, caption?: string) => { await send({ image: buffer, caption }) },

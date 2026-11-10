@@ -2,7 +2,10 @@ import { cfg } from './config.ts'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 
-export type ChatMsg = { role: string; content: string }
+// File payload for AI (base64 + optional name/mime)
+export type AiFileInput = { data: string; name?: string; mime?: string }
+// Chat message shape; may include attached files for multimodal prompts
+export type ChatMsg = { role: string; content: string; files?: AiFileInput[] }
 
 const ROOT = join(import.meta.dirname, '..', '..')
 const GPT_SIDECAR = join(ROOT, 'native', 'ai', 'chatgpt-anon.py')
@@ -12,15 +15,15 @@ const TIMEOUT = 120_000
 
 const cleanMessages = (messages: ChatMsg[]): ChatMsg[] =>
   messages
-    .filter((m) => m.content?.trim())
+    .filter((m) => m.content?.trim() || m.files?.length)
     .map((m) => ({
       role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content.trim(),
+      content: (m.content || '').trim() || (m.files?.length ? 'Tolong analisis file ini.' : ''),
+      ...(m.files?.length ? { files: m.files } : {}),
     }))
 
-// --- persistent sidecar daemon -------------------------------------------
-// One python process, one warm sentinel token, per-worker sessions. Falls
-// back to a one-shot spawn if the daemon dies.
+// --- Persistent Python sidecar (daemon) ---
+// Reuses one process/token for speed; falls back to one-shot if it dies.
 type Pending = { resolve: (s: string) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
 
 let daemon: ChildProcess | null = null
@@ -75,7 +78,7 @@ const startDaemon = (): ChildProcess => {
   return child
 }
 
-const gptDaemon = (messages: ChatMsg[]): Promise<string> => {
+const gptDaemon = (messages: ChatMsg[], files: AiFileInput[] = []): Promise<string> => {
   const child = daemon ?? startDaemon()
   const id = ++seq
   return new Promise<string>((resolve, reject) => {
@@ -84,7 +87,7 @@ const gptDaemon = (messages: ChatMsg[]): Promise<string> => {
       reject(new Error('gptanon: timeout'))
     }, TIMEOUT)
     pending.set(id, { resolve, reject, timer })
-    const payload = JSON.stringify({ id, messages, model: AI_MODEL }) + '\n'
+    const payload = JSON.stringify({ id, messages, model: AI_MODEL, files }) + '\n'
     try {
       child.stdin!.write(payload, (err) => {
         if (!err) return
@@ -101,8 +104,8 @@ const gptDaemon = (messages: ChatMsg[]): Promise<string> => {
 }
 
 // last-resort one-shot (daemon unavailable / crashed)
-const gptOnce = (messages: ChatMsg[]): Promise<string> => {
-  const payload = JSON.stringify({ messages, model: AI_MODEL })
+const gptOnce = (messages: ChatMsg[], files: AiFileInput[] = []): Promise<string> => {
+  const payload = JSON.stringify({ messages, model: AI_MODEL, files })
   return new Promise<string>((resolve, reject) => {
     const child = spawn('python3', [GPT_SIDECAR], { timeout: TIMEOUT })
     let stdout = ''
@@ -124,11 +127,11 @@ const gptOnce = (messages: ChatMsg[]): Promise<string> => {
 
 const daemonDead = (msg: string): boolean => /daemon exit|spawn|stdin/i.test(msg)
 
-async function gptChat(messages: ChatMsg[]): Promise<string> {
+async function gptChat(messages: ChatMsg[], files: AiFileInput[] = []): Promise<string> {
   const msgs = cleanMessages(messages)
-  if (!msgs.length) throw new Error('gptanon: empty prompt')
+  if (!msgs.length && !files.length) throw new Error('gptanon: empty prompt')
   try {
-    const text = (await gptDaemon(msgs)).trim()
+    const text = (await gptDaemon(msgs, files)).trim()
     if (!text) throw new Error('gptanon: empty response')
     return text
   } catch (err) {
@@ -140,7 +143,7 @@ async function gptChat(messages: ChatMsg[]): Promise<string> {
       // already gone
     }
     failAll(new Error(msg))
-    const text = (await gptOnce(msgs)).trim()
+    const text = (await gptOnce(msgs, files)).trim()
     if (!text) throw new Error('gptanon: empty response')
     return text
   }
@@ -188,12 +191,14 @@ async function poolChat(messages: ChatMsg[]): Promise<string> {
   return out
 }
 
-// Chain: local sidecar (one retry for hiccups), poolside last.
-export async function askLLM(messages: ChatMsg[]): Promise<string> {
+// Main entry: try local sidecar (with small retry), then Poolside fallback.
+// Note: file-based prompts skip Poolside fallback (it doesn't support our file payload).
+export async function askLLM(messages: ChatMsg[], files: AiFileInput[] = []): Promise<string> {
+  const hasFiles = files.length > 0 || messages.some((m) => (m.files?.length ?? 0) > 0)
   let lastErr: unknown
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await gptChat(messages)
+      return await gptChat(messages, files)
     } catch (e) {
       lastErr = e
       const msg = (e as Error).message
@@ -206,6 +211,6 @@ export async function askLLM(messages: ChatMsg[]): Promise<string> {
       break
     }
   }
-  if (!poolKey()) throw lastErr
+  if (!poolKey() || hasFiles) throw lastErr
   return await poolChat(messages)
 }

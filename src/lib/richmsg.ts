@@ -406,13 +406,12 @@ function finishRich(
 /** HTML card (Android-only). Modern clients read `sections`; old ones read `submessages`. */
 export function buildRichContent(
   html: string,
-  opts: Pick<RichExOptions, 'title' | 'footer' | 'height'> = {},
+  opts: Pick<RichExOptions, 'title' | 'footer' | 'height' | 'mirrorSections'> = {},
 ): RichExContent {
   const page = String(html ?? '')
-  const sections: Record<string, unknown>[] = [
-    htmlSection(page, opts.height),
-    textSection(htmlToMarkdown(page) || ' '),
-  ]
+  const sections: Record<string, unknown>[] = [htmlSection(page, opts.height)]
+  // optional text mirror for clients that read sections but skip the HTML primitive; off by default to avoid double render
+  if (opts.mirrorSections) sections.push(textSection(htmlToMarkdown(page) || ' '))
   const submessages: RichSubMessage[] = chunkText(htmlToText(page) || ' ').map((messageText) => ({
     messageType: 2,
     messageText,

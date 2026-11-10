@@ -3,9 +3,11 @@ import { downloadMediaMessage, getContentType, normalizeMessageContent } from 'b
 import { logger } from './logger.ts'
 import { waka } from '../socket.ts'
 
+// Metadata for a media message (quoted/current), including original filename if any
 export interface MediaMeta {
   mtype: string
   mimetype?: string
+  fileName?: string
   chat: string
   sender: string
   text: string
@@ -148,6 +150,7 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
     s.quoted = {
       mtype: qtype,
       mimetype: qc.mimetype,
+      fileName: typeof qc.fileName === 'string' ? qc.fileName : undefined,
       chat: ctxt.remoteJid ?? chat,
       sender: ctxt.participant ?? '',
       text: qc.text || qc.caption || '',
