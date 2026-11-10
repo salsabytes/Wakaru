@@ -116,15 +116,12 @@ step "Dependencies"
 npm install
 ok "dependencies installed"
 
-# .ai primary backend needs python3 + curl_cffi — missing pieces only
-# knock out the sidecar, the poolside fallback still answers.
-step "AI sidecar (chatgpt-anon)"
-if has python3; then
-  python3 -m pip install --quiet curl_cffi 2>/dev/null \
-    && ok "curl_cffi installed" \
-    || skip "curl_cffi install failed - .ai falls back to poolside"
+# .ai uses Wakafy backend (../wakafy/ai-chat, JS). No Python sidecar needed.
+step "AI backend (Wakafy)"
+if [ -f "../wakafy/ai-chat/index.js" ] || [ -f "wakafy/ai-chat/index.js" ]; then
+  ok "wakafy ai-chat found"
 else
-  skip "python3 missing - .ai falls back to poolside"
+  skip "wakafy ai-chat not found (expected at ../wakafy/ai-chat) - .ai may fail until available"
 fi
 
 step "Engines (sticker)"
