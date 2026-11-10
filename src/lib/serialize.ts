@@ -3,8 +3,9 @@ import { downloadMediaMessage, getContentType, normalizeMessageContent } from 'b
 import { logger } from './logger.ts'
 import { waka } from '../socket.ts'
 
-// Metadata for a media message (quoted/current), including original filename if any
+// Metadata for a media message (quoted/current), including original filename/id if any
 export interface MediaMeta {
+  id?: string // quoted message stanza id (useful for reply-chain context)
   mtype: string
   mimetype?: string
   fileName?: string
@@ -148,6 +149,8 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
     } as WAMessage
     const qraw = () => downloadMediaMessage(qmsg, 'buffer', {}) as unknown as Promise<Buffer>
     s.quoted = {
+      // Quoted message id (helps locate it in message store for reply-chain context)
+      id: typeof ctxt.stanzaId === 'string' ? ctxt.stanzaId : undefined,
       mtype: qtype,
       mimetype: qc.mimetype,
       fileName: typeof qc.fileName === 'string' ? qc.fileName : undefined,

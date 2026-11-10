@@ -3,6 +3,7 @@ import { tx } from '../../../lib/lang.ts'
 import { logger } from '../../../lib/logger.ts'
 import { sendRichParts } from '../../../lib/richmsg.ts'
 import { clearPendingAiFiles, getAiHistory, getPendingAiFiles, saveAiHistory, trimFilesToBudget } from '../../../lib/aiHistory.ts'
+import { handleMemoryIntent, scheduleMemoryRefresh } from '../../../lib/aiMemory.ts'
 import { AI_FREE, buildSystem } from './prompt.ts'
 import { hasRich, parseRich, richToText, waText } from './rich.ts'
 import { parseRuns, runTool } from './tools.ts'
@@ -113,9 +114,34 @@ export default {
     if (!query && files.length) query = 'Tolong analisis file ini.'
     if (!query) return ctx.reply(await tx('aiUsage', { prefix: ctx.prefix }))
 
+    // 1b) Explicit memory intent: "remember ..." / "forget my memory" (fast, deterministic)
+    const memIntent = handleMemoryIntent(histKey, query)
+    if (memIntent) {
+      if (pendingFiles.length) clearPendingAiFiles(histKey)
+      const msg = memIntent === 'forgot'
+        ? 'Oke, ingatan aku soal kamu di chat ini sudah aku hapus ya.'
+        : 'Oke, aku ingat itu ya.'
+      return ctx.reply(msg)
+    }
+
     // 2) Build prompt: system + history + this message (+ files), then ask AI
     let finalText = ''
-    const userText = notes.length ? `${query}\n\n[catatan file: ${notes.join('; ')}]` : query
+    // If the user replied to a message, put it directly in the prompt.
+    // Why: ensures the AI sees the exact replied content (even if it's old/missing from store).
+    let quotedBlock = ''
+    if (ctx.quoted) {
+      const qType = String((ctx.quoted as any).mtype || '').replace(/Message$/, '')
+      const qText = String(ctx.quoted.text || '').trim()
+      const qFrom = ctx.quoted.sender ? String(ctx.quoted.sender).split(/[:@]/)[0] : ''
+      const label = qType && qType !== 'conversation' && qType !== 'extendedTextMessage' ? `[${qType}] ` : ''
+      // Use text if available; otherwise fall back to media type/filename
+      const content = qText ? `${label}${qText}` : (qType ? `[${qType}${ctx.quoted.fileName ? ': ' + ctx.quoted.fileName : ''}]` : '')
+      if (content) {
+        quotedBlock = `[Replied message${qFrom ? ` from ${qFrom}` : ''}]\n${content.slice(0, 1200)}\n\n`
+      }
+    }
+    const baseText = quotedBlock ? `${quotedBlock}${query}` : query
+    const userText = notes.length ? `${baseText}\n\n[catatan file: ${notes.join('; ')}]` : baseText
     try {
       const system = await buildSystem(ctx)
       const history = trimFilesToBudget(getAiHistory(histKey), MAX_AI_FILES - files.length)
@@ -129,10 +155,12 @@ export default {
       finalText = `x ${(err as Error).message}`
     }
 
-    // 3) Save history on success-ish reply and clear any used pending files
+    // 3) Save history, clear used pending files, and refresh memory in background
     if (finalText.trim()) {
       saveAiHistory(histKey, userText, finalText, files)
       if (pendingFiles.length) clearPendingAiFiles(histKey)
+      // Async (non-blocking): summarize/update durable memory when useful
+      scheduleMemoryRefresh(histKey, getAiHistory(histKey), askLLM)
     }
 
     // 4) Send reply (rich/table/code card if present, else plain text)

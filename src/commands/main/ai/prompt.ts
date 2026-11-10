@@ -2,11 +2,14 @@ import type { ChatMsg } from '../../../lib/llm.ts'
 import { language, langName } from '../../../lib/lang.ts'
 import { cfg } from '../../../lib/config.ts'
 import { listCommands } from '../../index.ts'
-import { recentByChat } from '../../../lib/store.ts'
-import { textOfMessage } from '../../../lib/serialize.ts'
+import { messageStore, recentByChat } from '../../../lib/store.ts'
 import { fetchContributors } from '../../../lib/contributors.ts'
+import { describeMessage, formatMemory } from '../../../lib/aiMemory.ts'
+import { getGrounding } from '../../../lib/aiKnowledge.ts'
 
 const PARTICIPANT_MAX = 80 // cap group member list so prompts stay small
+const RECENT_MAX = 10 // recent chat messages to include (budgeted)
+const DESC_MAX = 400 // max group description chars
 // WAKARU_AI_FREE=1 (or "aiFree":"1" in config.json) drops fixed persona/style
 // and gives the model a minimal prompt with more tool rounds.
 export const AI_FREE = process.env.WAKARU_AI_FREE === '1' || cfg('aiFree', '') === '1'
@@ -14,48 +17,97 @@ export const AI_FREE = process.env.WAKARU_AI_FREE === '1' || cfg('aiFree', '') =
 const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([p.then((v): T | null => v), new Promise<T | null>((r) => setTimeout(() => r(null), ms))])
 
+const clip = (s: string, n: number): string => {
+  const t = String(s || '').replace(/\s+/g, ' ').trim()
+  return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t
+}
+
 async function buildContext(ctx: CommandContext): Promise<string> {
   const lines = [`chat: ${ctx.chat}`, `sender: ${ctx.sender}`, ctx.isGroup ? 'chat type: group' : 'chat type: private']
   if (ctx.pushName) lines.push(`sender pushname: ${ctx.pushName}`)
   if (ctx.mtype !== 'conversation') lines.push(`user's message has media (${ctx.mtype}) — media commands like sticker can use it`)
-  if (ctx.quoted?.text) lines.push(`user is replying to: "${ctx.quoted.text.slice(0, 200)}"`)
+
+  // REPLIED MESSAGE: put the exact replied content front-and-center for the AI
+  if (ctx.quoted) {
+    const qid = (ctx.quoted as any).id || (ctx.quoted as any).stanzaId
+    const stored = qid ? messageStore.get(String(qid)) : undefined
+    const qType = String((ctx.quoted as any).mtype || 'message').replace(/Message$/, '')
+    const storedDesc = stored ? describeMessage(stored, 500) : ''
+    const qText = clip(ctx.quoted.text || '', 500)
+    const qLabel = qType && qType !== 'conversation' && qType !== 'extendedTextMessage' ? `[${qType}] ` : ''
+    const qContent = storedDesc || (qText ? `${qLabel}${qText}` : qLabel.trim())
+    const qFrom = ctx.quoted.sender ? String(ctx.quoted.sender).split(/[:@]/)[0] : 'unknown'
+    const block = [
+      'REPLIED MESSAGE (primary focus if user asks about the replied/quoted message):',
+      `- from: ${qFrom}`,
+      `- content: ${qContent || '(no text content)'}`,
+    ]
+    // If we have the replied msg in store, try to show a short chain above it
+    if (qid && stored) {
+      const chain: string[] = []
+      let cur = stored
+      for (let i = 0; i < 2; i++) {
+        const body: any = (cur.message as any)?.extendedTextMessage || (cur.message as any)?.conversation
+        const parentId = body?.contextInfo?.stanzaId
+        if (!parentId) break
+        const parent = messageStore.get(String(parentId))
+        if (!parent) break
+        const desc = describeMessage(parent, 200)
+        if (desc) chain.push(desc)
+        cur = parent
+      }
+      if (chain.length) block.push(`- context above replied message:\n${chain.map((c, i) => `  ${i + 1}. ${c}`).join('\n')}`)
+    }
+    lines.push(block.join('\n'))
+  }
+
+  // GROUP INFO (factual from WhatsApp): subject + description; say "(none set)" if missing
   if (ctx.isGroup) {
     try {
       const meta = await withTimeout(ctx.sock.groupMetadata(ctx.chat), 3_000)
-      if (!meta) return lines.join('\n')
-      const me = meta.participants.find((p) => p.id.split(/[:@]/)[0] === ctx.sender.split(/[:@]/)[0])
-      if (me?.notify) lines.push(`current sender name in group: ${me.notify}`)
-      const members = meta.participants
-        .slice(0, PARTICIPANT_MAX)
-        .map((p) => {
-          const num = p.id.split(/[:@]/)[0]
-          const name = p.notify || p.name || num
-          return `${name} | ${num} | ${p.id}`
-        })
-        .join('\n')
-      if (members) lines.push(`group members (name | number | id). To tag someone write @number in your message:\n${members}`)
+      if (meta) {
+        if (meta.subject) lines.push(`group subject (from WhatsApp): ${clip(meta.subject, 120)}`)
+        const desc = String((meta as any).desc || '').trim()
+        lines.push(`group description (from WhatsApp, factual): ${desc ? clip(desc, DESC_MAX) : '(none set)'}`)
+        const me = meta.participants.find((p) => p.id.split(/[:@]/)[0] === ctx.sender.split(/[:@]/)[0])
+        if (me?.notify) lines.push(`current sender name in group: ${me.notify}`)
+        const members = meta.participants
+          .slice(0, PARTICIPANT_MAX)
+          .map((p) => {
+            const num = p.id.split(/[:@]/)[0]
+            const name = p.notify || (p as any).name || num
+            return `${name} | ${num} | ${p.id}`
+          })
+          .join('\n')
+        if (members) lines.push(`group members (name | number | id). To tag someone write @number in your message:\n${members}`)
+      }
     } catch {
-
+      // ignore metadata errors
     }
   }
-  const recent = recentByChat(ctx.chat, 4)
+
+  // RECENT CHAT (background context only), budgeted
+  const recent = recentByChat(ctx.chat, RECENT_MAX)
   if (recent.length) {
     const chatLines = recent.map((m) => {
-      const sender = (m.key?.participant ?? m.key?.remoteJid ?? '?').split('@')[0]
-      return `${sender}: ${textOfMessage(m).slice(0, 150)}`
+      const who = String(m.key?.participant ?? m.key?.remoteJid ?? '?').split('@')[0]
+      return `${who}: ${describeMessage(m, 180)}`
     })
-    lines.push(`recent messages in this chat (oldest → newest — answer "what did we talk about" from these):\n${chatLines.join('\n')}`)
+    lines.push(`recent messages in this chat (oldest → newest, background context):\n${chatLines.join('\n')}`)
   }
   return lines.join('\n')
 }
 
 export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
   // independent lookups run together — serial awaits waste 1-2s per message
+  const histKey = `${ctx.chat}:${ctx.sender}`
   const [context, contributors, commands] = await Promise.all([
     buildContext(ctx),
     fetchContributors(),
     listCommands(),
   ])
+  const grounding = getGrounding(ctx.chat)
+  const memory = formatMemory(histKey)
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -100,7 +152,11 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
         '',
         'WhatsApp formatting: *bold* with ONE star (never **double**), _italic_, ~strikethrough~; paste bare URLs, never Markdown links. You can tag/mention group members by writing @number (use the number from group members context) and you may tag multiple people naturally when relevant.',
         'Never talk about the mechanics of attachments: do not say "upload", "uploaded", "attachment", "file sent", or count how many files/images were attached. Treat everything in the conversation as something you simply remember or see, and say it naturally (e.g. "the 4 images I remember").',
+        'If CONTEXT has a "REPLIED MESSAGE", and the user asks about the replied/quoted message, answer based on that REPLIED MESSAGE (not recent chat).',
+        'Group subject/description in CONTEXT are factual WhatsApp info. Report them as-is when asked; if "(none set)", say there is no group description. Do not invent or suggest a new description unless explicitly asked.',
         '',
+        ...(grounding ? ['GROUNDING (curated notes; prefer these for bot/group facts):', grounding, ''] : []),
+        ...(memory ? ['MEMORY (about this user in this chat; use naturally, do not mention mechanics):', memory, ''] : []),
         'CONTEXT:',
         context,
         '',
@@ -157,6 +213,8 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       '- Never use Markdown links [text](url) — WhatsApp shows them raw. Paste the bare URL instead.',
       '- You can tag/mention people in groups by writing @number (from group members in CONTEXT). Use it naturally when talking about someone, you may tag multiple people.',
       '- Never talk about the mechanics of attachments: do not say "upload", "uploaded", "attachment", "file sent", or count how many files/images were attached. Treat everything in the conversation as something you simply remember or see, and say it naturally (e.g. "the 4 images I remember").',
+      '- If CONTEXT has a "REPLIED MESSAGE", and the user asks about the replied/quoted message, answer based on that REPLIED MESSAGE (not recent chat).',
+      '- Group subject/description in CONTEXT are factual WhatsApp info. Report them as-is when asked; if "(none set)", say there is no group description. Do not invent or suggest a new description unless explicitly asked.',
       '',
       'RICH OUTPUT — you can send a real table inside your reply (native, Android + Web + iPhone):',
       '@table optional title',
@@ -168,6 +226,8 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       '',
       `Today is ${today}. For date, time, or current-event questions answer from TODAY — your training data ends years ago, never quote it as \"now\".`,
       '',
+      ...(grounding ? ['GROUNDING (curated notes; prefer these for bot/group facts):', grounding, ''] : []),
+      ...(memory ? ['MEMORY (about this user in this chat; use naturally, do not mention mechanics):', memory, ''] : []),
       'CONTEXT:',
       context,
       '',
