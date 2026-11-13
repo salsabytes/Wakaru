@@ -30,7 +30,7 @@ Pick whatever fits you best — no contribution is too small.
 | 💻 **Write code** | Fork → branch → commit → PR (workflow below) |
 | 📖 **Improve docs** | Fix the README, this file, or add a FAQ entry |
 | 🌐 **Translate** | Reply strings live in `src/lib/lang.ts` (id/en) — add a language or fix a translation |
-| 🧩 **Add a command** | Drop it in `src/commands/` and register it in `src/commands/index.ts` — it shows up in `.menu` automatically |
+| 🧩 **Add a command** | Drop it in `src/commands/<category>/` with a default export — `src/commands/index.ts` auto-registers it, `.menu` updates itself |
 
 > 💡 Not sure where to start? Look for the "good first issue" label, or ask
 > in your PR/issue before investing hours — we're friendly and fast.
@@ -96,7 +96,7 @@ This is a deliberately **small and lazy codebase** — keep it that way.
 - **No new dependencies without a reason.** The ladder: stdlib → existing deps → then maybe something new. Ask first.
 - **Reuse what's here.** Helpers live in `src/lib/` (scrapers, queue, sender, media, lang…). If a pattern already exists a few files away, use it.
 - **User-facing strings** go through `src/lib/lang.ts` (`t('key', { vars })`) — add both `id` and `en` entries. Never hardcode reply text.
-- **New commands:** create `src/commands/<category>/<name>.ts`, register it in `src/commands/index.ts`. Mark `ownerOnly` / `cooldown` (seconds) when relevant. The `.menu` list updates itself.
+- **New commands:** create `src/commands/<category>/<name>.ts` with a default export that has `name` + `run`. Registration is automatic (lazy tree walk). Mark `ownerOnly` / `cooldown` (seconds) when relevant; the `.menu` list updates itself.
 
 **Branch naming:** `feat/…`, `fix/…`, `docs/…`, `refactor/…`, `chore/…`
 
@@ -121,21 +121,19 @@ Run these from the repo root — they should all pass:
 # 1. Type check
 npm run typecheck
 
-# 2. AI tool-parser self-test
-AI_SELFTEST=1 node src/commands/main/ai/index.ts
+# 2. Unit tests (node:test, no extra deps)
+npm test
 
-# 3. Media duration/size parser self-test
-MEDIA_SELFTEST=1 node src/lib/media.ts
-
-# 4. If you touched native/sticker
+# 3. If you touched native/sticker
 npm run build:sticker
 ```
 
 > Requires Node ≥ 23.6 (type-stripping, no build step).
 >
-> CI ([`.github/workflows/install.yml`](.github/workflows/install.yml))
-> verifies the one-line installer on Ubuntu, macOS, Windows, and a simulated
-> Termux — it runs the typecheck + AI selftest on every push.
+> CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs the
+> typecheck + tests on every push/PR. The installer workflow
+> ([`.github/workflows/install.yml`](.github/workflows/install.yml)) verifies the
+> one-line install on Ubuntu, macOS, Windows, and a simulated Termux.
 
 ---
 
@@ -144,7 +142,7 @@ npm run build:sticker
 Before you hit "Create pull request", make sure:
 
 - [ ] `npm run typecheck` passes
-- [ ] Self-tests pass (`AI_SELFTEST=1 …`, `MEDIA_SELFTEST=1 …`)
+- [ ] `npm test` passes
 - [ ] Commit message follows Conventional Commits (`feat:`, `fix:`, …)
 - [ ] No new dependency added without explaining why in the PR
 - [ ] User-facing strings go through `lang.ts` (both `id` and `en`)

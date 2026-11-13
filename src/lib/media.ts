@@ -56,28 +56,6 @@ export const mediaDuration = (buf: Buffer): string | undefined => {
   return undefined
 }
 
-if (process.env.MEDIA_SELFTEST) {
-  const mp4 = Buffer.alloc(64)
-  mp4.write('mvhd', 4)
-  mp4.writeUInt32BE(1000, 4 + 16) // timescale at M+16 (M = 'mvhd' position)
-  mp4.writeUInt32BE(253000, 4 + 20) // duration at M+20 → 4:13
-  if (mediaDuration(mp4) !== '4:13') throw new Error('mediaDuration mp4 fail')
-  const v1mp4 = Buffer.alloc(64)
-  v1mp4.write('mvhd', 4)
-  v1mp4[8] = 1 // version 1
-  v1mp4.writeUInt32BE(1000, 4 + 24) // timescale at M+24 (4B in v1 too)
-  v1mp4.writeBigUInt64BE(253000n, 4 + 28) // duration at M+28 (8B)
-  if (mediaDuration(v1mp4) !== '4:13') throw new Error('mediaDuration mp4 v1 fail')
-  const mp3 = Buffer.alloc(128000) // 128kbps CBR → 8s
-  mp3[0] = 0xff
-  mp3[1] = 0xfb
-  mp3[2] = 0x90
-  if (mediaDuration(mp3) !== '0:08') throw new Error('mediaDuration mp3 fail')
-  if (fmtBytes(3.2e6) !== '3.2 MB') throw new Error('fmtBytes fail')
-  console.log('media self-check ok')
-  process.exit(0)
-}
-
 export interface OutMedia {
   type: 'image' | 'video' | 'audio'
   buf: Buffer

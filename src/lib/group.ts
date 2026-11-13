@@ -59,26 +59,3 @@ export const groupGuards = async (ctx: CommandContext): Promise<{ met: Meta } | 
   }
   return { met }
 }
-
-if (process.env.GROUP_SELFTEST) {
-  const eq = (a: unknown, b: unknown, m: string) => {
-    if (a !== b) throw new Error(`${m}: got ${a}, want ${b}`)
-  }
-  const met = {
-    participants: [
-      { id: '6281@s.whatsapp.net', admin: 'admin' },
-      { id: '6282@s.whatsapp.net', admin: null },
-      { id: '628bot@s.whatsapp.net', admin: 'admin' },
-    ],
-  } as unknown as Meta
-  const fake = (sender: string, botId?: string) =>
-    ({ sender, sock: botId ? { user: { id: botId } } : {} }) as unknown as CommandContext
-  eq(await isAdmin(fake('6281@s.whatsapp.net'), met), true, 'admin sender')
-  eq(await isAdmin(fake('6282@s.whatsapp.net'), met), false, 'member sender')
-  eq(await isAdmin(fake('6289@s.whatsapp.net'), met), false, 'outsider sender')
-  eq(await isBotAdmin(fake('6281@s.whatsapp.net', '628bot@s.whatsapp.net'), met), true, 'bot admin')
-  eq(await isBotAdmin(fake('6281@s.whatsapp.net', '6282@s.whatsapp.net'), met), false, 'bot not admin')
-  eq(await isBotAdmin(fake('6281@s.whatsapp.net'), met), false, 'bot id missing')
-  console.log('group self-check ok')
-  process.exit(0)
-}

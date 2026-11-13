@@ -20,9 +20,10 @@ const CATEGORY_LABEL: Record<string, string> = {
   downloader: '◈ DOWNLOADER',
   group: '✤ GROUP',
   converter: '✤ CONVERTER',
+  game: '✦ GAME',
   owner: '👑 OWNER',
 }
-const CATEGORY_ORDER = ['main', 'downloader', 'group', 'converter', 'owner']
+const CATEGORY_ORDER = ['main', 'downloader', 'group', 'converter', 'game', 'owner']
 const catLabel = (cat: string): string => CATEGORY_LABEL[cat] ?? cat.toUpperCase()
 const catOrder = (cat: string): number => {
   const i = CATEGORY_ORDER.indexOf(cat)
@@ -134,54 +135,3 @@ export default {
     })
   },
 } satisfies Command
-
-if (process.env.MENU_SELFTEST) {
-  void (async () => {
-    const m = await renderMenu({
-      pushName: 'Test',
-      prefix: '.',
-      isOwner: true,
-      elapsedMs: 42,
-      commands: [
-        { name: 'menu', category: 'main' },
-        { name: 'ytmp3', category: 'downloader' },
-      ],
-    })
-    const ok =
-      m.startsWith('```\n✦ WAKARU') &&
-      m.trimEnd().endsWith('```') &&
-      m.includes('── ✦ MAIN ') &&
-      m.includes('── ◈ DOWNLOADER ') &&
-      m.includes('✧ .ytmp3') &&
-      m.includes('42ms')
-    if (!ok) throw new Error('menu render fail')
-    const ownerView = await renderMenu({
-      pushName: 'Test',
-      prefix: '.',
-      isOwner: true,
-      elapsedMs: 42,
-      commands: [
-        { name: 'menu', category: 'main' },
-        { name: 'mode', category: 'main', ownerOnly: true },
-      ],
-    })
-    if (!ownerView.includes('OWNER ') || !ownerView.includes('.mode')) {
-      throw new Error('menu owner section fail')
-    }
-    const userView = await renderMenu({
-      pushName: 'Test',
-      prefix: '.',
-      isOwner: false,
-      elapsedMs: 42,
-      commands: [
-        { name: 'menu', category: 'main' },
-        { name: 'mode', category: 'main', ownerOnly: true },
-      ],
-    })
-    if (userView.includes('.mode') || userView.includes('OWNER')) {
-      throw new Error('menu owner hide fail')
-    }
-    console.log('menu self-check ok')
-    process.exit(0)
-  })()
-}

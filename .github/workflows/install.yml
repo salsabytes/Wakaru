@@ -4,9 +4,13 @@ on:
   push:
     paths:
       - install.sh
+      - install.bat
       - .github/workflows/install.yml
-      - native/ai/**
-      - src/commands/main/ai/**
+      - native/**
+      - package.json
+      - package-lock.json
+      - tsconfig.json
+      - test/**
   workflow_dispatch:
 
 jobs:
@@ -30,7 +34,7 @@ jobs:
           cd wakaru
           test -d node_modules
           npm run typecheck
-          AI_SELFTEST=1 node src/commands/main/ai/index.ts
+          npm test
 
   # In-place path: run ./install.sh inside the repo
   inplace:

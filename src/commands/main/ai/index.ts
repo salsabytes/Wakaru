@@ -180,19 +180,3 @@ export default {
     await ctx.reply(waSafe)
   },
 }
-
-if (process.env.AI_SELFTEST) {
-  const cases: [string, number][] = [
-    ['@run:sticker', 1],
-    ['@run:kick 628123@x\n@run:promote 628123@x', 2],
-    ['just chatting, no markers', 0],
-    ['do it: @run:join https://chat.whatsapp.com/ABC and tell me', 1],
-    ['@run:ai hello', 1],
-  ]
-  for (const [text, want] of cases) {
-    const got = parseRuns(text).length
-    if (got !== want) throw new Error(`parseRuns(${JSON.stringify(text)}) = ${got}, want ${want}`)
-  }
-  console.log('ai self-check ok')
-  process.exit(0)
-}

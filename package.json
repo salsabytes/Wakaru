@@ -8,7 +8,8 @@
     "start": "node native/ensure-audio.mjs && node src/index.ts",
     "start:pairing": "node native/ensure-audio.mjs && node src/index.ts --use-pairing-code",
     "build:sticker": "bash native/build.sh",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\""
   },
   "engines": {
     "node": ">=23.6"
