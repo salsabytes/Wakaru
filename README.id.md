@@ -7,11 +7,11 @@
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
 [![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WXk69eF4A)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-join-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)
 
 <p>🌐 <a href="README.md">English</a> · <b>Bahasa Indonesia</b> · <a href="README.ja.md">日本語</a></p>
 
-<img src="assets/wakaru-banner.gif" alt="Wakaru — anime banner" width="820" />
+<img src="https://media.tenor.com/V-HpxdEazJMAAAAC/moon-purple.gif" alt="Wakaru — anime banner" width="500" />
 
 </div>
 
@@ -51,7 +51,8 @@ Login pakai kode: `npm run start:pairing` atau set `PAIRING_CODE=1`.
 - 🧠 `.ai` — ngobrol + jalanin command buat kamu (`@run:`), ingat konteks
 - 🎬 Downloader — YouTube, TikTok, IG, FB, Pinterest, SoundCloud, Spotify, X
 - 🖼️ Stiker & media — foto/video → stiker, stiker → foto, video → audio, upscale AI
-- 👥 Tools grup — kick / promote / demote / add
+- 👥 Tools grup — kick / promote / demote / add, anti-link per grup
+- ⏰ Pengingat & game — `.remind` dan Family 100
 - 📱 Jalan di Termux, tanpa root. Tanpa yt-dlp, tanpa ffmpeg
 
 ---
@@ -64,7 +65,7 @@ Kirim `.menu` di WhatsApp buat liat daftar live + alias.
 <summary>Lihat semua command</summary>
 
 **Ngobrol**
-`.ai` — chat agen · `.menu` — list semua · `.wiki` — cari Wikipedia · `.setlang` — ganti bahasa
+`.ai` — chat agen · `.menu` — list semua · `.wiki` — cari Wikipedia · `.setlang` — ganti bahasa · `.remind` — pengingat
 
 **Stiker & media** (reply foto/video/stiker)
 `.sticker` — → stiker · `.toimg` — stiker → foto · `.brat` — teks → meme stiker · `.toaudio` — video → audio · `.hd` — upscale AI 2x
@@ -74,7 +75,10 @@ Kirim `.menu` di WhatsApp buat liat daftar live + alias.
 `.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **Grup** (khusus admin/owner)
-`.kick` · `.promote` · `.demote` · `.add`
+`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — anti-link per grup
+
+**Game**
+`.family100` — kuis Family 100
 
 **Khusus owner**
 `.mode` (public/self/private) · `.prefix` · `.limit` (10–2048 MB) · `.update`
@@ -134,7 +138,7 @@ Jalanin `termux-wake-lock`.
 
 ## 🤝 Kontribusi
 
-Codebase kecil yang malas — jaga tetap begitu. Nemu bug / punya ide? [Buka issue](https://github.com/salsabytes/Wakaru/issues). PR welcome. Mau nanya-nanya? Mampir ke [Discord](https://discord.gg/WXk69eF4A).
+Codebase kecil yang malas — jaga tetap begitu. Nemu bug / punya ide? [Buka issue](https://github.com/salsabytes/Wakaru/issues). PR welcome. Mau nanya-nanya? Gabung ke [grup WhatsApp](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD).
 
 [MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Rilis](https://github.com/salsabytes/Wakaru/releases) · Dibangun di atas [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Node + Rust
 

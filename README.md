@@ -7,11 +7,11 @@
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
 [![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WXk69eF4A)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-join-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)
 
 <p>🌐 <b>English</b> · <a href="README.id.md">Bahasa Indonesia</a> · <a href="README.ja.md">日本語</a></p>
 
-<img src="https://c.tenor.com/3ItItqL53f4AAAAC/tenor.gif" alt="Wakaru — anime banner" width="250" />
+<img src="https://media.tenor.com/V-HpxdEazJMAAAAC/moon-purple.gif" alt="Wakaru — anime banner" width="500" />
 
 </div>
 
@@ -51,7 +51,8 @@ Pairing code login: `npm run start:pairing` or set `PAIRING_CODE=1`.
 - 🧠 `.ai` — chat + runs commands for you (`@run:`), remembers context
 - 🎬 Downloaders — YouTube, TikTok, IG, FB, Pinterest, SoundCloud, Spotify, X
 - 🖼️ Stickers & media — photo/video → sticker, sticker → photo, video → audio, AI upscale
-- 👥 Group tools — kick / promote / demote / add
+- 👥 Group tools — kick / promote / demote / add, per-group anti-link
+- ⏰ Reminders & games — `.remind` and Family 100
 - 📱 Runs on Termux, no root. No yt-dlp, no ffmpeg
 
 ---
@@ -64,7 +65,7 @@ Send `.menu` in WhatsApp for the live list with aliases.
 <summary>Show all commands</summary>
 
 **Chat**
-`.ai` — agentic chat · `.menu` — list all · `.wiki` — Wikipedia search · `.setlang` — switch language
+`.ai` — agentic chat · `.menu` — list all · `.wiki` — Wikipedia search · `.setlang` — switch language · `.remind` — reminders
 
 **Stickers & media** (reply to a photo/video/sticker)
 `.sticker` — → sticker · `.toimg` — sticker → photo · `.brat` — text → meme sticker · `.toaudio` — video → audio · `.hd` — 2x AI upscale
@@ -74,7 +75,10 @@ Send `.menu` in WhatsApp for the live list with aliases.
 `.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **Group** (admins/owner only)
-`.kick` · `.promote` · `.demote` · `.add`
+`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — per-group anti-link
+
+**Games**
+`.family100` — Family 100 quiz
 
 **Owner only**
 `.mode` (public/self/private) · `.prefix` · `.limit` (10–2048 MB) · `.update`
@@ -134,7 +138,7 @@ Run `termux-wake-lock`.
 
 ## 🤝 Contributing
 
-Small lazy codebase — keep it that way. Bug or idea? [Open an issue](https://github.com/salsabytes/Wakaru/issues). PRs welcome. Questions? Hang out on [Discord](https://discord.gg/WXk69eF4A).
+Small lazy codebase — keep it that way. Bug or idea? [Open an issue](https://github.com/salsabytes/Wakaru/issues). PRs welcome. Questions? Join the [WhatsApp group](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD).
 
 [MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Releases](https://github.com/salsabytes/Wakaru/releases) · Built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Node + Rust
 

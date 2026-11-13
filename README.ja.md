@@ -7,11 +7,11 @@
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
 [![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WXk69eF4A)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-join-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)
 
 <p>🌐 <a href="README.md">English</a> · <a href="README.id.md">Bahasa Indonesia</a> · <b>日本語</b></p>
 
-<img src="assets/wakaru-banner.gif" alt="Wakaru — anime banner" width="820" />
+<img src="https://media.tenor.com/V-HpxdEazJMAAAAC/moon-purple.gif" alt="Wakaru — anime banner" width="500" />
 
 </div>
 
@@ -51,7 +51,8 @@ npm run start           # or: npm run start:pairing
 - 🧠 `.ai` — 会話＋コマンド代行（`@run:`）、文脈を記憶
 - 🎬 ダウンローダー — YouTube、TikTok、IG、FB、Pinterest、SoundCloud、Spotify、X
 - 🖼️ ステッカー＆メディア — 写真・動画→ステッカー、ステッカー→画像、動画→音声、AIアップスケール
-- 👥 グループ管理 — kick / promote / demote / add
+- 👥 グループ管理 — kick / promote / demote / add、グループごとのリンク対策
+- ⏰ リマインダー＆ゲーム — `.remind` と Family 100
 - 📱 Termuxで動く、root不要。yt-dlp・ffmpegなし
 
 ---
@@ -64,7 +65,7 @@ npm run start           # or: npm run start:pairing
 <summary>全コマンドを表示</summary>
 
 **チャット**
-`.ai` — エージェント会話 · `.menu` — 一覧 · `.wiki` — Wikipedia検索 · `.setlang` — 言語切替
+`.ai` — エージェント会話 · `.menu` — 一覧 · `.wiki` — Wikipedia検索 · `.setlang` — 言語切替 · `.remind` — リマインダー
 
 **ステッカー＆メディア**（写真・動画・ステッカーに返信）
 `.sticker` — →ステッカー · `.toimg` — ステッカー→画像 · `.brat` — テキスト→ミーム · `.toaudio` — 動画→音声 · `.hd` — 2x AIアップスケール
@@ -74,7 +75,10 @@ npm run start           # or: npm run start:pairing
 `.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **グループ**（管理者／ownerのみ）
-`.kick` · `.promote` · `.demote` · `.add`
+`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — グループごとのリンク対策
+
+**ゲーム**
+`.family100` — Family 100 クイズ
 
 **ownerのみ**
 `.mode`（public/self/private） · `.prefix` · `.limit`（10–2048MB） · `.update`
@@ -134,7 +138,7 @@ npm run start           # or: npm run start:pairing
 
 ## 🤝 コントリビュート
 
-小さく怠惰なコードベース — そのままに。バグ・要望は[issueへ](https://github.com/salsabytes/Wakaru/issues)。PR歓迎。質問は[Discordへ](https://discord.gg/WXk69eF4A)。
+小さく怠惰なコードベース — そのままに。バグ・要望は[issueへ](https://github.com/salsabytes/Wakaru/issues)。PR歓迎。質問は[WhatsAppグループへ](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)。
 
 [MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [リリース](https://github.com/salsabytes/Wakaru/releases) · [Baileys](https://github.com/whiskeysockets/Baileys)＋TypeScript＋Node＋Rust
 
