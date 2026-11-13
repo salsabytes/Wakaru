@@ -30,6 +30,7 @@ const placeholderResendCache = new NodeCache({ stdTTL: 5 * 60 }) as CacheStore
 const groupCache = new NodeCache({ stdTTL: 5 * 60, maxKeys: 100 }) as CacheStore
 
 export let waka: WASocket
+export const getSock = (): WASocket | undefined => waka
 let isShuttingDown = false
 let isAskingPairingCode = false
 let reconnectAttempts = 0

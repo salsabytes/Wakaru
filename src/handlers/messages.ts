@@ -12,11 +12,57 @@ import { aiHasHistory } from '../lib/aiHistory.ts'
 import { rememberAiMedia } from '../lib/aiMediaMemory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 import { pendingF100, handleF100Answer } from '../commands/game/family100.ts'
+import { handleAntilinkMaxInput } from '../commands/group/antilink.ts'
 import { participantMaps } from '../lib/group.ts'
+import { addAntilinkWarn, antilinkConfig, resetAntilinkWarns } from '../lib/groupSettings.ts'
 
 // commands run concurrently (globally slot-capped) so a slow downloader never blocks other chats
 const dispatch = (msg: WAMessage, m: SerializedMessage, jid: string): void => {
   void maybeRunCommand(msg, m, jid).catch((err) => logger.error('command error:', err))
+}
+
+const LINK_RE = /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/|wa\.me\/)/i
+
+const adminNums = async (chat: string): Promise<Set<string> | undefined> => {
+  const met = await waka.groupMetadata(chat).catch(() => undefined)
+  if (!met) return undefined
+  const { byPart } = participantMaps(met)
+  const out = new Set<string>()
+  for (const [num, p] of byPart) if (p.admin) out.add(num)
+  return out
+}
+
+const checkAntilink = async (msg: WAMessage, m: SerializedMessage, jid: string): Promise<boolean> => {
+  if (!m.isGroup) return false
+  const cfg = antilinkConfig(m.chat)
+  if (!cfg.on) return false
+  if (isOwner(m.sender)) return false
+  if (!m.text || !LINK_RE.test(m.text)) return false
+  // admins and the bot are immune
+  const botNum = waka.user?.id?.split(':')[0].split('@')[0]
+  const senderNum = m.sender.split(/[@:]/)[0]
+  if (botNum && senderNum === botNum) return false
+  const admins = await adminNums(m.chat)
+  if (admins?.has(senderNum)) return false
+
+  try {
+    await waka.sendMessage(m.chat, { delete: msg.key as any })
+  } catch (e) {
+    logger.warn('antilink: delete failed (bot not admin?)', e)
+  }
+  // delete silently. replying would surface the link again
+  // kick is per group. off = delete only
+  if (!cfg.kick) return true
+  const strikes = addAntilinkWarn(m.chat, senderNum)
+  if (strikes >= cfg.maxWarn) {
+    try {
+      await waka.groupParticipantsUpdate(m.chat, [m.sender], 'remove')
+      resetAntilinkWarns(m.chat, senderNum)
+    } catch (e) {
+      logger.warn('antilink: kick failed (bot not admin?)', e)
+    }
+  }
+  return true
 }
 
 const lidCache = new Map<string, string>()
@@ -70,6 +116,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
         }
       }
       if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
+      if (await checkAntilink(msg, m, jid)) continue
       if (!m.button) continue
       logger.info(`🔘 ${jid} [append]: ${m.button.text || m.button.id}`)
       dispatch(msg, m, jid)
@@ -89,7 +136,8 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
       void rememberAiMedia(m, sender).catch((err) => logger.warn('ai media remember error:', err))
       continue
     }
-    logger.info(m.button ? `dY"~ ${jid}: ${m.button.text || m.button.id}` : `dY"� ${jid}: ${m.text}`)
+    if (await checkAntilink(msg, m, jid)) continue
+    logger.info(m.button ? `🔘 ${jid}: ${m.button.text || m.button.id}` : `💬 ${jid}: ${m.text}`)
     dispatch(msg, m, jid)
   }
 }
@@ -113,6 +161,12 @@ const aiFallback = async (m: SerializedMessage, sender: string, text: string): P
 }
 
 const parseCommand = async (m: SerializedMessage, sender: string, text: string): Promise<Parsed> => {
+  // button taps go back to the command that owns them
+  const bid = m.button?.id
+  if (bid?.startsWith('antilink:')) {
+    const parts = bid.slice('antilink:'.length).split(':').filter(Boolean)
+    return { cmd: await getCommand('antilink'), queryText: parts.join(' '), args: parts }
+  }
   const direct = prefixBody(text)
   if (direct !== undefined) {
     const [rawName, ...rest] = direct.split(/\s+/)
@@ -174,6 +228,11 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
 
   if (pendingF100(m.chat) && !m.fromMe && !usedPrefix(text) && text.trim()) {
     if (await handleF100Answer({ sock: waka, chat: m.chat, reply: send.text }, sender, text, msg.pushName ?? undefined)) return
+  }
+
+  // "max warn" input: eat the next text from the admin who tapped
+  if (!m.fromMe && text.trim() && !usedPrefix(text)) {
+    if (await handleAntilinkMaxInput(m.chat, sender, text, send)) return
   }
 
   const { cmd, queryText, args } = await parseCommand(m, sender, text)

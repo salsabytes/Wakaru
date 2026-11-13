@@ -12,13 +12,52 @@ export const curl = (args: string[], timeout = 60_000): Promise<Buffer> =>
     })
   })
 
+export const fetchWithTimeout = async (
+  input: any,
+  init: RequestInit & { timeout?: number } = {},
+): Promise<Response> => {
+  const { timeout = 60_000, signal, ...rest } = init
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(new Error('request timeout')), timeout)
+  const merged = signal
+    ? (() => {
+        const c2 = new AbortController()
+        const onAbort = () => c2.abort(signal.reason ?? new Error('aborted'))
+        signal.addEventListener('abort', onAbort, { once: true })
+        ctrl.signal.addEventListener('abort', () => c2.abort(ctrl.signal.reason), { once: true })
+        return { signal: c2.signal, ...rest }
+      })()
+    : { signal: ctrl.signal, ...rest }
+  try {
+    return await fetch(input, merged as RequestInit)
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+export const withRetry = async <T>(fn: () => Promise<T>, opts: { retries?: number; delayMs?: number } = {}): Promise<T> => {
+  const retries = opts.retries ?? 1
+  const delayMs = opts.delayMs ?? 500
+  let lastErr: unknown
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastErr = e
+      if (i === retries) break
+      await new Promise((r) => setTimeout(r, delayMs * (i + 1)))
+    }
+  }
+  throw lastErr
+}
+
 // WA caps media around ~64MB; peak RAM while downloading ≈2-3× file size
 export const fetchBuffer = async (
   url: string,
-  opts: { headers?: Record<string, string>; maxBytes?: number; timeout?: number; onHeaders?: (h: Headers) => void } = {},
+  opts: { headers?: Record<string, string>; maxBytes?: number; timeout?: number; onHeaders?: (h: Headers) => void; method?: string; body?: string } = {},
 ): Promise<Buffer> => {
   const maxBytes = opts.maxBytes ?? botMaxDownloadMB() * 1024 * 1024
-  const res = await fetch(url, { headers: opts.headers, signal: AbortSignal.timeout(opts.timeout ?? 300_000) })
+  const res = await fetch(url, { method: opts.method, body: opts.body, headers: opts.headers, signal: AbortSignal.timeout(opts.timeout ?? 300_000) })
   if (!res.ok) {
     const snippet = await res.text().then((t) => t.slice(0, 200)).catch(() => '')
     throw new Error(`download http ${res.status}${snippet ? `: ${snippet}` : ''}`)

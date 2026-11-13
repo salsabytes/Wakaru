@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process'
 import { chmodSync } from 'node:fs'
 import { join } from 'node:path'
-import { connectToWhatsApp, shutdown } from './socket.ts'
+import { connectToWhatsApp, shutdown, getSock } from './socket.ts'
 import { handleMessagesUpsert } from './handlers/messages.ts'
 import { logger } from './lib/logger.ts'
 import { checkForUpdate } from './lib/updater.ts'
+import { getDueReminders } from './lib/reminders.ts'
 import pkg from '../package.json' with { type: 'json' }
 
 // libsignal logs its session lifecycle to console.info/warn on every media send —
@@ -55,8 +56,31 @@ process.on('unhandledRejection', (err) => {
   logger.error('Unhandled rejection:', err)
 })
 
+const startReminderLoop = () => {
+  setInterval(async () => {
+    try {
+      const due = getDueReminders()
+      if (!due.length) return
+      const sock = getSock()
+      if (!sock) return
+      for (const r of due) {
+        try {
+          await sock.sendMessage(r.chat, { text: `🔔 Pengingat\n\n${r.text}` })
+        } catch (e) {
+          logger.warn('reminder: failed to send', e)
+        }
+      }
+    } catch (e) {
+      logger.warn('reminder: loop error', e)
+    }
+  }, 30_000)
+}
+
 connectToWhatsApp(handleMessagesUpsert)
-  .then(() => checkForUpdate())
+  .then(() => {
+    startReminderLoop()
+    checkForUpdate()
+  })
   .catch((err) => {
     logger.error('Failed to start bot:', err)
     process.exit(1)
