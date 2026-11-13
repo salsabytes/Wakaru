@@ -1,4 +1,4 @@
-import { addReminder, getDueReminders, listReminders, removeReminder } from '../../lib/reminders.ts'
+import { addReminder, listReminders, removeReminder } from '../../lib/reminders.ts'
 import { parseDuration, formatDuration } from '../../lib/time.ts'
 import { isOwner } from '../../lib/config.ts'
 

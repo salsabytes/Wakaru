@@ -8,6 +8,7 @@ export interface Reminder {
   text: string
   dueAt: number // epoch ms
   createdAt: number
+  attempts?: number // failed send attempts (retried before giving up)
 }
 
 const FILE = 'reminders.json'
@@ -46,17 +47,24 @@ export const removeReminder = (id: number, filter?: Partial<Pick<Reminder, 'chat
   return true
 }
 
-export const getDueReminders = (now = Date.now()): Reminder[] => {
-  const out: Reminder[] = []
-  for (let i = state.length - 1; i >= 0; i--) {
-    const r = state[i]
-    if (r.dueAt <= now) {
-      out.push(r)
-      state.splice(i, 1)
-    }
-  }
-  if (out.length) persist()
-  return out
+// Peek only — the reminder leaves the store after the send succeeds, so a
+// failed send (offline, rate limit) gets retried instead of disappearing.
+export const getDueReminders = (now = Date.now()): Reminder[] =>
+  state.filter((r) => r.dueAt <= now).sort((a, b) => a.dueAt - b.dueAt)
+
+export const completeReminder = (id: number): void => {
+  const idx = state.findIndex((r) => r.id === id)
+  if (idx === -1) return
+  state.splice(idx, 1)
+  persist()
+}
+
+export const rescheduleReminder = (id: number, dueAt: number, attempts: number): void => {
+  const r = state.find((x) => x.id === id)
+  if (!r) return
+  r.dueAt = dueAt
+  r.attempts = attempts
+  persist()
 }
 
 const persist = async () => {

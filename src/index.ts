@@ -5,7 +5,7 @@ import { connectToWhatsApp, shutdown, getSock } from './socket.ts'
 import { handleMessagesUpsert } from './handlers/messages.ts'
 import { logger } from './lib/logger.ts'
 import { checkForUpdate } from './lib/updater.ts'
-import { getDueReminders } from './lib/reminders.ts'
+import { completeReminder, getDueReminders, rescheduleReminder } from './lib/reminders.ts'
 import pkg from '../package.json' with { type: 'json' }
 
 // libsignal logs its session lifecycle to console.info/warn on every media send —
@@ -56,8 +56,14 @@ process.on('unhandledRejection', (err) => {
   logger.error('Unhandled rejection:', err)
 })
 
+const MAX_REMINDER_ATTEMPTS = 3
+const REMINDER_RETRY_MS = 5 * 60_000
+
 const startReminderLoop = () => {
+  let running = false
   setInterval(async () => {
+    if (running) return
+    running = true
     try {
       const due = getDueReminders()
       if (!due.length) return
@@ -66,12 +72,22 @@ const startReminderLoop = () => {
       for (const r of due) {
         try {
           await sock.sendMessage(r.chat, { text: `🔔 Pengingat\n\n${r.text}` })
+          completeReminder(r.id)
         } catch (e) {
-          logger.warn('reminder: failed to send', e)
+          const attempts = (r.attempts ?? 0) + 1
+          if (attempts >= MAX_REMINDER_ATTEMPTS) {
+            logger.warn(`reminder #${r.id}: giving up after ${attempts} attempts`, e)
+            completeReminder(r.id)
+          } else {
+            rescheduleReminder(r.id, Date.now() + REMINDER_RETRY_MS, attempts)
+            logger.warn(`reminder #${r.id}: retry ${attempts}/${MAX_REMINDER_ATTEMPTS}`, e)
+          }
         }
       }
     } catch (e) {
       logger.warn('reminder: loop error', e)
+    } finally {
+      running = false
     }
   }, 30_000)
 }
