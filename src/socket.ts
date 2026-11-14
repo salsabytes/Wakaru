@@ -16,7 +16,7 @@ import {
 } from 'baileys'
 import { getMessage } from './lib/store.ts'
 import { botMarkOnline } from './lib/config.ts'
-import { flushAll } from './lib/disk.ts'
+import { flushAll, whenIdle } from './lib/disk.ts'
 import { logger } from './lib/logger.ts'
 
 const SESSION_DIR = process.env.SESSION_DIR ?? 'sessions'
@@ -125,6 +125,7 @@ export async function shutdown(signal: string): Promise<void> {
   if (reconnectTimer) clearTimeout(reconnectTimer)
   logger.info(`Received ${signal} — shutting down...`)
   flushAll() // don't lose the last throttle window of chat history
+  await whenIdle() // and let in-flight writes finish before exiting
   try {
     await waka?.end(new Error('Bot stopped manually'))
   } catch (err) {

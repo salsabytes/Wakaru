@@ -9,9 +9,26 @@ const SUMMARY_MAX = 600
 const FACTS_MAX = 10
 const FACT_MAX = 160
 
+export const MEMORY_MAX_KEYS = 2000
+
 type Mem = { summary: string; facts: string[]; updatedAt: number }
 
 const mem = new Map<string, Mem>()
+
+const pruneOldest = (): void => {
+  while (mem.size > MEMORY_MAX_KEYS) {
+    let oldestKey: string | undefined
+    let oldestAt = Infinity
+    for (const [k, v] of mem) {
+      if (v.updatedAt < oldestAt) {
+        oldestAt = v.updatedAt
+        oldestKey = k
+      }
+    }
+    if (!oldestKey) return
+    mem.delete(oldestKey)
+  }
+}
 
 const trim = (s: string, max: number): string => {
   const t = String(s || '').replace(/\s+/g, ' ').trim()
@@ -30,6 +47,7 @@ const load = (): void => {
       : []
     mem.set(k, { summary, facts, updatedAt: Number(v.updatedAt) || Date.now() })
   }
+  pruneOldest()
 }
 
 load()
@@ -48,12 +66,14 @@ export function addFacts(key: string, facts: string[]): void {
     nextFacts.push(f)
   }
   mem.set(key, { summary: cur.summary, facts: nextFacts.slice(-FACTS_MAX), updatedAt: Date.now() })
+  pruneOldest()
   saveJson('ai-memory.json')
 }
 
 export function setSummary(key: string, summary: string): void {
   const cur = getMemory(key)
   mem.set(key, { summary: trim(summary, SUMMARY_MAX), facts: cur.facts, updatedAt: Date.now() })
+  pruneOldest()
   saveJson('ai-memory.json')
 }
 

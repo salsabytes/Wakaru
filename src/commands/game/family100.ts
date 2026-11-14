@@ -5,6 +5,13 @@ type Q = { soal: string; jawaban: string[] }
 type Game = { chat: string; q: Q; open: boolean[]; by: (string | null)[]; at: number }
 const games = new Map<string, Game>()
 const TTL = 3 * 60_000
+const GAMES_MAX = 500
+
+const pruneGames = (): void => {
+  const now = Date.now()
+  for (const [chat, g] of games) if (now - g.at > TTL) games.delete(chat)
+  while (games.size > GAMES_MAX) games.delete(games.keys().next().value!)
+}
 
 type ApiQ = { ok: boolean; total: number; id: number; soal: string; jawaban: string[] }
 
@@ -102,6 +109,7 @@ export default {
       return ctx.reply(`❌ Gagal ambil soal Family 100: ${(err as Error).message}`)
     }
     const g: Game = { chat: ctx.chat, q, open: q.jawaban.map(() => false), by: q.jawaban.map(() => null), at: Date.now() }
+    pruneGames()
     games.set(ctx.chat, g)
     await renderF100(ctx, g, 'Mulai! Ketik jawabanmu langsung (tanpa perintah).')
   },

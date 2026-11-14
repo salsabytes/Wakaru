@@ -1,5 +1,8 @@
 import { wakafy } from '../../lib/wakafy.ts'
 import { requireUrl, sendMediaOrCarousel } from '../../lib/media.ts'
+import { scraperErrorKey } from '../../lib/scrapers/index.ts'
+import { logger } from '../../lib/logger.ts'
+import { tx } from '../../lib/lang.ts'
 
 export default {
   name: 'facebook',
@@ -9,8 +12,13 @@ export default {
   run: async (ctx: CommandContext) => {
     const url = await requireUrl(ctx, 'facebook', '<facebook link>')
     if (!url) return
-    // the whole FB flow in one call: resolve via wakafy direct+meta, pull items straight from CDN
-    const r = await wakafy.media('/v1/media/fbdl', url, { label: 'facebook' })
-    await sendMediaOrCarousel(ctx, r)
+    try {
+      // one wakafy call: resolve the post, then fetch items straight from CDN
+      const r = await wakafy.media('/v1/media/fbdl', url, { label: 'facebook' })
+      await sendMediaOrCarousel(ctx, r)
+    } catch (e) {
+      logger.warn('facebook download failed:', (e as Error).message)
+      await ctx.reply(await tx(scraperErrorKey(e)))
+    }
   },
 } satisfies Command

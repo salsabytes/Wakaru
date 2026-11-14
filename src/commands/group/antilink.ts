@@ -15,6 +15,13 @@ const onOff = (w: string): boolean | undefined =>
 // "max warn" = tap button, then type a number
 const pending = new Map<string, number>()
 const PENDING_TTL = 2 * 60_000
+const PENDING_MAX = 500
+
+const prunePending = (now = Date.now()): void => {
+  for (const [key, at] of pending) if (now - at > PENDING_TTL) pending.delete(key)
+  while (pending.size > PENDING_MAX) pending.delete(pending.keys().next().value!)
+}
+
 const keyOf = (chat: string, sender: string): string => `${chat}:${sender}`
 const dropPending = (chat: string, sender: string): void => {
   pending.delete(keyOf(chat, sender))
@@ -107,6 +114,7 @@ export default {
         setAntilinkMaxWarn(ctx.chat, n)
       } else {
         // no number yet, ask for it
+        prunePending()
         pending.set(keyOf(ctx.chat, ctx.sender), Date.now())
         return ctx.reply(
           `Ketik angka ${ANTILINK_MAX_WARN_MIN}-${ANTILINK_MAX_WARN_MAX} untuk batas maksimal warn sebelum kick.\nKetik "batal" buat berhenti.`,

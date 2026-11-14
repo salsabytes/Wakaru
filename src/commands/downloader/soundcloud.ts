@@ -1,6 +1,7 @@
-import { downloadSoundCloud, isScraperError } from '../../lib/scrapers/index.ts'
+import { downloadSoundCloud, scraperErrorKey } from '../../lib/scrapers/index.ts'
 import { oversizedDoc, requireUrl } from '../../lib/media.ts'
 import { tx } from '../../lib/lang.ts'
+import { logger } from '../../lib/logger.ts'
 
 export default {
   name: 'soundcloud',
@@ -17,12 +18,8 @@ export default {
       if (doc) return ctx.sendDocument(doc.buf, doc.name, doc.mime)
       await ctx.sendAudio(r.buf, r.title)
     } catch (e) {
-      if (isScraperError(e)) {
-        if (e.type === 'private' || e.type === 'blocked') return ctx.reply('❌ Track ini private/terbatas.')
-        if (e.type === 'notfound') return ctx.reply('❌ Track tidak ditemukan atau sudah dihapus.')
-        if (e.type === 'rate_limited') return ctx.reply('❌ Terlalu banyak permintaan. Coba lagi nanti.')
-      }
-      throw e
+      logger.warn('soundcloud download failed:', (e as Error).message)
+      return ctx.reply(await tx(scraperErrorKey(e)))
     }
   },
 } satisfies Command

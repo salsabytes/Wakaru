@@ -1,5 +1,4 @@
-import { readFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs'
-import { join } from 'node:path'
+import { readJson, register, saveJsonNow } from '../disk.ts'
 
 export interface CachedDownload {
   url: string
@@ -11,27 +10,31 @@ export interface CachedDownload {
 
 const CACHE_FILE = 'dl-cache.json'
 const DEFAULT_TTL = 6 * 60 * 60 * 1000 // 6 hours
+const MAX_ENTRIES = 500
 
-const DATA_DIR = join(import.meta.dirname, '..', '..', 'data')
 const cache = new Map<string, CachedDownload>()
+let loaded = false
 
-const readJson = <T>(file: string, fallback: T): T => {
-  try {
-    return JSON.parse(readFileSync(join(DATA_DIR, file), 'utf8')) as T
-  } catch {
-    return fallback
-  }
+const keyOf = (url: string): string => url.trim()
+
+const load = (): void => {
+  if (loaded) return
+  loaded = true
+  const now = Date.now()
+  const rows = Object.entries(readJson<Record<string, CachedDownload>>(CACHE_FILE, {}))
+    .filter(([, v]) => v && typeof v.ts === 'number' && now - v.ts <= DEFAULT_TTL)
+    .sort((a, b) => a[1].ts - b[1].ts)
+    .slice(-MAX_ENTRIES)
+  for (const [k, v] of rows) cache.set(k, v)
 }
 
-function load() {
-  if (cache.size) return
-  const data = readJson<Record<string, CachedDownload>>(CACHE_FILE, {})
-  for (const [k, v] of Object.entries(data)) {
-    if (v) cache.set(k, v)
-  }
-}
+register(CACHE_FILE, () => Object.fromEntries(cache))
 
-const keyOf = (url: string) => url.trim()
+const trim = (): void => {
+  if (cache.size <= MAX_ENTRIES) return
+  const rows = [...cache.entries()].sort((a, b) => a[1].ts - b[1].ts)
+  for (const [k] of rows.slice(0, cache.size - MAX_ENTRIES)) cache.delete(k)
+}
 
 export const getCachedDownload = (url: string, ttl = DEFAULT_TTL): CachedDownload | undefined => {
   load()
@@ -45,25 +48,17 @@ export const getCachedDownload = (url: string, ttl = DEFAULT_TTL): CachedDownloa
   return v
 }
 
-export const setCachedDownload = (url: string, v: Partial<CachedDownload>) => {
+export const setCachedDownload = (url: string, v: Partial<CachedDownload>): void => {
   load()
   const k = keyOf(url)
   const existing = cache.get(k)
-  cache.set(k, {
-    url: k,
-    ts: Date.now(),
-    ...existing,
-    ...v,
-  })
-  // save in background
-  try {
-    mkdirSync(DATA_DIR, { recursive: true })
-    const tmp = join(DATA_DIR, `${CACHE_FILE}.tmp`)
-    writeFileSync(tmp, JSON.stringify(Object.fromEntries(cache)))
-    renameSync(tmp, join(DATA_DIR, CACHE_FILE))
-  } catch {}
+  cache.set(k, { url: k, ts: Date.now(), ...existing, ...v })
+  trim()
+  void saveJsonNow(CACHE_FILE)
 }
 
-export const clearDownloadCache = () => {
+export const clearDownloadCache = (): void => {
+  load()
   cache.clear()
+  void saveJsonNow(CACHE_FILE)
 }

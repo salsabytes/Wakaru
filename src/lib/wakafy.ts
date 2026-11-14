@@ -83,13 +83,26 @@ export const wakafy = {
   async file(
     path: string,
     params: Record<string, string | undefined> = {},
-    opts: { strip?: RegExp; timeout?: number; maxBytes?: number } = {},
+    opts: { strip?: RegExp; timeout?: number; maxBytes?: number; method?: 'GET' | 'POST' } = {},
   ): Promise<{ buf: Buffer; title: string }> {
     // title starts as the source url, upgraded from response headers when present
     let title = params.url ?? ''
     try {
-      const buf = await fetchBuffer(this.url(path, params), {
-        headers: this.headers(),
+      const method = opts.method ?? 'GET'
+      const headers = this.headers()
+      let url: string
+      let body: string | undefined
+      if (method === 'POST') {
+        url = this.url(path)
+        headers['Content-Type'] = 'application/json'
+        body = JSON.stringify(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined)))
+      } else {
+        url = this.url(path, params)
+      }
+      const buf = await fetchBuffer(url, {
+        method,
+        body,
+        headers,
         timeout: opts.timeout,
         maxBytes: opts.maxBytes,
         onHeaders: (h) => {

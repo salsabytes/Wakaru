@@ -1,7 +1,8 @@
-import { downloadTikTok, isScraperError } from '../../lib/scrapers/index.ts'
+import { downloadTikTok, scraperErrorKey } from '../../lib/scrapers/index.ts'
 import { oversizedDoc, requireUrl, asDoc } from '../../lib/media.ts'
 import { videoPlayability } from '../../lib/sender.ts'
 import { tx } from '../../lib/lang.ts'
+import { logger } from '../../lib/logger.ts'
 
 export default {
   name: 'tiktok',
@@ -19,8 +20,7 @@ export default {
         await ctx.sendDocument(doc.buf, doc.name, doc.mime)
         return
       }
-      // 1080p60/HEVC files arrive fine but WA's inline player won't play them —"
-      // send as .mp4 document so they still open in an external player
+      // WA's inline player can't play 1080p60/HEVC; send a document instead
       if (videoPlayability(r.buf) === 'heavy') {
         const d = asDoc(media)
         await ctx.sendDocument(d.buf, d.name, d.mime)
@@ -29,13 +29,8 @@ export default {
       }
       await ctx.sendVideo(r.buf, r.title)
     } catch (e) {
-      if (isScraperError(e)) {
-        if (e.type === 'private') return ctx.reply('❌ Video ini private / hanya bisa diakses login.')
-        if (e.type === 'notfound') return ctx.reply('❌ Video tidak ditemukan atau sudah dihapus.')
-        if (e.type === 'blocked') return ctx.reply('❌ Video diblokir/terbatas wilayah.')
-        if (e.type === 'rate_limited') return ctx.reply('❌ Terlalu banyak permintaan. Coba lagi nanti.')
-      }
-      throw e
+      logger.warn('tiktok download failed:', (e as Error).message)
+      return ctx.reply(await tx(scraperErrorKey(e)))
     }
   },
 } satisfies Command

@@ -1,5 +1,4 @@
-import { readJson } from './disk.ts'
-import { logger } from './logger.ts'
+import { readJson, register, saveJsonNow } from './disk.ts'
 
 export interface Reminder {
   id: number
@@ -13,6 +12,7 @@ export interface Reminder {
 
 const FILE = 'reminders.json'
 const state: Reminder[] = readJson<Reminder[]>(FILE, [])
+register(FILE, () => state)
 
 let nextId = state.reduce((m, r) => Math.max(m, r.id), 0) + 1
 
@@ -67,16 +67,6 @@ export const rescheduleReminder = (id: number, dueAt: number, attempts: number):
   persist()
 }
 
-const persist = async () => {
-  try {
-    const { DATA_DIR } = await import('./disk.ts')
-    const { mkdir, writeFile, rename } = await import('node:fs/promises')
-    const { join } = await import('node:path')
-    await mkdir(DATA_DIR, { recursive: true })
-    const tmp = join(DATA_DIR, `${FILE}.tmp`)
-    await writeFile(tmp, JSON.stringify(state))
-    await rename(tmp, join(DATA_DIR, FILE))
-  } catch (e) {
-    logger.warn('reminders: persist failed', e)
-  }
+const persist = (): void => {
+  void saveJsonNow(FILE)
 }

@@ -1,7 +1,4 @@
-import { readJson } from './disk.ts'
-import { mkdir, writeFile, rename } from 'node:fs/promises'
-import { join } from 'node:path'
-import { DATA_DIR } from './disk.ts'
+import { readJson, register, saveJsonNow } from './disk.ts'
 
 export interface GroupSettings {
   antilink?: boolean
@@ -15,15 +12,11 @@ export const ANTILINK_MAX_WARN_MIN = 1
 export const ANTILINK_MAX_WARN_MAX = 10
 
 const FILE = 'groups.json'
-let store = readJson<Record<string, GroupSettings>>(FILE, {})
+const store = readJson<Record<string, GroupSettings>>(FILE, {})
+register(FILE, () => store)
 
-const persist = async () => {
-  try {
-    await mkdir(DATA_DIR, { recursive: true })
-    const tmp = join(DATA_DIR, `${FILE}.tmp`)
-    await writeFile(tmp, JSON.stringify(store))
-    await rename(tmp, join(DATA_DIR, FILE))
-  } catch {}
+const persist = (): void => {
+  void saveJsonNow(FILE)
 }
 
 export const getGroupSettings = (jid: string): GroupSettings => store[jid] ?? {}
@@ -41,7 +34,7 @@ export const antilinkConfig = (jid: string): { on: boolean; kick: boolean; maxWa
 export const setGroupSetting = (jid: string, key: keyof GroupSettings, val: any) => {
   if (!store[jid]) store[jid] = {}
   ;(store[jid] as any)[key] = val
-  void persist()
+  persist()
 }
 
 export const toggleAntilink = (jid: string, on?: boolean): boolean => {
@@ -51,14 +44,14 @@ export const toggleAntilink = (jid: string, on?: boolean): boolean => {
   store[jid].antilink = next
   // off clears strikes, so re-enabling starts fresh
   if (!next) delete store[jid].warns
-  void persist()
+  persist()
   return next
 }
 
 export const setAntilinkKick = (jid: string, on: boolean): boolean => {
   if (!store[jid]) store[jid] = {}
   store[jid].antilinkKick = on
-  void persist()
+  persist()
   return on
 }
 
@@ -69,7 +62,7 @@ export const setAntilinkMaxWarn = (jid: string, n: unknown): number => {
     : ANTILINK_DEFAULT_MAX_WARN
   if (!store[jid]) store[jid] = {}
   store[jid].antilinkMaxWarn = clamped
-  void persist()
+  persist()
   return clamped
 }
 
@@ -79,7 +72,7 @@ export const addAntilinkWarn = (jid: string, user: string): number => {
   const warns = (store[jid].warns ??= {})
   const n = (warns[user] ?? 0) + 1
   warns[user] = n
-  void persist()
+  persist()
   return n
 }
 
@@ -87,5 +80,5 @@ export const resetAntilinkWarns = (jid: string, user: string): void => {
   const warns = store[jid]?.warns
   if (!warns) return
   delete warns[user]
-  void persist()
+  persist()
 }

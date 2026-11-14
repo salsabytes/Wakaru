@@ -11,7 +11,7 @@
 
 <p>🌐 <b>English</b> · <a href="README.id.md">Bahasa Indonesia</a> · <a href="README.ja.md">日本語</a></p>
 
-<img src="https://media.tenor.com/V-HpxdEazJMAAAAC/moon-purple.gif" alt="Wakaru — anime banner" width="500" />
+<img src="https://media.tenor.com/ZafC06r3sksAAAAC/anime-anime-girl.gif" alt="Wakaru — anime girl banner" width="500" />
 
 </div>
 

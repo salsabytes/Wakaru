@@ -14,7 +14,14 @@ export interface PendingPlay {
 }
 
 const TTL = 3 * 60_000
+const PENDING_MAX = 500
 const pending = new Map<string, PendingPlay>()
+
+const prunePending = (): void => {
+  const now = Date.now()
+  for (const [key, p] of pending) if (now - p.at > TTL) pending.delete(key)
+  while (pending.size > PENDING_MAX) pending.delete(pending.keys().next().value!)
+}
 
 export const pendingPlay = (chat: string, sender: string): PendingPlay | undefined => {
   const p = pending.get(`${chat}:${sender}`)
@@ -100,16 +107,15 @@ export async function handlePlayPick(
     await send.react('✅', msg.key).catch(() => {})
   } catch (err) {
     logger.error('play download error:', err)
-    // the search stays alive so a source-side failure doesn't force a new search —
-    // the user can just reply with another number ("2 mp3")
+    // keep the search alive: a failed download shouldn't force a new search
+    prunePending()
     pending.set(`${m.chat}:${sender}`, { results: pick.results, at: Date.now() })
     await send.react('❌', msg.key).catch(() => {})
     const why = (err as Error).message
     // 422 "video tidak tersedia" is the source refusing, not a real error to dump raw
     const unavailable = /tidak tersedia|no disponible|not available|unsupported|422/i.test(why)
     if (unavailable && mode === 'audio') {
-      // the video route is a separate pipeline and often still works — offer it
-      // instead of leaving the user with nothing
+      // the video route often still works — offer it instead of failing
       await send.buttons(
         [
           { id: `play:${choice.index + 1}:mp4`, text: '🎬 Coba MP4' },
@@ -137,9 +143,10 @@ export default {
 
     const results = await searchYouTube(query)
     if (!results.length) return ctx.reply(await tx('noResults'))
+    prunePending()
     pending.set(`${ctx.chat}:${ctx.sender}`, { results, at: Date.now() })
 
-    // quick_reply buttons (not single_select — that renders blank on iOS); body stays replyable as "1 mp3"
+    // quick_reply, not single_select (blank on iOS); body still accepts "1 mp3" replies
     const numbered = results.map((r, i) => `${i + 1}. ${r.title.slice(0, 60)}`).join('\n')
     await ctx.sendButtons(
       [{ id: 'play:cancel', text: '❌ Batal' }],

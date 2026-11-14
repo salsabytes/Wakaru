@@ -27,6 +27,20 @@ export class ScraperError extends Error {
 
 export const isScraperError = (e: unknown): e is ScraperError => e instanceof ScraperError
 
+const ERROR_KEY: Record<ScraperErrorType, string> = {
+  private: 'scraperErrPrivate',
+  expired: 'scraperErrNotFound',
+  unsupported: 'scraperErrUnsupported',
+  notfound: 'scraperErrNotFound',
+  rate_limited: 'scraperErrRateLimited',
+  blocked: 'scraperErrBlocked',
+  network: 'scraperErrNetwork',
+  unknown: 'scraperErrUnknown',
+}
+
+// i18n key for any thrown download error.
+export const scraperErrorKey = (e: unknown): string => ERROR_KEY[classifyError(e).type]
+
 export const classifyError = (e: unknown, platform?: string): ScraperError => {
   if (isScraperError(e)) {
     if (platform && !e.platform) e.platform = platform

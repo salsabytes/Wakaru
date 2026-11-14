@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-export const DATA_DIR = join(import.meta.dirname, '..', '..', 'data')
+export const DATA_DIR = process.env.WAKARU_DATA_DIR ?? join(import.meta.dirname, '..', '..', 'data')
 
 export function readJson<T>(file: string, fallback: T): T {
   try {
@@ -68,6 +68,21 @@ export function saveJson(file: string, delay = 5000): void {
     timers.delete(file)
     void writeAsync(file)
   }, delay))
+}
+
+// Skip the save throttle — for stores that must survive a crash.
+export function saveJsonNow(file: string): Promise<void> {
+  const timer = timers.get(file)
+  if (timer) {
+    clearTimeout(timer)
+    timers.delete(file)
+  }
+  return writeAsync(file)
+}
+
+// Wait for in-flight writes (shutdown/tests).
+export async function whenIdle(): Promise<void> {
+  while (writing.size) await new Promise((r) => setTimeout(r, 10))
 }
 
 // Force-persist all pending saves (called during shutdown).
