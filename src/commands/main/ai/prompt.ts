@@ -31,10 +31,12 @@ async function buildContext(ctx: CommandContext): Promise<string> {
   if (ctx.quoted) {
     const qid = (ctx.quoted as any).id || (ctx.quoted as any).stanzaId
     const stored = qid ? messageStore.get(String(qid)) : undefined
-    const qType = String((ctx.quoted as any).mtype || 'message').replace(/Message$/, '')
+    const qRawType = String((ctx.quoted as any).mtype || '')
+    const qType = qRawType.replace(/Message$/, '')
     const storedDesc = stored ? describeMessage(stored, 500) : ''
     const qText = clip(ctx.quoted.text || '', 500)
-    const qLabel = qType && qType !== 'conversation' && qType !== 'extendedTextMessage' ? `[${qType}] ` : ''
+    const isText = qRawType === 'conversation' || qRawType === 'extendedTextMessage'
+    const qLabel = qType && !isText ? `[${qType}] ` : ''
     const qContent = storedDesc || (qText ? `${qLabel}${qText}` : qLabel.trim())
     const qFrom = ctx.quoted.sender ? String(ctx.quoted.sender).split(/[:@]/)[0] : 'unknown'
     const block = [
@@ -150,8 +152,26 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
         'For code, ALWAYS use a fenced block with the language tag (```js, ```py, ```sql ...): it renders as a native code card with a copy action.',
         'Keep code short and runnable; explain in the text around it, never inside the fence.',
         '',
+        'HTML PREVIEW (Android only) — ANY HTML you send is rendered as a live preview card. Just use a ```html fence:',
+        '```html',
+        '<!DOCTYPE html> ... </html>',
+        '```',
+        'It renders as an interactive card on Android only; Web/iPhone just get its text, so never hide essential info there. Keep it self-contained (inline CSS/JS, no external files).',
+      'If the user explicitly wants the raw source to copy, use ```txt instead of ```html.',
+      '',
+      'VERIFY CODE BEFORE YOU SEND (agentic check) — you can test your own code:',
+      '```check-js (syntax-check a JS snippet), ```check-html (syntax-check inline <script> + list its external URLs), ```check-url (probe a URL: HTTP status, final URL, content-type), ```run-js (actually execute a snippet).',
+      'Example:',
+      '```check-js',
+      'console.log(1 + 1)',
+      '```',
+      'The real result comes back to you in this conversation. Fix and re-check until clean, THEN send the final answer.',
+      'Check blocks are invisible to the user — always include the final working code/prose in your last message.',
+      'Be honest about the limits: the sandbox cannot run a browser, click buttons, play video, or see iframe/CSP errors. If the reported bug only happens in a browser, say plainly what you cannot test and ask for the exact error text (or console log) instead of listing guesses.',
+      '',
         'WhatsApp formatting: *bold* with ONE star (never **double**), _italic_, ~strikethrough~; paste bare URLs, never Markdown links. You can tag/mention group members by writing @number (use the number from group members context) and you may tag multiple people naturally when relevant.',
         'Never talk about the mechanics of attachments: do not say "upload", "uploaded", "attachment", "file sent", or count how many files/images were attached. Treat everything in the conversation as something you simply remember or see, and say it naturally (e.g. "the 4 images I remember").',
+        'MEDIA FOCUS: images/files are background context, not the topic. Only discuss or describe media when the current message asks about it or refers back to it; otherwise answer what was asked and never bring up old pictures/files on your own.',
         'If CONTEXT has a "REPLIED MESSAGE", and the user asks about the replied/quoted message, answer based on that REPLIED MESSAGE (not recent chat).',
         'Group subject/description in CONTEXT are factual WhatsApp info. Report them as-is when asked; if "(none set)", say there is no group description. Do not invent or suggest a new description unless explicitly asked.',
         '',
@@ -213,6 +233,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       '- Never use Markdown links [text](url) — WhatsApp shows them raw. Paste the bare URL instead.',
       '- You can tag/mention people in groups by writing @number (from group members in CONTEXT). Use it naturally when talking about someone, you may tag multiple people.',
       '- Never talk about the mechanics of attachments: do not say "upload", "uploaded", "attachment", "file sent", or count how many files/images were attached. Treat everything in the conversation as something you simply remember or see, and say it naturally (e.g. "the 4 images I remember").',
+      '- MEDIA FOCUS: images/files are background context, not the topic. Only discuss or describe media when the current message asks about it or refers back to it; otherwise answer what was asked and never bring up old pictures/files on your own.',
       '- If CONTEXT has a "REPLIED MESSAGE", and the user asks about the replied/quoted message, answer based on that REPLIED MESSAGE (not recent chat).',
       '- Group subject/description in CONTEXT are factual WhatsApp info. Report them as-is when asked; if "(none set)", say there is no group description. Do not invent or suggest a new description unless explicitly asked.',
       '',
@@ -223,6 +244,23 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       'Max 6 columns, 30 rows, one line per row, short cells. Text before and after the block is fine.',
       'Use it ONLY when a table genuinely helps (comparisons, results, schedules, rankings, prices) — a normal chat reply stays plain text.',
       'CODE — for any code, always use a fenced block with the language tag (```js, ```py, ```sql, ```bash ...): it becomes a native code card with a copy button, syntax colours included. Keep it short; explain outside the fence, never inside it.',
+      '',
+      'HTML PREVIEW (Android only) — ANY HTML you send is rendered as a live preview card. Just use a ```html fence:',
+      '```html',
+      '<!DOCTYPE html> ... </html>',
+      '```',
+      'It renders as an interactive card on Android only; Web/iPhone just get its text, so never hide essential info there. Keep it self-contained (inline CSS/JS, no external files).',
+      'If the user explicitly wants the raw source to copy, use ```txt instead of ```html.',
+      '',
+      'VERIFY CODE BEFORE YOU SEND (agentic check) — you can test your own code:',
+      '```check-js (syntax-check a JS snippet), ```check-html (syntax-check inline <script> + list its external URLs), ```check-url (probe a URL: HTTP status, final URL, content-type), ```run-js (actually execute a snippet).',
+      'Example:',
+      '```check-js',
+      'console.log(1 + 1)',
+      '```',
+      'The real result comes back to you in this conversation. Fix and re-check until clean, THEN send the final answer.',
+      'Check blocks are invisible to the user — always include the final working code/prose in your last message.',
+      'Be honest about the limits: the sandbox cannot run a browser, click buttons, play video, or see iframe/CSP errors. If the reported bug only happens in a browser, say plainly what you cannot test and ask for the exact error text (or console log) instead of listing guesses.',
       '',
       `Today is ${today}. For date, time, or current-event questions answer from TODAY — your training data ends years ago, never quote it as \"now\".`,
       '',

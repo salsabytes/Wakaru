@@ -2,8 +2,10 @@ import NodeCache from '@cacheable/node-cache'
 import type { AiFileInput, ChatMsg } from './llm.ts'
 import { readJson, register, saveJson } from './disk.ts'
 
-const HISTORY_MAX = 20 // keep last N messages (user+assistant pairs)
-const HISTORY_TEXT_MAX = 12000 // rough text budget to avoid huge prompts
+const HISTORY_MAX = 40 // keep last N messages (20 user+assistant pairs)
+const HISTORY_TEXT_MAX = 24000 // rough text budget to avoid huge prompts
+const HISTORY_KEEP_RECENT = 6 // newest messages kept verbatim, older code gets compacted
+const CODE_FENCE_RE = /```[^\n]*\n([\s\S]*?)```/g
 export const FILE_MEMORY_MAX = 4 // max files remembered across history/pending
 const SESSION_TTL = 6 * 60 * 60 * 1000 // 6h session TTL (also persisted)
 const PENDING_TTL = 30 * 60 * 1000 // media kept for a later .ai question
@@ -95,6 +97,13 @@ export const getPendingAiFiles = (key: string): AiFileInput[] => {
   return p.files
 }
 
+// How long ago the pending media was stashed (undefined = none).
+export const pendingAiFilesAge = (key: string): number | undefined => {
+  const p = pending.get(key)
+  if (!p) return undefined
+  return Date.now() - p.at
+}
+
 export function addPendingAiFiles(key: string, files: AiFileInput[]): void {
   if (!files.length) return
   prunePending()
@@ -109,9 +118,20 @@ export function clearPendingAiFiles(key: string): void {
   pending.delete(key)
 }
 
+// Code/HTML replies can be tens of KB; keep old ones as a short marker so the
+// text budget doesn't wipe the conversation (and the bot stays on-topic).
+const compactCode = (content: string): string =>
+  content.replace(CODE_FENCE_RE, (all: string, body: string) =>
+    body.length > 800 ? `[kode ${body.length} karakter — dipadatkan di history]` : all,
+  )
+
 export function saveAiHistory(key: string, query: string, finalText: string, files: AiFileInput[] = []): void {
+  const prev = getAiHistory(key)
+  const old = prev.map((m, i) =>
+    i < prev.length - HISTORY_KEEP_RECENT ? { ...m, content: compactCode(m.content) } : m,
+  )
   let next: ChatMsg[] = [
-    ...getAiHistory(key),
+    ...old,
     { role: 'user', content: query, ...(files.length ? { files } : {}) },
     { role: 'assistant', content: finalText },
   ]

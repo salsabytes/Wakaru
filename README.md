@@ -51,7 +51,7 @@ Pairing code login: `npm run start:pairing` or set `PAIRING_CODE=1`.
 - 🧠 `.ai` — chat + runs commands for you (`@run:`), remembers context
 - 🎬 Downloaders — YouTube, TikTok, IG, FB, Pinterest, SoundCloud, Spotify, X
 - 🖼️ Stickers & media — photo/video → sticker, sticker → photo, video → audio, AI upscale
-- 👥 Group tools — kick / promote / demote / add, per-group anti-link
+- 👥 Group tools — kick / promote / demote / add, per-group anti-link & anti-delete
 - ⏰ Reminders & games — `.remind` and Family 100
 - 📱 Runs on Termux, no root. No yt-dlp, no ffmpeg
 
@@ -75,7 +75,7 @@ Send `.menu` in WhatsApp for the live list with aliases.
 `.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **Group** (admins/owner only)
-`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — per-group anti-link
+`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — per-group anti-link · `.antidelete` — restore deleted messages
 
 **Games**
 `.family100` — Family 100 quiz

@@ -16,7 +16,6 @@ import { generateWAMessageFromContent, proto, type WASocket } from 'baileys'
 
 const BOT_JID = '0@bot'
 const TEXT_CHUNK = 4000
-const CODE_MAX = 4000
 
 /** Undocumented WhatsApp primitive; only Android renders it (offline, no network). */
 export const AI_RICH_HTML_PRIMITIVE = 'GenAIaeacdsnwHtmlPrimitive'
@@ -43,6 +42,8 @@ export type RichPart =
   | { type: 'text'; text: string }
   | { type: 'table'; title?: string; rows: string[][] }
   | { type: 'code'; language?: string; code: string }
+  /** Live HTML card — renders on Android only; other clients get its text. */
+  | { type: 'html'; html: string }
 
 interface RichSubMessage {
   messageType: number
@@ -248,7 +249,7 @@ type Tok = { codeContent: string; highlightType: number }
 
 /** Split code into highlight tokens for WhatsApp's code card. */
 export function tokenizeCode(code: string, lang = 'javascript'): { tokens: Tok[]; unified: Array<{ content: string; type: string }> } {
-  const src = String(code ?? '').slice(0, CODE_MAX)
+  const src = String(code ?? '')
   const language = normLang(lang)
   const keywords = KEYWORD_SET(language)
   const lineComments = CODE_COMMENTS[language] ?? ['//']
@@ -306,7 +307,9 @@ export function tokenizeCode(code: string, lang = 'javascript'): { tokens: Tok[]
       continue
     }
     if (/[A-Za-z_$@]/.test(c)) {
-      let j = i
+      // start past the first char: '@' matches the start class but not the
+      // continuation class, so j=i would never advance (infinite loop)
+      let j = i + 1
       while (j < src.length && /[A-Za-z0-9_$]/.test(src[j])) j++
       const word = src.slice(i, j)
       let type: number = HL.DEFAULT
@@ -410,7 +413,8 @@ export function buildRichContent(
 ): RichExContent {
   const page = String(html ?? '')
   const sections: Record<string, unknown>[] = [htmlSection(page, opts.height)]
-  // optional text mirror for clients that read sections but skip the HTML primitive; off by default to avoid double render
+  // Optional text mirror for clients that read sections but skip the HTML
+// primitive. Off by default to avoid a double render.
   if (opts.mirrorSections) sections.push(textSection(htmlToMarkdown(page) || ' '))
   const submessages: RichSubMessage[] = chunkText(htmlToText(page) || ' ').map((messageText) => ({
     messageType: 2,
@@ -432,6 +436,14 @@ export function buildRichParts(parts: RichPart[], opts: RichExOptions = {}): Ric
     if (part.type === 'code') {
       sections.push(codeSection(part))
       submessages.push(codeSubMessage(part))
+      continue
+    }
+    if (part.type === 'html') {
+      sections.push(htmlSection(part.html))
+      // Web/iPhone can't draw the HTML primitive — mirror the visible text
+      for (const messageText of chunkText(htmlToText(part.html) || ' ')) {
+        submessages.push({ messageType: 2, messageText })
+      }
       continue
     }
     const section = tableSection(part)
@@ -459,6 +471,13 @@ export function buildRichMulti(html: string, parts: RichPart[], opts: RichExOpti
       if (opts.mirrorSections === true) mirrored.push(codeSection(part))
       continue
     }
+    if (part.type === 'html') {
+      for (const messageText of chunkText(htmlToText(part.html) || ' ')) {
+        submessages.push({ messageType: 2, messageText })
+      }
+      if (opts.mirrorSections === true) mirrored.push(htmlSection(part.html))
+      continue
+    }
     const table = tableSubMessage(part)
     if (table) submessages.push(table)
     if (opts.mirrorSections === true) {
@@ -476,7 +495,8 @@ function partsToText(parts: RichPart[], footer?: string): string {
   for (const part of parts) {
     if (part.type === 'text') lines.push(part.text)
     else if (part.type === 'code') lines.push('```' + (part.language ?? '') + '\n' + part.code + '\n```')
-    else for (const row of part.rows) lines.push(row.join(' · '))
+    else if (part.type === 'html') lines.push(htmlToText(part.html))
+    else for (const row of part.rows) lines.push(row.join(' A� '))
   }
   if (footer) lines.push(footer)
   return lines.join('\n')
@@ -577,14 +597,68 @@ export async function sendHtmlThenText(
   return id
 }
 
+// Rich messages with several code cards (or a huge payload) get dropped or not
+// rendered by WhatsApp, so send in small batches: at most one code part per
+// message. Nothing is lost — long code just arrives as consecutive cards.
+const RICH_BATCH_CHARS = 6000
+
+const isCard = (p: RichPart): boolean => p.type === 'code' || p.type === 'html'
+
+const partChars = (p: RichPart): number =>
+  p.type === 'text'
+    ? p.text.length
+    : p.type === 'code'
+      ? p.code.length
+      : p.type === 'html'
+        ? p.html.length
+        : p.rows.reduce((n, r) => n + r.join('|').length, 0)
+
+export function batchRichParts(parts: RichPart[], max = RICH_BATCH_CHARS): RichPart[][] {
+  const out: RichPart[][] = []
+  let cur: RichPart[] = []
+  let chars = 0
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i]
+    const size = partChars(p)
+    const hasCard = cur.some(isCard)
+    // one card (code or HTML preview) per message; a text that precedes a card
+    // (e.g. the "kode 2/3" label) starts the next message so it stays with its
+    // card. Trailing text after the last card is merged into that same message.
+    const nextPart = parts[i + 1]
+    const leadsCard = p.type === 'text' && (nextPart?.type === 'code' || nextPart?.type === 'html')
+    const mustBreak = (isCard(p) && hasCard) || (leadsCard && hasCard) || chars + size > max
+    if (cur.length && mustBreak) {
+      out.push(cur)
+      cur = []
+      chars = 0
+    }
+    cur.push(p)
+    chars += size
+  }
+  if (cur.length) out.push(cur)
+  return out
+}
+
 /** Send native rich parts (text/table/code). Works on Android, Web, and iPhone. */
-export function sendRichParts(
+export async function sendRichParts(
   sock: WASocket,
   jid: string,
   parts: RichPart[],
   opts: RichExOptions = {},
 ): Promise<string | undefined> {
-  return relayRich(sock, jid, buildRichParts(parts, opts), opts, partsToText(parts, opts.footer))
+  const batches = batchRichParts(parts)
+  let id: string | undefined
+  for (let i = 0; i < batches.length; i++) {
+    const o = i === batches.length - 1 ? opts : { ...opts, footer: undefined }
+    try {
+      const sent = await relayRich(sock, jid, buildRichParts(batches[i], o), o, partsToText(batches[i], o.footer))
+      id = sent ?? id
+    } catch {
+      // rich failed for this batch — plain text is better than silence
+      await sock.sendMessage(jid, { text: partsToText(batches[i], o.footer) }).catch(() => {})
+    }
+  }
+  return id
 }
 
 /** Send an HTML card + native submessages in one bubble (mostly Android-focused). */

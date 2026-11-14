@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 1280" width="960" height="1280">
+  <defs>
+    <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M1,1 L11,6 L1,11" fill="none" stroke="#5a5a6e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text { font-family: "Segoe Print", "Comic Sans MS", "Bradley Hand", "Chalkboard SE", cursive; fill: #2f2f3a; }
+      .title { font-size: 32px; font-weight: 700; }
+      .label { font-size: 18px; font-weight: 700; }
+      .small { font-size: 14px; }
+      .tiny { font-size: 12.5px; fill: #55556a; }
+      .box { stroke: #444455; stroke-width: 2.4; fill-opacity: 0.92; }
+      .line { stroke: #5a5a6e; stroke-width: 2.4; fill: none; stroke-linecap: round; marker-end: url(#arrow); }
+      .dash { stroke: #7a6aa8; stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-dasharray: 8 7; marker-end: url(#arrow); }
+      .sketch { filter: url(#rough); }
+    </style>
+  </defs>
+
+  <rect width="960" height="1280" fill="#fffdf7"/>
+  <g stroke="#efe9d8" stroke-width="1">
+    <path d="M0,120 H960 M0,240 H960 M0,360 H960 M0,480 H960 M0,600 H960 M0,720 H960 M0,840 H960 M0,960 H960 M0,1080 H960 M0,1200 H960" opacity="0.5"/>
+  </g>
+
+  <text x="480" y="70" text-anchor="middle" class="title">Agentic Wakaru</text>
+
+  <g class="sketch">
+    <!-- 1 -->
+    <rect class="box" x="305" y="110" width="350" height="70" rx="18" fill="#ffd9e8"/>
+    <text x="480" y="142" text-anchor="middle" class="label">1. kamu bilang</text>
+    <text x="480" y="164" text-anchor="middle" class="small">"tolong dong..."</text>
+    <path class="line" d="M480,180 L480,215"/>
+
+    <!-- 2 -->
+    <rect class="box" x="320" y="215" width="320" height="66" rx="18" fill="#e6dcff"/>
+    <text x="480" y="245" text-anchor="middle" class="label">2. aku mikir</text>
+    <text x="480" y="267" text-anchor="middle" class="small">bikin rencana dulu</text>
+    <path class="line" d="M480,281 L480,316"/>
+
+    <!-- 3 -->
+    <rect class="box" x="350" y="316" width="260" height="56" rx="16" fill="#d9f0ff"/>
+    <text x="480" y="350" text-anchor="middle" class="label">3. aku ngapain ya?</text>
+    <path class="line" d="M480,372 L480,408"/>
+    <path class="line" d="M380,372 C300,392 210,398 170,438"/>
+    <path class="line" d="M580,372 C660,392 750,398 790,438"/>
+
+    <!-- actions -->
+    <rect class="box" x="40" y="438" width="250" height="90" rx="16" fill="#dcf7e3"/>
+    <text x="165" y="470" text-anchor="middle" class="label">lihat</text>
+    <text x="165" y="492" text-anchor="middle" class="small">aku baca kodenya</text>
+    <text x="165" y="514" text-anchor="middle" class="tiny">(cari file sendiri)</text>
+
+    <rect class="box" x="355" y="438" width="250" height="90" rx="16" fill="#fff1c9"/>
+    <text x="480" y="470" text-anchor="middle" class="label">benerin</text>
+    <text x="480" y="492" text-anchor="middle" class="small">aku ubah kodenya</text>
+    <text x="480" y="514" text-anchor="middle" class="tiny">(di dalam repo aja)</text>
+
+    <rect class="box" x="670" y="438" width="250" height="90" rx="16" fill="#ffe4d1"/>
+    <text x="795" y="470" text-anchor="middle" class="label">coba</text>
+    <text x="795" y="492" text-anchor="middle" class="small">jalanin di kotak aman</text>
+    <text x="795" y="514" text-anchor="middle" class="tiny">(sandbox, ada timer)</text>
+
+    <path class="line" d="M165,528 C175,560 330,580 450,604"/>
+    <path class="line" d="M480,528 L480,604"/>
+    <path class="line" d="M795,528 C785,560 630,580 510,604"/>
+
+    <!-- 4 observe -->
+    <rect class="box" x="255" y="604" width="450" height="94" rx="18" fill="#e8e4ff"/>
+    <text x="480" y="636" text-anchor="middle" class="label">4. komputer ngomong balik</text>
+    <text x="480" y="660" text-anchor="middle" class="small">"yay berhasil!" (stdout)  /  "aduh error!" (stderr)</text>
+    <text x="480" y="682" text-anchor="middle" class="tiny">+ kode sukses/gagal</text>
+    <path class="line" d="M480,698 L480,736"/>
+
+    <!-- 5 check -->
+    <path class="box" d="M480,736 L605,794 L480,852 L355,794 Z" fill="#fff6bf"/>
+    <text x="480" y="788" text-anchor="middle" class="label">5. udah</text>
+    <text x="480" y="812" text-anchor="middle" class="label">bener?</text>
+
+    <!-- udah bener -->
+    <path class="line" d="M480,852 L480,900"/>
+    <rect class="box" x="320" y="900" width="320" height="78" rx="18" fill="#cff7d3"/>
+    <text x="480" y="932" text-anchor="middle" class="label">udah bener! yay</text>
+    <text x="480" y="956" text-anchor="middle" class="small">aku bilang: "selesai!"</text>
+
+    <!-- error branches -->
+    <path class="line" d="M605,794 L700,794"/>
+    <text x="652" y="782" text-anchor="middle" class="tiny">masih error</text>
+
+    <!-- wakafy check -->
+    <path class="box" d="M780,744 L890,794 L780,844 L670,794 Z" fill="#ffe0e0"/>
+    <text x="780" y="788" text-anchor="middle" class="label">error dari</text>
+    <text x="780" y="810" text-anchor="middle" class="label">wakafy?</text>
+
+    <!-- wakafy yes -->
+    <path class="line" d="M780,844 L780,900"/>
+    <text x="812" y="874" text-anchor="middle" class="tiny">iya</text>
+    <rect class="box" x="635" y="900" width="290" height="118" rx="18" fill="#ffd6d6"/>
+    <text x="780" y="930" text-anchor="middle" class="label">stop, jangan diganggu</text>
+    <text x="780" y="952" text-anchor="middle" class="small">aku ga bisa apa-apa</text>
+    <text x="780" y="974" text-anchor="middle" class="small">kirim error ke owner</text>
+    <text x="780" y="996" text-anchor="middle" class="tiny">bilang: bukan dari kode kita</text>
+
+    <!-- wakafy no -> fix loop -->
+    <path class="dash" d="M780,744 C780,660 730,560 640,520 C480,440 260,360 320,340"/>
+    <text x="700" y="640" text-anchor="middle" class="tiny">bukan, dari kode kita</text>
+    <text x="700" y="658" text-anchor="middle" class="tiny">-&gt; benerin lagi</text>
+
+    <!-- mentok -->
+    <path class="line" d="M355,794 L210,794 L210,900"/>
+    <text x="282" y="782" text-anchor="middle" class="tiny">nyoba terus tapi mentok</text>
+    <rect class="box" x="60" y="900" width="260" height="78" rx="18" fill="#f1e3ff"/>
+    <text x="190" y="932" text-anchor="middle" class="label">capek / mentok</text>
+    <text x="190" y="956" text-anchor="middle" class="small">aku jujur + udah coba apa</text>
+  </g>
+
+  <!-- notes -->
+  <g class="sketch">
+    <rect class="box" x="110" y="1085" width="740" height="110" rx="16" fill="#fffef9"/>
+    <text x="480" y="1116" text-anchor="middle" class="small">kotak aman = sandbox. kode cuma di dalam repo, rahasia nggak boleh diintip.</text>
+    <text x="480" y="1138" text-anchor="middle" class="small">kalau error dari wakafy: jangan diutak-atik, kirim ke owner, bilang bukan dari kode kita.</text>
+    <text x="480" y="1162" text-anchor="middle" class="tiny">loop: salah (kode kita) -&gt; benerin -&gt; cek lagi -&gt; bener -&gt; kirim</text>
+  </g>
+
+  <text x="885" y="1255" text-anchor="end" class="sketch" style="font-family:'Segoe Print','Comic Sans MS','Bradley Hand',cursive; font-size:26px; fill:#7a6aa8;">~ Nazwa</text>
+</svg>

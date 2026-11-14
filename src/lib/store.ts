@@ -2,7 +2,7 @@ import type { WAMessage, WAMessageContent, WAMessageKey } from 'baileys'
 import { readJson, register, saveJson } from './disk.ts'
 
 const MAX = 500
-const PER_CHAT_MAX = 20
+const PER_CHAT_MAX = 50
 const CHAT_MAX = 500
 const store = new Map<string, WAMessage>()
 const byChat = new Map<string, WAMessage[]>()

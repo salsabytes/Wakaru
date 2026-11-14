@@ -3,6 +3,8 @@ import { chmodSync } from 'node:fs'
 import { join } from 'node:path'
 import { connectToWhatsApp, shutdown, getSock } from './socket.ts'
 import { handleMessagesUpsert } from './handlers/messages.ts'
+import { handleMessagesUpdate } from './handlers/antidelete.ts'
+import { handleGroupParticipantsUpdate } from './handlers/welcome.ts'
 import { logger } from './lib/logger.ts'
 import { checkForUpdate } from './lib/updater.ts'
 import { completeReminder, getDueReminders, rescheduleReminder } from './lib/reminders.ts'
@@ -92,7 +94,15 @@ const startReminderLoop = () => {
   }, 30_000)
 }
 
-connectToWhatsApp(handleMessagesUpsert)
+connectToWhatsApp(
+  handleMessagesUpsert,
+  (updates) => {
+    void handleMessagesUpdate(updates, getSock()).catch((err) => logger.error('antidelete error:', err))
+  },
+  (update) => {
+    void handleGroupParticipantsUpdate(update as any).catch((err) => logger.error('welcome error:', err))
+  },
+)
   .then(() => {
     startReminderLoop()
     checkForUpdate()

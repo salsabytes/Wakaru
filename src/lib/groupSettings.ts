@@ -4,7 +4,11 @@ export interface GroupSettings {
   antilink?: boolean
   antilinkKick?: boolean // kick at max warns? default true
   antilinkMaxWarn?: number // warns before kick, default 3
+  antidelete?: boolean
+  antideleteSince?: number // epoch seconds when it was enabled
   warns?: Record<string, number> // sender num -> strike count
+  welcome?: boolean
+  welcomeMsg?: string
 }
 
 export const ANTILINK_DEFAULT_MAX_WARN = 3
@@ -29,6 +33,26 @@ export const antilinkConfig = (jid: string): { on: boolean; kick: boolean; maxWa
     kick: s.antilinkKick ?? true,
     maxWarn: s.antilinkMaxWarn ?? ANTILINK_DEFAULT_MAX_WARN,
   }
+}
+
+// anti-delete only covers messages sent after it was enabled
+export const antideleteConfig = (jid: string): { on: boolean; since: number } => {
+  const s = store[jid] ?? {}
+  return {
+    on: s.antidelete ?? false,
+    since: s.antideleteSince ?? 0,
+  }
+}
+
+export const toggleAntidelete = (jid: string, on?: boolean): boolean => {
+  const cur = store[jid]?.antidelete ?? false
+  const next = on === undefined ? !cur : on
+  if (!store[jid]) store[jid] = {}
+  store[jid].antidelete = next
+  if (next && !cur) store[jid].antideleteSince = Math.floor(Date.now() / 1000)
+  if (!next) delete store[jid].antideleteSince
+  persist()
+  return next
 }
 
 export const setGroupSetting = (jid: string, key: keyof GroupSettings, val: any) => {
@@ -81,4 +105,27 @@ export const resetAntilinkWarns = (jid: string, user: string): void => {
   if (!warns) return
   delete warns[user]
   persist()
+}
+
+export const DEFAULT_WELCOME = '`pp` halo `mention`, selamat datang di `gcname`!'
+
+export const welcomeConfig = (jid: string): { on: boolean; msg: string } => {
+  const s = store[jid] ?? {}
+  return { on: s.welcome ?? false, msg: s.welcomeMsg ?? DEFAULT_WELCOME }
+}
+
+export const setWelcome = (jid: string, msg: string): void => {
+  if (!store[jid]) store[jid] = {}
+  store[jid].welcome = true
+  store[jid].welcomeMsg = msg
+  persist()
+}
+
+export const toggleWelcome = (jid: string, on?: boolean): boolean => {
+  const cur = store[jid]?.welcome ?? false
+  const next = on === undefined ? !cur : on
+  if (!store[jid]) store[jid] = {}
+  store[jid].welcome = next
+  persist()
+  return next
 }

@@ -42,6 +42,19 @@ test('disabling antilink clears strikes', () => {
   assert.equal(gs.getGroupSettings('g2').warns, undefined)
 })
 
+test('antidelete tracks activation time and resets on disable', () => {
+  assert.deepEqual(gs.antideleteConfig('g5'), { on: false, since: 0 })
+
+  const before = Math.floor(Date.now() / 1000)
+  assert.equal(gs.toggleAntidelete('g5', true), true)
+  const on = gs.antideleteConfig('g5')
+  assert.equal(on.on, true)
+  assert.ok(on.since >= before)
+
+  gs.toggleAntidelete('g5', false)
+  assert.deepEqual(gs.antideleteConfig('g5'), { on: false, since: 0 })
+})
+
 test('warn reset only clears one member', () => {
   gs.addAntilinkWarn('g3', 'a')
   gs.addAntilinkWarn('g3', 'b')
@@ -54,4 +67,11 @@ test('settings are registered with the disk flusher', async () => {
   gs.toggleAntilink('g4', true)
   const saved = await readGroups()
   assert.equal((saved.g4 as { antilink?: boolean }).antilink, true)
+})
+
+test('antidelete setting is persisted', async () => {
+  gs.toggleAntidelete('g6', true)
+  await disk.whenIdle()
+  const saved = await readGroups()
+  assert.equal((saved.g6 as { antidelete?: boolean }).antidelete, true)
 })

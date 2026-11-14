@@ -76,8 +76,8 @@ const statusOf = (err: unknown): number | undefined => {
   return e?.output?.statusCode ?? (typeof e?.status === 'number' ? e.status : undefined)
 }
 
-// URL CDN basi (403) / media kehapus (404/410) / host CDN mati (DNS error):
-// minta URL fresh ke pengirim, retry sekali.
+// Stale CDN URL (403), removed media (404/410), or dead CDN host (DNS error):
+// ask the sender for a fresh URL and retry once.
 const netDead = (err: unknown): boolean => {
   const c = (err as { code?: unknown })?.code
   return c === 'ENOTFOUND' || c === 'EAI_AGAIN' || c === 'ETIMEDOUT' || c === 'ECONNRESET'
@@ -137,7 +137,9 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
   const q = ctxt?.quotedMessage
   if (q) {
     const qtype = Object.keys(q)[0]
-    const qc = (q as any)?.[qtype] ?? {}
+    const qc = (q as any)?.[qtype]
+    // plain text quotes arrive as a string under `conversation`, not an object
+    const qbody = typeof qc === 'string' ? { text: qc } : (qc ?? {})
     const qmsg = {
       key: {
         id: ctxt.stanzaId,
@@ -152,11 +154,11 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
       // Quoted message id (helps locate it in message store for reply-chain context)
       id: typeof ctxt.stanzaId === 'string' ? ctxt.stanzaId : undefined,
       mtype: qtype,
-      mimetype: qc.mimetype,
-      fileName: typeof qc.fileName === 'string' ? qc.fileName : undefined,
+      mimetype: qbody.mimetype,
+      fileName: typeof qbody.fileName === 'string' ? qbody.fileName : undefined,
       chat: ctxt.remoteJid ?? chat,
       sender: ctxt.participant ?? '',
-      text: qc.text || qc.caption || '',
+      text: qbody.text || qbody.caption || '',
       download: withReupload(qmsg, qraw),
     }
   }

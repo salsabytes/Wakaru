@@ -51,7 +51,7 @@ Login pakai kode: `npm run start:pairing` atau set `PAIRING_CODE=1`.
 - 🧠 `.ai` — ngobrol + jalanin command buat kamu (`@run:`), ingat konteks
 - 🎬 Downloader — YouTube, TikTok, IG, FB, Pinterest, SoundCloud, Spotify, X
 - 🖼️ Stiker & media — foto/video → stiker, stiker → foto, video → audio, upscale AI
-- 👥 Tools grup — kick / promote / demote / add, anti-link per grup
+- 👥 Tools grup — kick / promote / demote / add, anti-link & anti-delete per grup
 - ⏰ Pengingat & game — `.remind` dan Family 100
 - 📱 Jalan di Termux, tanpa root. Tanpa yt-dlp, tanpa ffmpeg
 
@@ -75,7 +75,7 @@ Kirim `.menu` di WhatsApp buat liat daftar live + alias.
 `.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **Grup** (khusus admin/owner)
-`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — anti-link per grup
+`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — anti-link per grup · `.antidelete` — pulihkan pesan yang dihapus
 
 **Game**
 `.family100` — kuis Family 100

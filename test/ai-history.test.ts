@@ -52,3 +52,19 @@ test('history media is capped by total bytes', () => {
   assert.ok(total <= hist.FILE_MEMORY_MAX_BYTES)
   assert.equal(history.at(-2)?.files?.[0]?.data, big)
 })
+
+test('history keeps 20 exchanges (40 messages)', () => {
+  for (let i = 0; i < 25; i++) hist.saveAiHistory('long:chat', `tanya ${i}`, `jawab ${i}`)
+  const h = hist.getAiHistory('long:chat')
+  assert.equal(h.length, 40)
+  assert.equal(h.at(-2)?.content, 'tanya 24')
+})
+
+test('old bulky code is compacted so the conversation survives', () => {
+  const big = '```html\n' + 'x'.repeat(20000) + '\n```'
+  hist.saveAiHistory('compact:chat', 'bikin game', big)
+  for (let i = 0; i < 5; i++) hist.saveAiHistory('compact:chat', `lanjut ${i}`, 'oke')
+  const h = hist.getAiHistory('compact:chat')
+  assert.equal(h[1]?.content.includes('dipadatkan'), true)
+  assert.ok(h.length > 10)
+})

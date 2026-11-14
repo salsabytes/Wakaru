@@ -8,6 +8,7 @@ import {
 } from '../../lib/groupSettings.ts'
 import type { Button } from '../../lib/buttons.ts'
 import type { Sender } from '../../lib/sender.ts'
+import { tx } from '../../lib/lang.ts'
 
 const onOff = (w: string): boolean | undefined =>
   w === 'on' || w === 'enable' || w === '1' ? true : w === 'off' || w === 'disable' || w === '0' ? false : undefined
@@ -36,28 +37,29 @@ export const hasPendingAntilinkMax = (chat: string, sender: string): boolean => 
   return true
 }
 
-const panel = (chat: string): { text: string; buttons: Button[] } => {
+const panel = async (chat: string): Promise<{ text: string; buttons: Button[] }> => {
   const c = antilinkConfig(chat)
+  const status = await tx(c.on ? 'toggleOn' : 'toggleOff')
   const text = [
-    '🛡️ *Anti-Link*',
+    await tx('antilinkTitle'),
     '',
-    `Status : ${c.on ? 'ON ✅' : 'OFF ⛔'}`,
-    `Kick   : ${c.kick ? `ON — kick setelah ${c.maxWarn}x pelanggaran` : 'OFF — hanya hapus pesan'}`,
+    await tx('statusLine', { status }),
+    c.kick ? await tx('antilinkKickOn', { n: c.maxWarn }) : await tx('antilinkKickOff'),
     '',
-    'Ketuk tombol buat ngatur. Owner, admin grup, dan bot sendiri nggak kena.',
+    await tx('antilinkHint'),
   ].join('\n')
   return {
     text,
     buttons: [
-      { id: 'antilink:toggle', text: c.on ? '⛔ Matikan' : '✅ Aktifkan' },
-      { id: 'antilink:kick', text: c.kick ? '👢 Kick: ON' : '👢 Kick: OFF' },
-      { id: 'antilink:max', text: `⚠️ Maks warn: ${c.maxWarn}` },
+      { id: 'antilink:toggle', text: await tx(c.on ? 'disableButton' : 'enableButton') },
+      { id: 'antilink:kick', text: await tx(c.kick ? 'antilinkKickButtonOn' : 'antilinkKickButtonOff') },
+      { id: 'antilink:max', text: await tx('antilinkMaxButton', { n: c.maxWarn }) },
     ],
   }
 }
 
 const sendPanel = async (ctx: CommandContext): Promise<void> => {
-  const { text, buttons } = panel(ctx.chat)
+  const { text, buttons } = await panel(ctx.chat)
   try {
     await ctx.sendButtons(buttons, text)
   } catch {
@@ -76,19 +78,17 @@ export async function handleAntilinkMaxInput(
   const t = text.trim().toLowerCase()
   if (/^(batal|cancel|gajadi|gak jadi|nggak jadi)$/.test(t)) {
     dropPending(chat, sender)
-    await send.text('Dibatalkan. Maks warn tidak diubah.')
+    await send.text(await tx('antilinkMaxCancelled'))
     return true
   }
   const n = Number(t)
   if (!Number.isInteger(n) || n < ANTILINK_MAX_WARN_MIN || n > ANTILINK_MAX_WARN_MAX) {
-    await send.text(
-      `Masukkan angka ${ANTILINK_MAX_WARN_MIN}-${ANTILINK_MAX_WARN_MAX} ya. Ketik "batal" buat berhenti.`,
-    )
+    await send.text(await tx('antilinkMaxInvalid', { min: ANTILINK_MAX_WARN_MIN, max: ANTILINK_MAX_WARN_MAX }))
     return true
   }
   dropPending(chat, sender)
   setAntilinkMaxWarn(chat, n)
-  const { text: body, buttons } = panel(chat)
+  const { text: body, buttons } = await panel(chat)
   await send.buttons(buttons, body).catch(() => send.text(body))
   return true
 }
@@ -117,7 +117,7 @@ export default {
         prunePending()
         pending.set(keyOf(ctx.chat, ctx.sender), Date.now())
         return ctx.reply(
-          `Ketik angka ${ANTILINK_MAX_WARN_MIN}-${ANTILINK_MAX_WARN_MAX} untuk batas maksimal warn sebelum kick.\nKetik "batal" buat berhenti.`,
+          await tx('antilinkMaxPrompt', { min: ANTILINK_MAX_WARN_MIN, max: ANTILINK_MAX_WARN_MAX }),
         )
       }
     }

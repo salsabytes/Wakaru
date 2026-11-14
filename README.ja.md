@@ -51,7 +51,7 @@ npm run start           # or: npm run start:pairing
 - 🧠 `.ai` — 会話＋コマンド代行（`@run:`）、文脈を記憶
 - 🎬 ダウンローダー — YouTube、TikTok、IG、FB、Pinterest、SoundCloud、Spotify、X
 - 🖼️ ステッカー＆メディア — 写真・動画→ステッカー、ステッカー→画像、動画→音声、AIアップスケール
-- 👥 グループ管理 — kick / promote / demote / add、グループごとのリンク対策
+- 👥 グループ管理 — kick / promote / demote / add、グループごとのリンク対策＆削除対策
 - ⏰ リマインダー＆ゲーム — `.remind` と Family 100
 - 📱 Termuxで動く、root不要。yt-dlp・ffmpegなし
 
@@ -75,7 +75,7 @@ npm run start           # or: npm run start:pairing
 `.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
 
 **グループ**（管理者／ownerのみ）
-`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — グループごとのリンク対策
+`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — グループごとのリンク対策 · `.antidelete` — 削除メッセージを復元
 
 **ゲーム**
 `.family100` — Family 100 クイズ

@@ -34,6 +34,9 @@ const adminNums = async (chat: string): Promise<Set<string> | undefined> => {
 
 const checkAntilink = async (msg: WAMessage, m: SerializedMessage, jid: string): Promise<boolean> => {
   if (!m.isGroup) return false
+  // never police the bot's own account (its own replies / owner typing from the
+  // linked phone). Missing this deleted the bot's own link-laden replies.
+  if (msg.key?.fromMe || m.fromMe) return false
   const cfg = antilinkConfig(m.chat)
   if (!cfg.on) return false
   if (isOwner(m.sender)) return false
@@ -87,6 +90,12 @@ const serialize = async (msg: WAMessage): Promise<SerializedMessage> => {
   const m = serializeMessage(msg)
   m.sender = await resolveJid(m.sender)
   if (m.quoted?.sender) m.quoted.sender = await resolveJid(m.quoted.sender)
+  // own group messages arrive with a @lid participant when the LID mapping is
+  // cold, so fromMe=false slipped past the filter and antilink removed them.
+  if (!m.fromMe && m.isGroup && waka.user?.id) {
+    const botNum = waka.user.id.split(':')[0].split('@')[0]
+    if (m.sender.split(/[@:]/)[0] === botNum) m.fromMe = true
+  }
   return m
 }
 
@@ -167,6 +176,10 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
     const parts = bid.slice('antilink:'.length).split(':').filter(Boolean)
     return { cmd: await getCommand('antilink'), queryText: parts.join(' '), args: parts }
   }
+  if (bid?.startsWith('antidelete:')) {
+    const parts = bid.slice('antidelete:'.length).split(':').filter(Boolean)
+    return { cmd: await getCommand('antidelete'), queryText: parts.join(' '), args: parts }
+  }
   const direct = prefixBody(text)
   if (direct !== undefined) {
     const [rawName, ...rest] = direct.split(/\s+/)
@@ -179,7 +192,8 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
         args: rest,
       }
     }
-    // unknown word with a prefix (or bare attempt) — still let reply-to-bot and link follow-ups reach the AI
+    // Unknown word with a prefix (or bare attempt) — still let reply-to-bot and
+    // link follow-ups reach the AI.
     if (botPrefixes().length) return aiFallback(m, sender, text)
   }
   const noPrefix = (direct ?? text).trim()

@@ -40,11 +40,19 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const question = (text: string) => new Promise<string>((resolve) => rl.question(text, resolve))
 
 let onMessageHandler: (upsert: BaileysEventMap['messages.upsert']) => void | undefined
+type UpdateHandler = (updates: BaileysEventMap['messages.update']) => void
+type ParticipantsHandler = (update: BaileysEventMap['group-participants.update']) => void
+let onUpdateHandler: UpdateHandler = () => {}
+let onParticipantsHandler: ParticipantsHandler = () => {}
 
 export async function connectToWhatsApp(
   onMessage: (upsert: BaileysEventMap['messages.upsert']) => void,
+  onUpdate: UpdateHandler = () => {},
+  onParticipants: ParticipantsHandler = () => {},
 ): Promise<void> {
   onMessageHandler = onMessage
+  onUpdateHandler = onUpdate
+  onParticipantsHandler = onParticipants
   const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR)
   waka = makeWASocket({
     auth: {
@@ -72,6 +80,8 @@ export async function connectToWhatsApp(
   waka.ev.on('connection.update', handleConnectionUpdate)
   waka.ev.on('creds.update', saveCreds)
   waka.ev.on('messages.upsert', onMessage)
+  waka.ev.on('messages.update', onUpdateHandler)
+  waka.ev.on('group-participants.update', onParticipantsHandler)
 }
 
 async function handleConnectionUpdate(
@@ -90,7 +100,7 @@ async function handleConnectionUpdate(
       logger.warn(
         `Connection lost${statusCode ? ` (status ${statusCode})` : ''} — reconnecting in ${delay / 1000}s...`,
       )
-      reconnectTimer = setTimeout(connectToWhatsApp, delay, onMessageHandler)
+      reconnectTimer = setTimeout(connectToWhatsApp, delay, onMessageHandler, onUpdateHandler, onParticipantsHandler)
     }
     return
   }

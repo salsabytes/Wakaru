@@ -143,8 +143,8 @@ let maxDownloadMB: number = (() => {
 
 export const botMaxDownloadMB = (): number => maxDownloadMB
 
-// false = bot tampil offline, notif HP tetap bunyi (nomor utama).
-// default true biar perilaku upstream gak berubah. restart buat apply.
+// false = show the bot as offline (the main phone still gets notifications).
+// Defaults to true so upstream behavior stays the same. Restart to apply.
 let markOnline: boolean = (() => {
   try {
     const v = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).markOnline
