@@ -8,6 +8,7 @@ export const FILE_MEMORY_MAX = 4 // max files remembered across history/pending
 const SESSION_TTL = 6 * 60 * 60 * 1000 // 6h session TTL (also persisted)
 const PENDING_TTL = 30 * 60 * 1000 // media kept for a later .ai question
 const PENDING_MAX_KEYS = 500
+export const FILE_MEMORY_MAX_BYTES = 24 * 1024 * 1024 // in-memory media budget per session
 
 const history = new NodeCache({ stdTTL: 6 * 60 * 60, checkperiod: 600, maxKeys: 2000 }) as {
   get(k: string): ChatMsg[] | undefined
@@ -17,8 +18,7 @@ const history = new NodeCache({ stdTTL: 6 * 60 * 60, checkperiod: 600, maxKeys: 
 }
 
 const touched = new Map<string, number>()
-// Media sent before an AI prompt (image first, ".ai question" later).
-// TTL + cap stop old base64 files piling up.
+// Media waiting for the next .ai prompt; memory only, bounded by TTL and caps.
 type PendingFiles = { files: AiFileInput[]; at: number }
 const pending = new Map<string, PendingFiles>()
 
@@ -31,8 +31,13 @@ const pruneTouched = (): void => {
   for (const k of touched.keys()) if (!history.has(k)) touched.delete(k)
 }
 
-const limitFiles = (msgs: ChatMsg[], max = FILE_MEMORY_MAX): ChatMsg[] => {
+const fileBytes = (f: AiFileInput): number => String(f.data || '').length
+
+const stripFiles = (m: ChatMsg): ChatMsg => ({ role: m.role, content: m.content })
+
+const limitFiles = (msgs: ChatMsg[], max = FILE_MEMORY_MAX, maxBytes = FILE_MEMORY_MAX_BYTES): ChatMsg[] => {
   let kept = 0
+  let bytes = 0
   for (let i = msgs.length - 1; i >= 0; i--) {
     const f = msgs[i].files
     if (!f?.length) continue
@@ -41,28 +46,40 @@ const limitFiles = (msgs: ChatMsg[], max = FILE_MEMORY_MAX): ChatMsg[] => {
       delete msgs[i].files
       continue
     }
-    if (f.length > room) msgs[i].files = f.slice(f.length - room)
-    kept += msgs[i].files!.length
+    const take = f.slice(f.length - Math.min(f.length, room))
+    while (take.length && bytes + fileBytes(take[0]) > maxBytes) take.shift()
+    if (!take.length) {
+      delete msgs[i].files
+      continue
+    }
+    msgs[i].files = take
+    kept += take.length
+    bytes += take.reduce((n, x) => n + fileBytes(x), 0)
   }
   return msgs
 }
 
+// Older versions persisted media; drop it and rewrite the file once.
+let legacyMedia = false
 for (const [key, [msgs, at]] of Object.entries(readJson<Record<string, [ChatMsg[], number]>>('ai-history.json', {}))) {
   if (Date.now() - at > SESSION_TTL) continue
-  history.set(key, limitFiles(msgs))
+  if (msgs.some((m) => m.files?.length)) legacyMedia = true
+  history.set(key, msgs.map(stripFiles))
   touched.set(key, Date.now())
 }
 register('ai-history.json', () => {
   pruneTouched()
-  return Object.fromEntries(history.keys().map((k) => [k, [history.get(k) ?? [], touched.get(k) ?? Date.now()]]))
+  return Object.fromEntries(
+    history.keys().map((k) => [k, [(history.get(k) ?? []).map(stripFiles), touched.get(k) ?? Date.now()]]),
+  )
 })
+if (legacyMedia) saveJson('ai-history.json')
 
 export const aiHasHistory = (key: string): boolean => history.has(key)
 
 export const getAiHistory = (key: string): ChatMsg[] => history.get(key) ?? []
 
-// Keep at most `budget` files across the given messages, newest first, without
-// touching the cached history objects.
+// Copy the messages, keep at most `budget` files newest-first within the byte cap.
 export const trimFilesToBudget = (msgs: ChatMsg[], budget: number): ChatMsg[] => {
   const copy = msgs.map((m) => (m.files?.length ? { ...m, files: [...m.files] } : m))
   return limitFiles(copy, Math.max(0, budget))

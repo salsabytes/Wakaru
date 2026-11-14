@@ -1,6 +1,6 @@
 import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -26,4 +26,29 @@ test('pending media can be cleared', () => {
   hist.addPendingAiFiles('chat:clear', [{ data: 'eA==' }])
   hist.clearPendingAiFiles('chat:clear')
   assert.deepEqual(hist.getPendingAiFiles('chat:clear'), [])
+})
+
+test('persisted history drops media payloads', async () => {
+  hist.saveAiHistory('persist:chat', 'lihat gambar', 'oke', [
+    { data: 'aGVsbG8=', mime: 'image/png', name: 'foto.png' },
+  ])
+  assert.equal(hist.getAiHistory('persist:chat')[0].files?.[0]?.data, 'aGVsbG8=')
+
+  await disk.saveJsonNow('ai-history.json')
+  const raw = await readFile(join(dir, 'ai-history.json'), 'utf8')
+  assert.equal(raw.includes('aGVsbG8='), false)
+
+  const parsed = JSON.parse(raw)
+  assert.deepEqual(parsed['persist:chat'][0][0], { role: 'user', content: 'lihat gambar' })
+})
+
+test('history media is capped by total bytes', () => {
+  const big = 'x'.repeat(hist.FILE_MEMORY_MAX_BYTES / 2 + 1)
+  hist.saveAiHistory('bytes:chat', 'satu', 'oke', [{ data: big }])
+  hist.saveAiHistory('bytes:chat', 'dua', 'oke', [{ data: big }])
+
+  const history = hist.getAiHistory('bytes:chat')
+  const total = history.flatMap((m) => m.files ?? []).reduce((n, f) => n + f.data.length, 0)
+  assert.ok(total <= hist.FILE_MEMORY_MAX_BYTES)
+  assert.equal(history.at(-2)?.files?.[0]?.data, big)
 })
