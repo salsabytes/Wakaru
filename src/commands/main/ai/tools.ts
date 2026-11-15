@@ -32,6 +32,10 @@ export const runTool = async (r: { name: string; args: string }, ctx: CommandCon
   if (cmd.ownerOnly && !isOwner(ctx.sender)) return failed(`[${r.name}] denied — owner only`)
   try {
     const captured: string[] = []
+    // reply() only captures text - it never reaches the chat. Only the helpers
+    // below actually send. Track those, or reply-only tools (kick, delete...)
+    // look "already shown" and the AI stays silent.
+    let visible = false
     const sub: CommandContext = {
       ...ctx,
       text: r.args,
@@ -40,30 +44,34 @@ export const runTool = async (r: { name: string; args: string }, ctx: CommandCon
       // capture real output so the AI can report actual titles/results instead of "(ok)"
       sendList: async (o) => {
         captured.push(`${o.text} ${o.sections.flatMap((s) => s.rows.map((r) => (r.header ? r.header + '. ' : '') + r.title)).join(' | ')}`)
+        visible = true
         await ctx.sendList(o)
       },
       sendButtons: async (buttons, text, footer) => {
         captured.push(text)
+        visible = true
         await ctx.sendButtons(buttons, text, footer)
       },
-      sendImage: async (b, c) => { captured.push(mediaMeta(c || 'image', b)); await ctx.sendImage(b, c) },
+      sendImage: async (b, c) => { captured.push(mediaMeta(c || 'image', b)); visible = true; await ctx.sendImage(b, c) },
       sendVideo: async (b, c) => {
         const doc = oversizedDoc({ type: 'video', buf: b, caption: c })
+        visible = true
         if (doc) { captured.push(mediaMeta(doc.name, b)); await ctx.sendDocument(doc.buf, doc.name, doc.mime) }
         else { captured.push(mediaMeta(c || 'video', b)); await ctx.sendVideo(b, c) }
       },
       sendAudio: async (b, t2) => {
         const doc = oversizedDoc({ type: 'audio', buf: b, caption: t2 })
+        visible = true
         if (doc) { captured.push(mediaMeta(doc.name, b)); await ctx.sendDocument(doc.buf, doc.name, doc.mime) }
         else { captured.push(mediaMeta(t2 || 'audio', b)); await ctx.sendAudio(b) }
       },
-      sendDocument: async (b, f) => { captured.push(mediaMeta(f, b)); await ctx.sendDocument(b, f) },
-      sendSticker: async (b) => { captured.push(mediaMeta('sticker', b)); await ctx.sendSticker(b) },
+      sendDocument: async (b, f) => { captured.push(mediaMeta(f, b)); visible = true; await ctx.sendDocument(b, f) },
+      sendSticker: async (b) => { captured.push(mediaMeta('sticker', b)); visible = true; await ctx.sendSticker(b) },
     }
     await cmd.run(sub)
     return {
       text: `[${r.name}]${captured.length ? ' ' + captured.join(' | ') : ' (ok)'}`,
-      sent: captured.length > 0,
+      sent: visible,
       failed: false,
     }
   } catch (err) {

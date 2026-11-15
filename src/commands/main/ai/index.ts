@@ -105,8 +105,9 @@ const startProgress = async (ctx: CommandContext, text: string): Promise<AiProgr
   }
 }
 
-// Run AI + optional @run tool loop; returns final text to send (or '' if tool replied)
-const runExchange = async (msgs: ChatMsg[], ctx: CommandContext, showProcess = false): Promise<string> => {
+// Run AI + optional @run tool loop. Returns the text to send, or null when a
+// tool already posted visible output (so we don't double-reply).
+const runExchange = async (msgs: ChatMsg[], ctx: CommandContext, showProcess = false): Promise<string | null> => {
   const title = await tx('aiProcessTitle')
   let progress: AiProgress | undefined
   let lines: string[] = []
@@ -177,7 +178,7 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext, showProcess = f
     }
     if (sent && !failed) {
       await done()
-      return ''
+      return null
     }
     msgs.push({ role: 'assistant', content: reply })
     const resultPrompt = AI_FREE
@@ -222,7 +223,7 @@ export default {
     }
 
     // 2) Build prompt: system + history + this message (+ files), then ask AI
-    let finalText = ''
+    let finalText: string | null = ''
     // If the user replied to a message, put it directly in the prompt.
     // Why: ensures the AI sees the exact replied content (even if it's old/missing from store).
     let quotedBlock = ''
@@ -258,12 +259,18 @@ export default {
       finalText = `x ${(err as Error).message}`
     }
 
+    // Tool already posted output; don't duplicate it.
+    if (finalText === null) return
+
     // 3) Save history, clear used pending files, and refresh memory in background
     if (finalText.trim()) {
       saveAiHistory(histKey, userText, finalText, files)
       if (pendingFiles.length) clearPendingAiFiles(histKey)
       // Async (non-blocking): summarize/update durable memory when useful
       scheduleMemoryRefresh(histKey, getAiHistory(histKey), askLLM)
+    } else {
+      // Empty model reply: never leave a stuck typing indicator.
+      finalText = await tx('aiEmpty')
     }
 
     // 4) Send reply (rich/table/code card if present, else plain text)
