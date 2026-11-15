@@ -102,7 +102,7 @@ Add your number → owner commands unlock. See [`config.example.json`](config.ex
 <details>
 <summary>Advanced</summary>
 
-- `.ai` brain: free, no key — uses Wakafy AI backend (`../wakafy/ai-chat`), Poolside fallback for text-only requests
+- `.ai` brain: free, no key — GPT-6 via the public Wakafy API (`/v1/ext/salsabytes/gpt-6`), no fallback model, no sibling repo
 - Live from WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` — or just ask `.ai`
 - Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (optional — public free key `@waka:alpha` built in, no signup; set only for your own key)
 - Update: send `.update` from WhatsApp (backs up, pulls, rebuilds, restarts, rolls back on failure)

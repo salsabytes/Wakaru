@@ -80,6 +80,22 @@ export const wakafy = {
     return res.json() as Promise<T>
   },
 
+  // POST a JSON body (ext plugins / AI). Callers cap the body size themselves:
+  // /v1/ext rejects anything over 256 KB.
+  async jsonPost<T>(path: string, body: unknown, opts: { timeout?: number } = {}): Promise<T> {
+    const res = await fetch(this.url(path), {
+      method: 'POST',
+      headers: { ...this.headers(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(opts.timeout ?? 60_000),
+    })
+    if (!res.ok) {
+      const snippet = await res.text().then((t) => t.slice(0, 500)).catch(() => '')
+      throw this.error(res.status, snippet)
+    }
+    return res.json() as Promise<T>
+  },
+
   async file(
     path: string,
     params: Record<string, string | undefined> = {},

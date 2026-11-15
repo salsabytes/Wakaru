@@ -55,7 +55,12 @@ const asksAboutMedia = (text: string): boolean => ASKS_MEDIA.test(String(text ||
 // Only show the live progress bubble for coding-ish requests (or once a code
 // check actually runs) — normal chats should just get a reply.
 const ASKS_CODE =
-  /(kode|code|ngoding|coding|program|script|javascript|typescript|\bjs\b|\bts\b|html|css|python|php|java|c\+\+|sql|react|node|npm|api|fungsi|function|bug|error|debug|fix|perbaiki|benerin|bikin\s+(web|situs|game|aplikasi|bot|script)|website|landing|komponen|component|syntax|compile|build)/i
+  /(kode|code|ngoding|coding|program|script|javascript|typescript|\bjs\b|\bts\b|html|css|python|php|java|c\+\+|sql|react|node|npm|api|fungsi|function|bug|error|debug|fix|perbaiki|benerin|bikin(?:in|kan)?\s+(web|situs|game|aplikasi|app|bot|script|tools?)|buat(?:in|kan)?\s+(web|situs|game|aplikasi|app|bot|script|tools?)|website|landing|komponen|component|syntax|compile|build)/i
+
+// Models sometimes answer a build request with "login to enable visual creation"
+// instead of the code. Detect that excuse on round one and force a real answer.
+const REFUSAL =
+  /(harus|perlu|butuh).{0,40}(login|log in|sign in|sign up|akun|account|langganan|subscribe|upgrade|premium)|fitur.{0,30}(pembuatan visual|visual|dibuat|diaktifkan|tersedia)|(login|sign in).{0,30}(untuk|to).{0,20}(mengaktifkan|enable)/i
 
 // Download attached/replied media into base64 files for the AI (with size checks)
 const collectAiFiles = async (ctx: CommandContext): Promise<{ files: AiFileInput[]; notes: string[] }> => {
@@ -123,6 +128,7 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext, showProcess = f
     if (progress) await show(lines.length ? await tx('aiCheckDone') : await tx('aiDone'))
   }
   if (showProcess) await ensure()
+  let refusalFixed = false
   for (let round = 0; round < MAX_ROUNDS; round++) {
     let reply: string
     try {
@@ -132,6 +138,21 @@ const runExchange = async (msgs: ChatMsg[], ctx: CommandContext, showProcess = f
         await new Promise((r) => setTimeout(r, 1500))
         reply = (await askLLM(msgs)).trim()
       } else throw err
+    }
+    // No login/account exists for this bot: if the model stalls on that excuse
+    // for a build request, hand it back with the only acceptable answer shape.
+    const asked = [...msgs].reverse().find((m) => m.role === 'user')?.content || ''
+    if (!refusalFixed && round === 0 && ASKS_CODE.test(asked) && REFUSAL.test(reply) && !reply.includes('```')) {
+      refusalFixed = true
+      await ensure()
+      msgs.push({ role: 'assistant', content: reply })
+      msgs.push({
+        role: 'user',
+        content:
+          'No login, account, subscription or upgrade is needed — you can build this entirely in a self-contained HTML file. ' +
+          'Output the complete working code now in ONE ```html fence, with a short intro before it.',
+      })
+      continue
     }
     // Agentic verification: explicit ```check-* blocks, or — since some models
     // ignore the instruction — auto-check any JS/HTML fence in the reply. The

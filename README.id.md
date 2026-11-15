@@ -102,7 +102,7 @@ Tambah nomormu → command owner kebuka. Sisanya liat [`config.example.json`](co
 <details>
 <summary>Lanjutan</summary>
 
-- Otak `.ai`: gratis, tanpa key — pakai backend AI Wakafy (`../wakafy/ai-chat`), fallback Poolside untuk request teks
+- Otak `.ai`: gratis, tanpa key — GPT-6 lewat API publik Wakafy (`/v1/ext/salsabytes/gpt-6`), tanpa model fallback, tanpa repo sebelah
 - Live dari WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` — atau tinggal minta `.ai`
 - Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (opsional — key publik gratis `@waka:alpha` sudah bawaan, tanpa daftar; isi hanya kalau punya key sendiri)
 - Update: kirim `.update` dari WhatsApp (backup, pull, rebuild, restart, rollback kalau gagal)

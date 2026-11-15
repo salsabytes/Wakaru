@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { checkCode, extractResources, extractScripts, probeUrl, runCode } from '../src/lib/agentSandbox.ts'
-import { autoChecks, extractChecks } from '../src/commands/main/ai/checks.ts'
+import { autoChecks, extractChecks, previewIssues, runChecks } from '../src/commands/main/ai/checks.ts'
 
 test('check-js passes valid code and reports syntax errors', async () => {
   const good = await checkCode('js', 'const x = 1\nconsole.log(x)')
@@ -75,4 +75,20 @@ test('autoChecks finds js/html fences without stripping them', () => {
 test('autoChecks skips short fragments and non-code fences', () => {
   assert.deepEqual(autoChecks('```js\nx\n```'), [])
   assert.deepEqual(autoChecks('```py\nprint("hi")\n```'), [])
+})
+
+test('previewIssues flags APIs that break the offline WhatsApp card', () => {
+  const html = '<script>const best = localStorage.getItem("s") || 0; alert("hi")</script>'
+  const issues = previewIssues(html)
+  assert.equal(issues.some((i) => /storage/i.test(i)), true)
+  assert.equal(issues.some((i) => /alert/i.test(i)), true)
+  assert.deepEqual(previewIssues('<script>const s = 0; document.body.textContent = s</script>'), [])
+})
+
+test('runChecks makes a syntactically valid but unplayable card fail', async () => {
+  const html = '<!DOCTYPE html><html><body><canvas></canvas><script>localStorage.setItem("x", "1"); document.addEventListener("keydown", () => {})</script></body></html>'
+  const checks = autoChecks('```html\n' + html + '\n```')
+  const [r] = await runChecks(checks)
+  assert.equal(r.ok, false)
+  assert.match(r.text, /storage|keyboard/i)
 })

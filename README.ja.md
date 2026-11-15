@@ -102,7 +102,7 @@ npm run start           # or: npm run start:pairing
 <details>
 <summary>応用</summary>
 
-- `.ai`脳：無料・キー不要 — Wakafy AIバックエンド（`../wakafy/ai-chat`）を使用、テキストのみPoolsideフォールバック
+- `.ai`脳：無料・キー不要 — 公開Wakafy API（`/v1/ext/salsabytes/gpt-6`）経由のGPT-6、フォールバックモデルなし、隣接リポジトリ不要
 - WhatsAppからライブ変更：`.setlang`、`.mode`、`.prefix`、`.limit` — or `.ai`に頼むだけ
 - Env：`SESSION_DIR`（既定`sessions`）、`PAIRING_CODE=1`、`WAKAFY_API_KEY`（任意 — 公開フリーキー`@waka:alpha`内蔵、登録不要。自分のキーを使う場合のみ設定）
 - 更新：WhatsAppから`.update`（バックアップ→取得→再構築→再起動、失敗時はロールバック）

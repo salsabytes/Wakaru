@@ -116,14 +116,7 @@ step "Dependencies"
 npm install
 ok "dependencies installed"
 
-# .ai uses Wakafy backend (../wakafy/ai-chat, JS). No Python sidecar needed.
-step "AI backend (Wakafy)"
-if [ -f "../wakafy/ai-chat/index.js" ] || [ -f "wakafy/ai-chat/index.js" ]; then
-  ok "wakafy ai-chat found"
-else
-  skip "wakafy ai-chat not found (expected at ../wakafy/ai-chat) - .ai may fail until available"
-fi
-
+# .ai goes through the public Wakafy API (same base/key as the downloaders).
 step "Engines (sticker)"
 build_engine() {
   local crate="$1" binary="$2" out="$3"

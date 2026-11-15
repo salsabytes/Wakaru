@@ -10,6 +10,16 @@ import { getGrounding } from '../../../lib/aiKnowledge.ts'
 const PARTICIPANT_MAX = 80 // cap group member list so prompts stay small
 const RECENT_MAX = 10 // recent chat messages to include (budgeted)
 const DESC_MAX = 400 // max group description chars
+// Build/create requests must produce real code, never an excuse about accounts.
+const BUILD_RULES = [
+  'BUILD / CREATE REQUESTS — if the user asks you to make something (game, app, website, landing page, tool, calculator, animation, chart, "bikin/bikinin/buatkan/buatin"), you MUST DELIVER it, not describe it or promise it:',
+  '- Reply with ONE complete, self-contained HTML file in a ```html fence (inline CSS + JS, no external files or CDNs), ready to save and open in a browser.',
+  '- Put a very short intro before the fence; inside the fence put only the code.',
+  '- NEVER say you need to log in, sign in, create an account, subscribe, upgrade, or that a feature is disabled. You have no login and everything you build runs locally in the browser.',
+  '- The HTML card is a sandboxed OFFLINE page on Android: no network, no localStorage/sessionStorage/cookies, no alert/confirm/prompt, no external scripts/fonts/images/CDNs. Keep everything inline and keep state in plain JS variables — storage APIs throw and kill the script.',
+  '- Make it playable by touch/click on a phone (never keyboard-only) and size the stage with vw/vh or a fixed height so it fits the card.',
+  '- You cannot generate raster images/art. When the user wants something visual, BUILD it with HTML/CSS/SVG/Canvas instead of refusing.',
+]
 // WAKARU_AI_FREE=1 (or "aiFree":"1" in config.json) drops fixed persona/style
 // and gives the model a minimal prompt with more tool rounds.
 export const AI_FREE = process.env.WAKARU_AI_FREE === '1' || cfg('aiFree', '') === '1'
@@ -159,6 +169,8 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
         'It renders as an interactive card on Android only; Web/iPhone just get its text, so never hide essential info there. Keep it self-contained (inline CSS/JS, no external files).',
       'If the user explicitly wants the raw source to copy, use ```txt instead of ```html.',
       '',
+      ...BUILD_RULES,
+      '',
       'VERIFY CODE BEFORE YOU SEND (agentic check) — you can test your own code:',
       '```check-js (syntax-check a JS snippet), ```check-html (syntax-check inline <script> + list its external URLs), ```check-url (probe a URL: HTTP status, final URL, content-type), ```run-js (actually execute a snippet).',
       'Example:',
@@ -251,6 +263,8 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
       '```',
       'It renders as an interactive card on Android only; Web/iPhone just get its text, so never hide essential info there. Keep it self-contained (inline CSS/JS, no external files).',
       'If the user explicitly wants the raw source to copy, use ```txt instead of ```html.',
+      '',
+      ...BUILD_RULES,
       '',
       'VERIFY CODE BEFORE YOU SEND (agentic check) — you can test your own code:',
       '```check-js (syntax-check a JS snippet), ```check-html (syntax-check inline <script> + list its external URLs), ```check-url (probe a URL: HTTP status, final URL, content-type), ```run-js (actually execute a snippet).',

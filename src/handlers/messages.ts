@@ -170,6 +170,9 @@ const aiFallback = async (m: SerializedMessage, sender: string, text: string): P
 }
 
 const parseCommand = async (m: SerializedMessage, sender: string, text: string): Promise<Parsed> => {
+  // tolerate a leading punctuation the user *thinks* is the prefix (".ai", "!play")
+  // so a configured prefix like "w" doesn't make the command silently vanish
+  const cmdName = (token: string): string => token.replace(/^[^a-z0-9_]+/i, '').toLowerCase()
   // button taps go back to the command that owns them
   const bid = m.button?.id
   if (bid?.startsWith('antilink:')) {
@@ -184,7 +187,7 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
   if (direct !== undefined) {
     const [rawName, ...rest] = direct.split(/\s+/)
     if (!rawName) return { cmd: undefined, queryText: '', args: [] }
-    const cmd = await getCommand(rawName.toLowerCase())
+    const cmd = await getCommand(cmdName(rawName))
     if (cmd) {
       return {
         cmd,
@@ -198,7 +201,9 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
   }
   const noPrefix = (direct ?? text).trim()
   const guess = noPrefix.split(/\s+/)[0]?.toLowerCase() ?? ''
-  const bareCmd = await getCommand(guess)
+  // someone typed ".ai"/"!play": an explicit punctuation prefix, not a bare word
+  const punctPrefixed = guess !== cmdName(guess)
+  const bareCmd = await getCommand(cmdName(guess))
   if (bareCmd) {
     const key = `${sender}:${bareCmd.name}`
     const now = Date.now()
@@ -206,8 +211,10 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
     const last = bareSeen.get(key) ?? 0
     bareSeen.set(key, now)
     // prefixes only: same bare command twice in a row = deliberate, once = chat.
-    // bare on (flag or empty list): fire right away — the owner asked for it.
-    if (!botBare() && botPrefixes().length && now - last > BARE_WINDOW_MS) return aiFallback(m, sender, text)
+    // bare on (flag or empty list) or a punctuation prefix: fire right away.
+    if (!punctPrefixed && !botBare() && botPrefixes().length && now - last > BARE_WINDOW_MS) {
+      return aiFallback(m, sender, text)
+    }
     const after = noPrefix.slice(guess.length).trim()
     return { cmd: bareCmd, queryText: after, args: after ? after.split(/\s+/) : [] }
   }

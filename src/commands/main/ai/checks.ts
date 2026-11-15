@@ -1,4 +1,4 @@
-import { checkCode, probeUrl, runCode, type SandboxResult } from '../../../lib/agentSandbox.ts'
+import { checkCode, extractResources, probeUrl, runCode, type SandboxResult } from '../../../lib/agentSandbox.ts'
 
 /**
  * Agentic verification blocks the AI can put in its reply:
@@ -65,6 +65,33 @@ export interface CheckResult {
   text: string
 }
 
+// The WhatsApp HTML card is a sandboxed, offline page on Android. These APIs
+// either throw or do nothing there, which silently kills the whole script — the
+// exact reason a "working" game can't be played in the preview.
+const PREVIEW_BLOCKERS: Array<{ re: RegExp; why: string }> = [
+  { re: /\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bdocument\.cookie\b/, why: 'storage APIs throw a SecurityError in the sandbox — keep state in a plain JS variable' },
+  { re: /\balert\s*\(|\bconfirm\s*\(|\bprompt\s*\(/, why: 'alert/confirm/prompt are blocked — show messages in the DOM instead' },
+  { re: /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bserviceWorker\b/, why: 'the card has no network — bundle all data and logic inline' },
+  { re: /\bwindow\.open\s*\(|\blocation\.(?:href|assign|replace)\b|\bhistory\.pushState\b/, why: 'navigation is blocked — never leave the card' },
+  { re: /\bnew\s+(?:Worker|SharedWorker)\s*\(/, why: 'web workers are not available in the card' },
+]
+
+/** Why an HTML page would break (or be unplayable) inside the WhatsApp card. */
+export const previewIssues = (html: string): string[] => {
+  const src = String(html ?? '')
+  const out: string[] = []
+  for (const b of PREVIEW_BLOCKERS) if (b.re.test(src)) out.push(b.why)
+  const external = extractResources(src)
+  if (external.length) out.push(`no external resources (offline card): load these inline instead — ${external.join(', ')}`)
+  if (/<canvas\b/i.test(src)) {
+    const hasPointer = /addEventListener\s*\(\s*['"](?:click|pointerdown|touchstart|mousedown)['"]|on(?:click|pointerdown|touchstart|mousedown)\s*=/.test(src)
+    const keysOnly = /addEventListener\s*\(\s*['"]key(?:down|up|press)['"]|onkey(?:down|up|press)\s*=/.test(src)
+    if (keysOnly && !hasPointer) out.push('the game only listens to the keyboard — add touch/click controls so it is playable on a phone')
+  }
+  const seen = new Set<string>()
+  return out.filter((s) => (seen.has(s) ? false : (seen.add(s), true)))
+}
+
 export const runChecks = async (checks: Check[]): Promise<CheckResult[]> => {
   const out: CheckResult[] = []
   for (const c of checks) {
@@ -74,7 +101,16 @@ export const runChecks = async (checks: Check[]): Promise<CheckResult[]> => {
         : c.kind === 'url'
           ? await probeUrl(c.code)
           : await checkCode(c.kind, c.code)
-    out.push({ kind: c.kind, ok: r.ok, text: describe(c.kind, r) })
+    let ok = r.ok
+    let text = describe(c.kind, r)
+    if (c.kind === 'html') {
+      const issues = previewIssues(c.code)
+      if (issues.length) {
+        ok = false
+        text += '\npreview would break inside the WhatsApp HTML card (offline sandbox):\n' + issues.map((i) => `- ${i}`).join('\n')
+      }
+    }
+    out.push({ kind: c.kind, ok, text })
   }
   return out
 }

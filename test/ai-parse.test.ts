@@ -210,3 +210,16 @@ test('batchRichParts keeps one preview card per message with its note', () => {
     assert.equal(b[1].type, 'html')
   }
 })
+
+test('a big preview keeps its intro text in the same message', () => {
+  const parts: RichPart[] = [
+    { type: 'text', text: 'intro panjang '.repeat(100) },
+    { type: 'text', text: '📱 preview HTML cuma tampil di Android' },
+    { type: 'html', html: '<!DOCTYPE html><html><body>' + 'x'.repeat(9000) + '</body></html>' },
+    { type: 'text', text: '📄 kode 1/2' },
+    { type: 'code', code: 'a'.repeat(3000), language: 'html' },
+  ]
+  const batches = batchRichParts(parts)
+  assert.deepEqual(batches[0].map((p) => p.type), ['text', 'text', 'html'])
+  assert.deepEqual(batches[1].map((p) => p.type), ['text', 'code'])
+})

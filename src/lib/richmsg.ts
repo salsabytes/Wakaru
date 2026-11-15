@@ -625,8 +625,12 @@ export function batchRichParts(parts: RichPart[], max = RICH_BATCH_CHARS): RichP
     // (e.g. the "kode 2/3" label) starts the next message so it stays with its
     // card. Trailing text after the last card is merged into that same message.
     const nextPart = parts[i + 1]
-    const leadsCard = p.type === 'text' && (nextPart?.type === 'code' || nextPart?.type === 'html')
-    const mustBreak = (isCard(p) && hasCard) || (leadsCard && hasCard) || chars + size > max
+    const nextCard = nextPart ? isCard(nextPart) : false
+    const leadsCard = p.type === 'text' && nextCard
+    // Never split a card away from the text above it: the intro/notes belong to
+    // the preview even when the HTML alone is already over the char budget.
+    const mustBreak =
+      (isCard(p) && hasCard) || (leadsCard && hasCard) || (!isCard(p) && !nextCard && chars + size > max)
     if (cur.length && mustBreak) {
       out.push(cur)
       cur = []
@@ -639,6 +643,11 @@ export function batchRichParts(parts: RichPart[], max = RICH_BATCH_CHARS): RichP
   return out
 }
 
+// WhatsApp silently drops rich messages sent back-to-back; a small gap lets each
+// one land (and an HTML card needs its self-edit to render first).
+const RICH_BATCH_GAP_MS = 450
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 /** Send native rich parts (text/table/code). Works on Android, Web, and iPhone. */
 export async function sendRichParts(
   sock: WASocket,
@@ -649,14 +658,20 @@ export async function sendRichParts(
   const batches = batchRichParts(parts)
   let id: string | undefined
   for (let i = 0; i < batches.length; i++) {
-    const o = i === batches.length - 1 ? opts : { ...opts, footer: undefined }
+    const last = i === batches.length - 1
+    const base = last ? opts : { ...opts, footer: undefined }
+    // HTML cards only render reliably on Android after the identical self-edit.
+    const hasHtml = batches[i].some((p) => p.type === 'html')
+    const o = hasHtml ? { ...base, withEdit: true } : base
     try {
       const sent = await relayRich(sock, jid, buildRichParts(batches[i], o), o, partsToText(batches[i], o.footer))
       id = sent ?? id
     } catch {
       // rich failed for this batch — plain text is better than silence
-      await sock.sendMessage(jid, { text: partsToText(batches[i], o.footer) }).catch(() => {})
+      const text = partsToText(batches[i], o.footer)
+      await sock.sendMessage(jid, { text: text.trim() ? text : '📄 (pesan rich gagal dikirim)' }).catch(() => {})
     }
+    if (!last) await pause(RICH_BATCH_GAP_MS)
   }
   return id
 }
