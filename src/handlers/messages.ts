@@ -85,10 +85,15 @@ const resolveJid = async (jid: string) => {
   return pn ?? jid
 }
 
+const isLid = (jid: string): boolean => jid.endsWith('@lid') || jid.endsWith('@hosted.lid')
+
 // LID→PN resolved once at the boundary; mentionedJid stays raw — WhatsApp sends mentions as-is
 const serialize = async (msg: WAMessage): Promise<SerializedMessage> => {
   const m = serializeMessage(msg)
-  m.sender = await resolveJid(m.sender)
+  // Stanza often carries the PN alternative; use it when the LID map is cold,
+  // otherwise owner checks fail and the AI loses repo access.
+  const alt = [msg.key?.participantAlt, msg.key?.remoteJidAlt].find((x) => x?.endsWith('@s.whatsapp.net'))
+  m.sender = isLid(m.sender) && alt ? alt : await resolveJid(m.sender)
   if (m.quoted?.sender) m.quoted.sender = await resolveJid(m.quoted.sender)
   // own group messages arrive with a @lid participant when the LID mapping is
   // cold, so fromMe=false slipped past the filter and antilink removed them.

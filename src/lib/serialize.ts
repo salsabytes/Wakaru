@@ -13,6 +13,7 @@ export interface MediaMeta {
   sender: string
   text: string
   download: () => Promise<Buffer>
+  msg?: WAMessage // full quoted message, for commands that need to re-quote it
 }
 
 export interface SerializedMessage {
@@ -165,6 +166,7 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
       sender: ctxt.participant ?? '',
       text: qbody.text || qbody.caption || '',
       download: withReupload(qmsg, qraw),
+      msg: qmsg,
     }
   }
 

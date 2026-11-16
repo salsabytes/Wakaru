@@ -6,6 +6,7 @@ import { messageStore, recentByChat } from '../../../lib/store.ts'
 import { fetchContributors } from '../../../lib/contributors.ts'
 import { describeMessage, formatMemory } from '../../../lib/aiMemory.ts'
 import { getGrounding } from '../../../lib/aiKnowledge.ts'
+import { AGENT_RULES } from '../../../lib/agentFiles.ts'
 
 const PARTICIPANT_MAX = 80 // cap group member list so prompts stay small
 const RECENT_MAX = 10 // recent chat messages to include (budgeted)
@@ -194,6 +195,7 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
         '',
         'AVAILABLE COMMANDS (name — description):',
         commandList,
+        ...(ctx.isOwner ? ['', 'REPO CHANGES and FILE ACCESS are unavailable in this chat. Never claim you added/deleted/edited files or invent repo paths or file contents; ask the user to resend with @repo in front.'] : []),
       ].join('\n'),
     }
   }
@@ -288,6 +290,29 @@ export const buildSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
         .filter((c) => c.name !== 'ai' && (ctx.isOwner || !c.ownerOnly))
         .map((c) => `- ${c.name}${c.desc ? ' — ' + c.desc : ''}`)
         .join('\n'),
+      ...(ctx.isOwner ? ['', 'REPO CHANGES and FILE ACCESS are unavailable in this chat. Never claim you added/deleted/edited files or invent repo paths or file contents; ask the user to resend with @repo in front.'] : []),
+    ].join('\n'),
+  }
+}
+
+// Owner repo task: use a small focused prompt. The normal persona prompt tells
+// the model to answer code in chat, which fights the tool loop.
+export const buildRepoSystem = async (ctx: CommandContext): Promise<ChatMsg> => {
+  const context = await buildContext(ctx)
+  return {
+    role: 'system',
+    content: [
+      'You are Wakaru (WhatsApp bot on Baileys + TypeScript), running in REPO MODE for the owner.',
+      'You edit the real repository by emitting marker lines; the bot executes them.',
+      '',
+      'CONTEXT:',
+      context,
+      '',
+      AGENT_RULES,
+      '',
+      'REPO MODE OVERRIDES ANY OTHER PERSONA RULE: for a code task never answer with a chat-only snippet.',
+      'Start with @ls or @read, edit with @write, then @typecheck, @test, and finish with @done.',
+      'Answer with the real tool output. Never print tool syntax as instructions and never ask the user to run it.',
     ].join('\n'),
   }
 }
