@@ -11,20 +11,19 @@ import { AGENT_RULES } from '../../../lib/agentFiles.ts'
 const PARTICIPANT_MAX = 80 // cap group member list so prompts stay small
 const RECENT_MAX = 10 // recent chat messages to include (budgeted)
 const DESC_MAX = 400 // max group description chars
-// Build/create requests must produce real code, never an excuse about accounts.
+// Build requests must return real, working code (no login/image-gen excuses).
 const BUILD_RULES = [
-  'BUILD / CREATE REQUESTS — if the user asks you to make something (game, app, website, landing page, tool, calculator, animation, chart, "bikin/bikinin/buatkan/buatin"), you MUST DELIVER it, not describe it or promise it:',
+  'BUILD / CREATE REQUESTS — if the user asks you to make/build/create something (game, app, website, landing page, tool, calculator, animation, chart, UI, "bikin/bikinin/buatkan/buatin"), you MUST DELIVER it, not describe it or promise it:',
   '- Reply with ONE complete, self-contained HTML file in a ```html fence (inline CSS + JS, no external files or CDNs), ready to save and open in a browser.',
   '- Put a very short intro before the fence; inside the fence put only the code.',
-  '- NEVER say you need to log in, sign in, create an account, subscribe, upgrade, or that a feature is disabled. You have no login and everything you build runs locally in the browser.',
+  '- NEVER ask the user to log in/sign in/create an account/subscribe/upgrade, and NEVER claim a feature is disabled or unavailable. You have no login and everything you build runs locally in the browser.',
+  '- If the user asks for an image, drawing, picture, or any visual, do NOT refuse and do NOT mention image generation — build it with HTML/CSS/SVG/Canvas code in the ```html fence.',
   '- The HTML card is a sandboxed OFFLINE page on Android: no network, no localStorage/sessionStorage/cookies, no alert/confirm/prompt, no external scripts/fonts/images/CDNs. Keep everything inline and keep state in plain JS variables — storage APIs throw and kill the script.',
-  '- Make it playable by touch/click on a phone (never keyboard-only) and size the stage with vw/vh or a fixed height so it fits the card.',
-  '- You cannot generate raster images/art. When the user wants something visual, BUILD it with HTML/CSS/SVG/Canvas instead of refusing.',
+  '- Mobile-first (phones): include `<meta name="viewport" content="width=device-width, initial-scale=1">`, set `html,body{margin:0;height:100%}`, and make the main UI fill the screen (`width:100%` / `min-height:100dvh`, no tiny fixed-width boxes). Use readable text (>=16px), large touch targets (>=44px), and touch/click only (no keyboard-only).',
 ]
-// WAKARU_AI_FREE=1 (or "aiFree":"1" in config.json) drops fixed persona/style
-// and gives the model a minimal prompt with more tool rounds.
+// Free-form mode: minimal prompt, more tool rounds (WAKARU_AI_FREE=1 or config aiFree:"1").
 export const AI_FREE = process.env.WAKARU_AI_FREE === '1' || cfg('aiFree', '') === '1'
-// groupMetadata can hang on a flaky connection — cap it so the reply never waits on member names
+// Cap group metadata fetch so a flaky connection can't stall the reply.
 const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([p.then((v): T | null => v), new Promise<T | null>((r) => setTimeout(() => r(null), ms))])
 

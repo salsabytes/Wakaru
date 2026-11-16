@@ -8,7 +8,7 @@ import { sendRichParts } from '../../../lib/richmsg.ts'
 import { clearPendingAiFiles, getAiHistory, getPendingAiFiles, pendingAiFilesAge, saveAiHistory, trimFilesToBudget } from '../../../lib/aiHistory.ts'
 import { handleMemoryIntent, scheduleMemoryRefresh } from '../../../lib/aiMemory.ts'
 import { AI_FREE, buildRepoSystem, buildSystem } from './prompt.ts'
-import { REPO_TASK, classifyIntent, routeText, takeModeOverride, type AiRoute } from '../../../lib/aiRoute.ts'
+import { classifyIntent, routeMode, routeText, takeModeOverride, type AiRoute } from '../../../lib/aiRoute.ts'
 import { setAiBusy } from '../../../lib/aiStatus.ts'
 import { hasRich, parseRich, richToText, waText } from './rich.ts'
 import { parseRuns, runTool } from './tools.ts'
@@ -62,18 +62,15 @@ const ASKS_MEDIA =
 
 const asksAboutMedia = (text: string): boolean => ASKS_MEDIA.test(String(text || ''))
 
-// Show the live progress bubble only for coding-ish asks.
-// Normal chat just gets a reply.
+// Code/build asks get a live progress bubble; normal chat just replies.
 const ASKS_CODE =
   /(kode|code|ngoding|coding|program|script|javascript|typescript|\bjs\b|\bts\b|html|css|python|php|java|c\+\+|sql|react|node|npm|api|fungsi|function|bug|error|debug|fix|perbaiki|benerin|bikin(?:in|kan)?\s+(web|situs|game|aplikasi|app|bot|script|tools?)|buat(?:in|kan)?\s+(web|situs|game|aplikasi|app|bot|script|tools?)|website|landing|komponen|component|syntax|compile|build)/i
 
-// Some models answer a build request with "login to enable visual creation"
-// instead of code. Catch that excuse on round one and force a real answer.
+// Catches "login/account" or "can't generate image" refusals so we can force real HTML.
 const REFUSAL =
-  /(harus|perlu|butuh).{0,40}(login|log in|sign in|sign up|akun|account|langganan|subscribe|upgrade|premium)|fitur.{0,30}(pembuatan visual|visual|dibuat|diaktifkan|tersedia)|(login|sign in).{0,30}(untuk|to).{0,20}(mengaktifkan|enable)/i
+  /(harus|perlu|butuh|silakan|silahkan|minta|coba).{0,40}(login|log ?in|sign ?in|sign ?up|masuk|akun|account|langganan|subscribe|upgrade|premium)|\b(login|log ?in|sign ?in)\b.{0,30}(dulu|untuk|agar|to\s+enable|to\s+use)|(fitur|feature).{0,40}(pembuatan visual|visual|gambar|image|disabled|tidak tersedia|unavailable|diaktifkan)|(tidak|nggak|tak|gak) bisa.{0,30}(buat|bikin|generate|membuat|menghasilkan).{0,20}(gambar|image|foto|visual|ilustrasi)|can'?t.{0,30}(generate|create|make|draw).{0,20}(image|picture|visual|illustration)/i
 
-// "Siap, sudah aku hapus" with zero tool calls is a lie. A listing answer is not.
-// That check lives in repoNudge() so it can see how many tools ran.
+// Repo "done" claims without tool calls are validated in repoNudge().
 
 // Download attached/replied media into base64 for the AI, with size checks.
 const collectAiFiles = async (ctx: CommandContext): Promise<{ files: AiFileInput[]; notes: string[] }> => {
@@ -224,8 +221,7 @@ const runExchange = async (
         reply = (await askLLM(msgs)).trim()
       } else throw err
     }
-    // This bot has no login/account. If the model stalls on that excuse
-    // for a build request, hand it back with the only acceptable answer shape.
+    // Block login/image-gen excuses: force a real HTML/SVG/Canvas answer on first refusal.
     const asked = [...msgs].reverse().find((m) => m.role === 'user')?.content || ''
     if (!refusalFixed && round === 0 && ASKS_CODE.test(asked) && REFUSAL.test(reply) && !reply.includes('```')) {
       refusalFixed = true
@@ -234,7 +230,8 @@ const runExchange = async (
       msgs.push({
         role: 'user',
         content:
-          'No login, account, subscription or upgrade is needed — you can build this entirely in a self-contained HTML file. ' +
+          'No login/account/subscription is needed and you must not refuse or mention image generation. ' +
+          'Build what was asked as a self-contained HTML file (use HTML/CSS/SVG/Canvas for any visuals). ' +
           'Output the complete working code now in ONE ```html fence, with a short intro before it.',
       })
       continue
@@ -434,18 +431,20 @@ export default {
       inline.length ? `[isi file]\n${inline.join('\n\n')}` : '',
     ].filter(Boolean)
     const userText = extra.length ? `${baseText}\n\n${extra.join('\n\n')}` : baseText
-    // Route on what the user typed, not on file contents.
-    // Sending a document must not flip an owner into repo mode.
+    // Route on typed/replied intent (not file contents) so attachments don't force repo mode.
     const routeTextNow = routeText(query, ctx.quoted?.text)
     let route: AiRoute
     if (!ctx.isOwner) {
       route = { mode: 'chat', why: 'not owner' }
     } else if (forced) {
       route = { mode: forced, why: 'manual override' }
-    } else if (REPO_TASK.test(routeTextNow)) {
-      route = { mode: 'repo', why: 'repo intent' }
     } else {
-      route = { mode: await classifyIntent(routeTextNow), why: 'ai intent' }
+      // LLM decides; heuristics only if the classifier fails.
+      try {
+        route = { mode: await classifyIntent(routeTextNow), why: 'ai intent' }
+      } catch {
+        route = { ...routeMode(routeTextNow), why: 'heuristic (classifier unavailable)' }
+      }
     }
     const repo: RepoSession | undefined = ctx.isOwner && route.mode === 'repo' ? {} : undefined
     if (ctx.isOwner) logger.info(`ai mode: ${route.mode} (${route.why})`)
