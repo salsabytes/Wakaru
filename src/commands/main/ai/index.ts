@@ -1,5 +1,5 @@
 ﻿import { askLLM, type AiFileInput, type ChatMsg } from '../../../lib/llm.ts'
-import { asksForListing, createFileTools, ensureListingShown, parseAgentActions, repoNudge, runAgentAction, REPO_ROOT, type FileTools } from '../../../lib/agentFiles.ts'
+import { asksForListing, createFileTools, ensureListingShown, parseAgentActions, repoNudge, runAgentAction, wantsCodeChange, REPO_ROOT, type FileTools } from '../../../lib/agentFiles.ts'
 import { sendRepoPath } from '../../../lib/agentSend.ts'
 import { fileMime, fileNameOf } from '../../../lib/fileinfo.ts'
 import { tx } from '../../../lib/lang.ts'
@@ -176,6 +176,7 @@ const runExchange = async (
   const lsSeen = new Map<string, string>()
   const firstUserText = [...msgs].reverse().find((m) => m.role === 'user')?.content || ''
   const wantsListing = !!repo && asksForListing(firstUserText)
+  const wantsChange = !!repo && wantsCodeChange(firstUserText)
   const finish = (text: string): string => (wantsListing ? ensureListingShown(text, [...lsSeen.values()]) : text)
 
   const ensure = async (): Promise<AiProgress> => {
@@ -189,12 +190,13 @@ const runExchange = async (
   const done = async (): Promise<void> => {
     if (progress) await show(lines.length ? await tx('aiCheckDone') : await tx('aiDone'))
   }
-  // One visible line per tool step. The user can see @ls/@read really ran,
-  // instead of only getting a summary at the end.
+  // One progress line per tool step so the user sees what's happening.
   const stepLabel = (tool: string, arg: string): string => {
     if (tool === 'ls') return `📂 ls ${arg || '.'}`
     if (tool === 'read') return `📄 read ${arg}`
     if (tool === 'grep') return `🔍 grep ${arg}`
+    if (tool === 'search') return `🌐 searching: ${arg}`
+    if (tool === 'fetch') return `🌐 reading: ${arg}`
     if (tool === 'write') return `✏️ write ${arg}`
     if (tool === 'rm') return `🗑️ rm ${arg}`
     if (tool === 'send') return `📤 send ${arg}`
@@ -210,6 +212,8 @@ const runExchange = async (
   if (showProcess) await ensure()
   let refusalFixed = false
   let nudges = 0
+  // True once a file is written/removed in this run.
+  let wrote = false
   for (let round = 0; round < maxRounds; round++) {
     let reply: string
     try {
@@ -238,8 +242,9 @@ const runExchange = async (
     // Owner repo tools: read/search/edit files, then see real tsc/test errors.
     if (repo) {
       const agent = parseAgentActions(reply)
+      // No tool calls in the reply? Nudge the model to keep working (not stall/chatter).
       if (!agent.actions.length && nudges < 2) {
-        const nudge = repoNudge(reply, toolsRun)
+        const nudge = repoNudge(reply, toolsRun, wantsChange && !wrote)
         if (nudge) {
           nudges++
           msgs.push({ role: 'assistant', content: reply })
@@ -253,9 +258,14 @@ const runExchange = async (
                 ? 'You have not listed anything yet, so you have no real paths. Run the tool now: ' +
                   '@ls -r . (one call for the whole subtree), then answer with the paths exactly ' +
                   'as the tool returned them (a ```txt tree). Do not invent directories.'
-                : 'You have not run any tool yet, so nothing changed. Do the work now: @read the ' +
-                  'relevant file, then @rm to delete or @write to change it, then @typecheck and ' +
-                  '@test, and finish with @done.',
+                : nudge === 'continue'
+                  ? 'Reading was only the first step and you have not changed anything yet. Do not ' +
+                    'send progress chatter ("sebentar", "aku lanjutkan", "udah aman") and do not wait ' +
+                    'for the user. Now @write the new or changed file with its full content, run ' +
+                    '@typecheck and @test, then finish with @done in this same turn.'
+                  : 'You have not run any tool yet, so nothing changed. Do the work now: @read the ' +
+                    'relevant file, then @rm to delete or @write to change it, then @typecheck and ' +
+                    '@test, and finish with @done.',
           })
           continue
         }
@@ -279,6 +289,7 @@ const runExchange = async (
           if (bad) failed = true
           if (running) {
             toolsRun++
+            wrote ||= action.tool === 'write' || action.tool === 'rm'
             logStep(`${bad ? '❌' : '✅'} ${stepLabel(action.tool, action.arg)}`)
           }
           if (action.tool === 'done') {

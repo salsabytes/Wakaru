@@ -11,6 +11,7 @@ import {
   renderTree,
   repoNudge,
   runAgentAction,
+  wantsCodeChange,
 } from '../src/lib/agentFiles.ts'
 
 const withRepo = async (fn: (root: string) => Promise<void>): Promise<void> => {
@@ -167,6 +168,21 @@ test('a listing answer is not a false claim once tools ran', () => {
   // a real lie about a write is still caught before any tool runs
   assert.equal(repoNudge('Sudah aku hapus file itu', 0), 'claim')
   assert.equal(repoNudge('Aku tidak punya akses repo di sini', 0), 'stall')
+})
+
+test('a change request is not finished by reading or chatting', () => {
+  assert.equal(wantsCodeChange('tolong buatin fitur test'), true)
+  assert.equal(wantsCodeChange('hapus command lama'), true)
+  assert.equal(wantsCodeChange('benerin bug play'), true)
+  assert.equal(wantsCodeChange('tunjukin struktur foldermu'), false)
+  assert.equal(wantsCodeChange('jelasin cara kerja handler'), false)
+  assert.equal(wantsCodeChange('baca file src/index.ts'), false)
+  // before any tool ran: must start with a tool
+  assert.equal(repoNudge('sebentar ya~', 0, true), 'stall')
+  // after @ls only: keep going instead of accepting filler
+  assert.equal(repoNudge('Aku lanjutkan pembuatan fitur setelah memastikan struktur.', 1, true), 'continue')
+  // already wrote: a normal summary is fine
+  assert.equal(repoNudge('Fitur test sudah jadi, typecheck dan test lolos.', 2, false), null)
 })
 
 test('a listing summary never hides the real structure', () => {

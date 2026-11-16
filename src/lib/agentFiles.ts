@@ -107,10 +107,12 @@ export const createFileTools = async (repoRoot = REPO_ROOT): Promise<FileTools> 
   const root = await realpath(repoRoot).catch(() => resolve(repoRoot))
   const backupDir = await mkdtemp(join(tmpdir(), 'wakaru-agent-'))
   const backups = new Map<string, string | null>() // rel -> saved copy, null = new file
+  // Cache file reads for this session to avoid repeated disk reads.
+  const readCache = new Map<string, string>()
 
   const absOf = (rel: string): string => (rel ? join(root, rel) : root)
 
-  // recursive @ls: one call for the whole subtree, so folder counts are exact
+  // List a folder; recursive mode walks the whole subtree in one call.
   const list = async (rel = '', recursive = false): Promise<string> => {
     const safe = String(rel ?? '').trim() ? normalizeRel(root, rel) : ''
     const abs = absOf(safe)
@@ -143,6 +145,8 @@ export const createFileTools = async (repoRoot = REPO_ROOT): Promise<FileTools> 
   const read = async (rel: string): Promise<string> => {
     const safe = normalizeRel(root, rel)
     if (!safe) throw new AgentPathError('empty path')
+    const cached = readCache.get(safe)
+    if (cached !== undefined) return cached
     const abs = absOf(safe)
     await assertInside(root, abs)
     const st = await stat(abs)
@@ -152,9 +156,11 @@ export const createFileTools = async (repoRoot = REPO_ROOT): Promise<FileTools> 
     if (buf.subarray(0, 8000).includes(0)) throw new AgentPathError(`binary file: ${safe}`)
     const text = buf.toString('utf8')
     // A partial read must never be treated as the whole file when writing.
-    return text.length > READ_MAX
+    const out = text.length > READ_MAX
       ? text.slice(0, READ_MAX) + '\n[... TRUNCATED: never write this file from a partial read - grep the exact lines instead]'
       : text
+    readCache.set(safe, out)
+    return out
   }
 
   const grep = async (pattern: string): Promise<string> => {
@@ -222,6 +228,7 @@ export const createFileTools = async (repoRoot = REPO_ROOT): Promise<FileTools> 
     }
     await mkdir(dirname(abs), { recursive: true })
     await writeFile(abs, content, 'utf8')
+    readCache.delete(safe)
     return `wrote ${safe} (${bytes} bytes)`
   }
 
@@ -244,6 +251,7 @@ export const createFileTools = async (repoRoot = REPO_ROOT): Promise<FileTools> 
       backups.set(safe, copy)
     }
     await rm(abs, { force: true })
+    readCache.delete(safe)
     return `deleted ${safe}`
   }
 
@@ -276,6 +284,7 @@ export const createFileTools = async (repoRoot = REPO_ROOT): Promise<FileTools> 
       restored.push(rel)
     }
     backups.clear()
+    readCache.clear()
     return restored
   }
 
@@ -298,6 +307,8 @@ Tools - one per line, at the start of a line, no markdown around them:
 @ls <path>         list one directory (empty = repo root)
 @ls -r <path>      list a whole subtree in ONE call (use it for repo structure)
 @grep <regex>      search text files
+@search <query>    web search (use only when NOT found in repo; tell user you're researching)
+@fetch <url>       fetch a web page/docs as text (use to read Baileys docs, etc.)
 @write <path>      the next fenced block is the FULL new file content
 @rm <path>         delete one file (never empty a file to "remove" it)
 @send <path>       send a file into this chat; a folder is zipped and sent
@@ -306,8 +317,15 @@ Tools - one per line, at the start of a line, no markdown around them:
 @done <summary>    finish; this summary is sent to the user
 
 Rules:
+- No progress chatter, ever. Never answer with "sebentar", "aku cek dulu",
+  "aku lanjutkan", "udah aman", "sekarang aku ...", or a numbered plan. The bot
+  already shows each tool step, so either send the next tool line or - only
+  when truly finished - @done. Filler prose is a failed reply.
 - For any code change, your FIRST line must be a tool call (usually @read or @ls).
   Do not reply with a plan or "let me check" before reading the files.
+- A build/change request is done only after you @write the real code and
+  @typecheck/@test pass, then @done in the SAME turn. Reading or listing first
+  is not an answer: keep going instead of waiting for the user to say "lanjut".
 - Read before you write. Keep edits small and match the existing style.
 - Writable/deletable: src/, test/, docs. Never touch config.json, sessions/, data/, .git, or deps.
 - To remove a feature, delete its file with @rm. Never replace it with an empty file.
@@ -317,10 +335,16 @@ Rules:
 - If @typecheck or @test says FAILED, fix it first. Never call @done while it fails.
 - One tool call per line. Never guess file contents - @read or @grep first.
 - If the user only asks a question, answer normally (no repo tools needed).
-- The user does NOT see raw tool output — only your final text. When the answer
+- The user does NOT see raw tool output - only your final text. When the answer
   IS the tool output (a folder listing, file contents, errors), paste the real
   lines/paths into your reply. A summary like "sudah diperiksa" without the
   paths is a failure: the user asked to see them.
+
+KEY FACTS (read the real files when you need details):
+- Commands live in src/commands/<category>/<name>.ts, default export \`{ name, desc?, aliases?, groupOnly?, adminOnly?, botAdmin?, ownerOnly?, cooldown?, run(ctx) } satisfies Command\`, auto-registered by src/commands/index.ts (no manual import).
+- Global types: src/commands/types.d.ts. \`ctx\` (CommandContext) has sock (Baileys WASocket), chat, sender, isGroup, isAdmin/isBotAdmin/isOwner, args, text, quoted, mentionedJid, reply/react, sendSticker/sendImage/sendVideo/sendAudio/sendDocument, etc.
+- Group members (Baileys): \`const meta = await ctx.sock.groupMetadata(ctx.chat)\` -> \`meta.participants\` (GroupParticipant: id, lid, phoneNumber, admin, notify). Tag by passing \`mentions\` (jid array) to \`ctx.sock.sendMessage(ctx.chat, { text, mentions })\`. Resolve targets/helpers: src/lib/group.ts (\`resolveTargets\`, \`participantMaps\`, \`groupGuards\`). Examples: src/commands/group/hidetag.ts, kick.ts, tagall.
+- Explore with @grep/@read: handlers in src/handlers/, shared helpers in src/lib/, command examples in src/commands/. For Baileys behavior prefer reading existing usage in-repo.
 - For directory listings, copy paths verbatim from @ls output; never invent or merge subdirs; format as a tree.
 - For "struktur repo / semua folder", run @ls -r . once instead of @ls per subfolder;
   its output is complete, so file counts per folder are exact.
@@ -339,17 +363,12 @@ Rules:
   file X", "send me the folder"), run @send <path>: a file arrives as a document,
   a folder arrives as a .zip. Send only what was asked - config.json, .env,
   sessions/ and data/ are blocked and must never be sent.
+- If something is completely missing from this repo (no existing command/lib/example) and you need to learn how (e.g. a new Baileys API), first @grep/@read to confirm it's absent, then @search and @fetch docs (e.g. https://baileys.wiki or https://github.com/WhiskeySockets/Baileys). Before searching, tell the user you're researching in your reply so they see progress; base the implementation on what you find, not guesses.
 
 Example reply:
 @read src/commands/index.ts
 @ls src/commands/main
-@write src/commands/main/hello.ts
-\`\`\`ts
-export default {
-  name: 'hello',
-  run: async (ctx) => { await ctx.reply('hi') },
-} satisfies Command
-\`\`\`
+@write src/commands/main/hello.ts (followed by a fenced ts block with the full file)
 @typecheck
 @done added the hello command`
 
@@ -362,15 +381,29 @@ const REPO_CLAIM =
   /(sudah|udah|telah)\s+(?:aku\s+)?(?:hapus|bikin|buat|tambah|ubah|ganti|benerin|perbaiki|delete|remove|inventaris|listing|daftar|tampilkan|tunjukkan|periksa|cek|beres)|\b(?:dihapus|dibuat|ditambah|diubah|diperbaiki|diperiksa|deleted|removed|fixed|patched|beres|inventaris|listing|daftar|struktur|periksa|ditemukan|dikelilingi|terdalam|tersisa)\b/i
 const REPO_LISTING = /(inventaris|listing|daftar|struktur|folder|direktori|directory|tree)/i
 
-export type RepoNudge = 'stall' | 'listing' | 'claim'
+export type RepoNudge = 'stall' | 'listing' | 'claim' | 'continue'
 
-/** Why a repo-mode reply without tool lines should be pushed back, if at all. */
-export const repoNudge = (reply: string, toolsRun: number): RepoNudge | null => {
+/**
+ * Decide if a reply-without-tools should be pushed back.
+ * - unfinished change: "stall" before any tool, "continue" after read-only steps.
+ * - otherwise: reject false claims/stalls when nothing has run yet.
+ */
+export const repoNudge = (reply: string, toolsRun: number, unfinishedChange = false): RepoNudge | null => {
+  if (unfinishedChange) return toolsRun === 0 ? 'stall' : 'continue'
   if (toolsRun > 0) return null
-  // a claim beats the stall words: "sudah aku cek" is a lie, not a promise
   if (REPO_CLAIM.test(reply)) return REPO_LISTING.test(reply) ? 'listing' : 'claim'
   if (REPO_STALL.test(reply)) return 'stall'
   return null
+}
+
+// Verbs that mean "change the code", not "look at it" or "explain it".
+const REPO_CHANGE =
+  /\b(?:bikin(?:in|kan)?|buat(?:in|kan)?|tambah(?:in|kan)?|hapus|delete|remove|buang|ubah|ganti|rename|pindah(?:in|kan)?|move|refactor|perbaiki|benerin|fix|implement(?:asikan)?|update|tulis(?:in)?|write)\b/i
+
+/** True when the user asked to create/modify/delete code, so reading alone is not enough. */
+export const wantsCodeChange = (text: string): boolean => {
+  const t = String(text ?? '')
+  return !asksForListing(t) && REPO_CHANGE.test(t)
 }
 
 // "show me the folders": the reply has to contain the real paths.
@@ -471,12 +504,72 @@ export const ensureListingShown = (text: string, outputs: string[]): string => {
 }
 
 export type AgentAction =
-  | { tool: 'read' | 'ls' | 'grep' | 'test'; arg: string }
+  | { tool: 'read' | 'ls' | 'grep' | 'test' | 'search' | 'fetch'; arg: string }
   | { tool: 'typecheck'; arg: '' }
   | { tool: 'write'; arg: string; content: string }
   | { tool: 'rm'; arg: string }
   | { tool: 'send'; arg: string }
   | { tool: 'done'; arg: string }
+
+const WEB_MAX = 12_000
+const WEB_TIMEOUT = 20_000
+
+// Strip HTML to readable text for doc lookups.
+const stripHtml = (html: string): string =>
+  html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+// Fetch a docs/web page as plain text (for research when the repo lacks it).
+const webFetch = async (url: string): Promise<string> => {
+  const u = String(url ?? '').trim()
+  if (!/^https?:\/\//i.test(u)) throw new AgentPathError('url must start with http(s)://')
+  const res = await fetch(u, {
+    signal: AbortSignal.timeout(WEB_TIMEOUT),
+    headers: { 'User-Agent': 'WakaruBot/1.0 (+repo-agent)', Accept: 'text/html,text/plain,application/json;q=0.9,*/*;q=0.8' },
+  })
+  if (!res.ok) throw new Error(`http ${res.status}`)
+  const ct = String(res.headers.get('content-type') || '')
+  const raw = await res.text()
+  const text = /json/i.test(ct) ? raw : /html/i.test(ct) || /<\w/i.test(raw.slice(0, 200)) ? stripHtml(raw) : raw
+  return clip(text, WEB_MAX)
+}
+
+// Lightweight web search (DuckDuckGo HTML) for APIs not found in-repo.
+const webSearch = async (q: string): Promise<string> => {
+  const query = String(q ?? '').trim()
+  if (!query) throw new AgentPathError('empty search query')
+  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(WEB_TIMEOUT),
+    headers: { 'User-Agent': 'WakaruBot/1.0 (+repo-agent)', Accept: 'text/html' },
+  })
+  if (!res.ok) throw new Error(`http ${res.status}`)
+  const html = await res.text()
+  const out: string[] = []
+  const re = /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>|<[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>)?/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html)) && out.length < 6) {
+    let link = m[1] || ''
+    const ud = /uddg=([^&]+)/.exec(link)
+    if (ud) try { link = decodeURIComponent(ud[1]) } catch { /* keep */ }
+    const title = stripHtml(m[2] || '').replace(/\s+/g, ' ').trim()
+    const snippet = stripHtml(m[3] || m[4] || '').replace(/\s+/g, ' ').trim()
+    if (!title && !link) continue
+    out.push(`- ${title}\n  ${link}${snippet ? `\n  ${snippet.slice(0, 220)}` : ''}`)
+  }
+  return out.length ? out.join('\n') : 'no results (try @fetch a direct docs URL, e.g. https://baileys.wiki or https://github.com/WhiskeySockets/Baileys)'
+}
 
 export const runAgentAction = async (tools: FileTools, a: AgentAction): Promise<string> => {
   try {
@@ -487,6 +580,8 @@ export const runAgentAction = async (tools: FileTools, a: AgentAction): Promise<
       return `[ls ${rec ? '-r ' : ''}${path || '.'}]\n${await tools.list(path, !!rec)}`
     }
     if (a.tool === 'grep') return `[grep ${a.arg}]\n${await tools.grep(a.arg)}`
+    if (a.tool === 'search') return `[search ${a.arg}]\n${await webSearch(a.arg)}`
+    if (a.tool === 'fetch') return `[fetch ${a.arg}]\n${await webFetch(a.arg)}`
     if (a.tool === 'write') return `[write] ${await tools.write(a.arg, a.content)}`
     if (a.tool === 'rm') return `[rm] ${await tools.remove(a.arg)}`
     // @send needs the live chat; the bot intercepts it before reaching here.
@@ -507,7 +602,7 @@ export const runAgentAction = async (tools: FileTools, a: AgentAction): Promise<
 
 // Tolerate models that decorate markers: bullets, numbering, bold/backticks.
 const CMD =
-  /^\s*(?:[-*+>]\s+|\d+[.)]\s+)?[`*_~]*@(read|ls|grep|write|rm|delete|send|test|typecheck|done)\b[`*_~]*\s*(.*)$/i
+  /^\s*(?:[-*+>]\s+|\d+[.)]\s+)?[`*_~]*@(read|ls|grep|search|fetch|write|rm|delete|send|test|typecheck|done)\b[`*_~]*\s*(.*)$/i
 const FENCE = /^\s*`{3,}\s*[a-z0-9+#_-]*\s*$/i
 
 /** Parse `@tool` lines. `@write` takes its body from the next fenced block. */
@@ -539,7 +634,7 @@ export const parseAgentActions = (text: string): { actions: AgentAction[]; prose
     }
     if (tool === 'typecheck') actions.push({ tool: 'typecheck', arg: '' })
     else if (tool === 'delete') actions.push({ tool: 'rm', arg })
-    else actions.push({ tool: tool as 'read' | 'ls' | 'grep' | 'rm' | 'send' | 'test' | 'done', arg })
+    else actions.push({ tool: tool as 'read' | 'ls' | 'grep' | 'search' | 'fetch' | 'rm' | 'send' | 'test' | 'done', arg })
   }
   return { actions, prose: prose.join('\n').replace(/\n{3,}/g, '\n\n').trim() }
 }

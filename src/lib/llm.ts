@@ -115,9 +115,9 @@ async function gptChat(messages: ChatMsg[], files: AiFileInput[] = []): Promise<
   return text
 }
 
-// Blips get one retry before we give up.
+// Transient API/plugin blips worth one retry (including empty upstream replies).
 const gptTransient = (msg: string): boolean =>
-  /HTTP 5\d\d|429|timeout|ECONN|ETIMEDOUT|EAI_AGAIN|socket hang up|Unusual activity|sentinel|conversation/i.test(msg) &&
+  /HTTP 5\d\d|429|timeout|ECONN|ETIMEDOUT|EAI_AGAIN|socket hang up|Unusual activity|sentinel|conversation|empty response|plugin error/i.test(msg) &&
   !/empty prompt|no such/i.test(msg)
 
 // Main entry. One backend only: the Wakafy API.
