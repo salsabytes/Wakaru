@@ -464,7 +464,8 @@ export default {
       ]
       setAiBusy(true)
       try {
-        finalText = await runExchange(msgs, ctx, ASKS_CODE.test(userText), repo)
+        // Progress bubble is for repo/agent work; plain chat replies stay clean.
+        finalText = await runExchange(msgs, ctx, !!repo, repo)
       } catch (err) {
         finalText = `x ${(err as Error).message}`
       } finally {
