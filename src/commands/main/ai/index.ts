@@ -1,4 +1,5 @@
 ﻿import { askLLM, type AiFileInput, type ChatMsg } from '../../../lib/llm.ts'
+import { fileMime, fileNameOf } from '../../../lib/fileinfo.ts'
 import { tx } from '../../../lib/lang.ts'
 import { logger } from '../../../lib/logger.ts'
 import { sendRichParts } from '../../../lib/richmsg.ts'
@@ -13,32 +14,37 @@ const MAX_ROUNDS = AI_FREE ? 6 : 4 // how many tool/AI/check back-and-forth roun
 const MAX_AI_FILES = 4 // max files we attach per AI request (keeps it light)
 const MAX_AI_FILE_BYTES = 20 * 1024 * 1024 // 20MB cap per file
 
-// Pick a best-guess MIME type for a WhatsApp media message
-const mimeOf = (mtype?: string, mimetype?: string, fileName?: string): string => {
-  const m = String(mimetype || '').split(';')[0].trim()
-  if (m) return m
-  if (mtype === 'imageMessage') return 'image/jpeg'
-  if (mtype === 'stickerMessage') return 'image/webp'
-  if (mtype === 'videoMessage') return 'video/mp4'
-  if (mtype === 'audioMessage') return 'audio/mpeg'
-  if (mtype === 'documentMessage') {
-    const ext = String(fileName || '').split('.').pop()?.toLowerCase() || ''
-    if (ext === 'pdf') return 'application/pdf'
-    if (ext === 'txt') return 'text/plain'
-    if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  }
-  return 'application/octet-stream'
-}
+// Read code/text documents straight into the prompt.
+// Why: the AI API may treat an octet-stream attachment as an opaque blob.
+// Inline text always works.
+const TEXT_LIKE = /^(text\/|application\/(json|xml|yaml|x-yaml)|image\/svg)/
+const INLINE_TEXT_MAX = 16_000
 
-// Give the file a friendly name if WhatsApp didn't provide one
-const nameOf = (mtype?: string, mime?: string, fileName?: string): string => {
-  if (fileName) return fileName
-  const ext = (mime || '').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'bin'
-  if (mtype === 'imageMessage') return `image.${ext}`
-  if (mtype === 'stickerMessage') return 'sticker.webp'
-  if (mtype === 'videoMessage') return `video.${ext}`
-  if (mtype === 'audioMessage') return `audio.${ext}`
-  return `file.${ext}`
+const splitTextFiles = (files: AiFileInput[]): { attach: AiFileInput[]; inline: string[] } => {
+  const attach: AiFileInput[] = []
+  const inline: string[] = []
+  const seen = new Set<string>()
+  for (const f of files) {
+    const key = `${f.name || ''}|${String(f.data || '').slice(0, 64)}|${String(f.data || '').length}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    if (!TEXT_LIKE.test(String(f.mime || ''))) {
+      attach.push(f)
+      continue
+    }
+    try {
+      const text = Buffer.from(String(f.data || ''), 'base64').toString('utf8')
+      if (!text.trim()) {
+        attach.push(f)
+        continue
+      }
+      const clipped = text.length > INLINE_TEXT_MAX ? text.slice(0, INLINE_TEXT_MAX) + '\n[... terpotong]' : text
+      inline.push(`--- ${f.name || 'file'} ---\n${clipped}`)
+    } catch {
+      attach.push(f)
+    }
+  }
+  return { attach, inline }
 }
 
 // Media types the AI flow knows how to collect
@@ -67,7 +73,7 @@ const collectAiFiles = async (ctx: CommandContext): Promise<{ files: AiFileInput
   const sources: Array<{ mtype?: string; mimetype?: string; fileName?: string; download: () => Promise<Buffer> }> = []
   if (ctx.quoted && MEDIA_TYPES.has(ctx.quoted.mtype)) sources.push(ctx.quoted)
   if (MEDIA_TYPES.has(ctx.mtype) && ctx.download) {
-    sources.push({ mtype: ctx.mtype, mimetype: ctx.mimetype, download: ctx.download })
+    sources.push({ mtype: ctx.mtype, mimetype: ctx.mimetype, fileName: ctx.fileName, download: ctx.download })
   }
   const files: AiFileInput[] = []
   const notes: string[] = []
@@ -76,8 +82,8 @@ const collectAiFiles = async (ctx: CommandContext): Promise<{ files: AiFileInput
       const buf = await src.download()
       if (!buf?.length) { notes.push('file kosong'); continue }
       if (buf.length > MAX_AI_FILE_BYTES) { notes.push(`file terlalu besar (> ${MAX_AI_FILE_BYTES >> 20}MB)`); continue }
-      const mime = mimeOf(src.mtype, src.mimetype, src.fileName)
-      files.push({ data: buf.toString('base64'), mime, name: nameOf(src.mtype, mime, src.fileName) })
+      const mime = fileMime(src.mtype, src.mimetype, src.fileName)
+      files.push({ data: buf.toString('base64'), mime, name: fileNameOf(src.mtype, mime, src.fileName) })
     } catch (e) {
       notes.push(`gagal baca file: ${(e as Error).message}`)
     }
@@ -229,8 +235,8 @@ export default {
     const mediaAge = pendingAiFilesAge(histKey)
     const wantsMedia = asksAboutMedia(query) || (mediaAge !== undefined && mediaAge < 3 * 60_000)
     const pendingFiles = directFiles.length || !wantsMedia ? [] : getPendingAiFiles(histKey)
-    const files = [...pendingFiles, ...directFiles].slice(-MAX_AI_FILES)
-    if (!query && files.length) query = 'Tolong analisis file ini.'
+    const { attach: files, inline } = splitTextFiles([...pendingFiles, ...directFiles].slice(-MAX_AI_FILES))
+    if (!query && (files.length || inline.length)) query = 'Tolong analisis file ini.'
     if (!query) return ctx.reply(await tx('aiUsage', { prefix: ctx.prefix }))
 
     // 1b) Explicit memory intent: "remember ..." / "forget my memory" (fast, deterministic)
@@ -261,7 +267,11 @@ export default {
       }
     }
     const baseText = quotedBlock ? `${quotedBlock}${query}` : query
-    const userText = notes.length ? `${baseText}\n\n[catatan file: ${notes.join('; ')}]` : baseText
+    const extra = [
+      notes.length ? `[catatan file: ${notes.join('; ')}]` : '',
+      inline.length ? `[isi file]\n${inline.join('\n\n')}` : '',
+    ].filter(Boolean)
+    const userText = extra.length ? `${baseText}\n\n${extra.join('\n\n')}` : baseText
     try {
       const system = await buildSystem(ctx)
       // Old media in history is only re-sent when the user asks about media;

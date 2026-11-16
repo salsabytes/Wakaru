@@ -30,6 +30,7 @@ declare global {
     isOwner: boolean
     mtype: string
     mimetype?: string
+    fileName?: string
     mentionedJid: string[]
     download: () => Promise<Buffer>
 

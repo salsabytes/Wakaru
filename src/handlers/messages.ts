@@ -143,6 +143,15 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
     // Media-only message (no text/button): stash it so `.ai` can use it later
     if (!m.text && !m.button) {
       void rememberAiMedia(m, sender).catch((err) => logger.warn('ai media remember error:', err))
+      // Silent stashing looks like "documents aren't supported".
+      // Confirm receipt for documents sent in DMs.
+      if (!m.isGroup && m.mtype === 'documentMessage') {
+        const name = m.fileName || 'file'
+        const prefix = botPrefixes()[0] ?? '.'
+        void (async () => {
+          await makeSender(waka, jid, msg).text(await tx('docReceived', { name, prefix }))
+        })().catch(() => {})
+      }
       continue
     }
     if (await checkAntilink(msg, m, jid)) continue
@@ -163,8 +172,10 @@ const aiFallback = async (m: SerializedMessage, sender: string, text: string): P
     !!waka.user?.id &&
     m.quoted.sender.split(':')[0].split('@')[0] === waka.user.id.split(':')[0].split('@')[0]
   const isLink = /(?:https?:\/\/|www\.)/i.test(text)
+  // A caption on a document ("baca ini") is meant for the AI even without a prefix.
+  const hasDoc = m.mtype === 'documentMessage'
   const queryText = text.trim()
-  if (!isReplyToBot && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return { cmd: undefined, queryText, args: [] }
+  if (!isReplyToBot && !hasDoc && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return { cmd: undefined, queryText, args: [] }
   if (!queryText) return { cmd: undefined, queryText, args: [] }
   return { cmd: await getCommand('ai'), queryText, args: queryText.split(/\s+/) }
 }
@@ -289,6 +300,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     isOwner: isOwner(sender),
     mtype: m.mtype,
     mimetype: m.mimetype,
+    fileName: m.fileName,
     mentionedJid: m.mentionedJid,
     download: m.download,
     button: m.button,

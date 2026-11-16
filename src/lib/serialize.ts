@@ -22,6 +22,7 @@ export interface SerializedMessage {
   isGroup: boolean
   mtype: string
   mimetype?: string
+  fileName?: string
   text: string
   mentionedJid: string[]
   download: () => Promise<Buffer>
@@ -128,6 +129,7 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
     isGroup: chat.endsWith('@g.us'),
     mtype,
     mimetype: content.mimetype,
+    fileName: typeof content.fileName === 'string' ? content.fileName : undefined,
     text,
     mentionedJid: ctxt?.mentionedJid ?? [],
     ...(button ? { button } : {}),
@@ -136,8 +138,11 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
 
   const q = ctxt?.quotedMessage
   if (q) {
-    const qtype = Object.keys(q)[0]
-    const qc = (q as any)?.[qtype]
+    // Documents with a caption arrive as documentWithCaptionMessage.
+    // Normalize first so reply-to-document keeps the real fileName and content.
+    const qn = (normalizeMessageContent(q as any) ?? q) as any
+    const qtype = getContentType(qn) ?? Object.keys(q)[0]
+    const qc = qn?.[qtype]
     // plain text quotes arrive as a string under `conversation`, not an object
     const qbody = typeof qc === 'string' ? { text: qc } : (qc ?? {})
     const qmsg = {
