@@ -9,6 +9,9 @@ export interface GroupSettings {
   warns?: Record<string, number> // sender num -> strike count
   welcome?: boolean
   welcomeMsg?: string
+  goodbye?: boolean
+  goodbyeMsg?: string
+  autodl?: boolean // auto-download supported media links
 }
 
 export const ANTILINK_DEFAULT_MAX_WARN = 3
@@ -108,6 +111,7 @@ export const resetAntilinkWarns = (jid: string, user: string): void => {
 }
 
 export const DEFAULT_WELCOME = '`pp` halo `mention`, selamat datang di `gcname`!'
+export const DEFAULT_GOODBYE = '`pp` selamat tinggal `mention`, semoga betah di luar sana!'
 
 export const welcomeConfig = (jid: string): { on: boolean; msg: string } => {
   const s = store[jid] ?? {}
@@ -126,6 +130,38 @@ export const toggleWelcome = (jid: string, on?: boolean): boolean => {
   const next = on === undefined ? !cur : on
   if (!store[jid]) store[jid] = {}
   store[jid].welcome = next
+  persist()
+  return next
+}
+
+export const goodbyeConfig = (jid: string): { on: boolean; msg: string } => {
+  const s = store[jid] ?? {}
+  return { on: s.goodbye ?? false, msg: s.goodbyeMsg ?? DEFAULT_GOODBYE }
+}
+
+export const setGoodbye = (jid: string, msg: string): void => {
+  if (!store[jid]) store[jid] = {}
+  store[jid].goodbye = true
+  store[jid].goodbyeMsg = msg
+  persist()
+}
+
+export const toggleGoodbye = (jid: string, on?: boolean): boolean => {
+  const cur = store[jid]?.goodbye ?? false
+  const next = on === undefined ? !cur : on
+  if (!store[jid]) store[jid] = {}
+  store[jid].goodbye = next
+  persist()
+  return next
+}
+
+export const autodlConfig = (jid: string): { on: boolean } => ({ on: store[jid]?.autodl ?? false })
+
+export const toggleAutodl = (jid: string, on?: boolean): boolean => {
+  const cur = store[jid]?.autodl ?? false
+  const next = on === undefined ? !cur : on
+  if (!store[jid]) store[jid] = {}
+  store[jid].autodl = next
   persist()
   return next
 }

@@ -14,7 +14,10 @@ import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
 import { pendingF100, handleF100Answer } from '../commands/game/family100.ts'
 import { handleAntilinkMaxInput } from '../commands/group/antilink.ts'
 import { participantMaps } from '../lib/group.ts'
-import { addAntilinkWarn, antilinkConfig, resetAntilinkWarns } from '../lib/groupSettings.ts'
+import { addAntilinkWarn, antilinkConfig, autodlConfig, resetAntilinkWarns } from '../lib/groupSettings.ts'
+import { clearAfk, getAfk, setAfk, shouldNotifyAfk } from '../lib/afk.ts'
+import { formatDuration } from '../lib/time.ts'
+import { maybeAutoDownload } from '../lib/autodl.ts'
 
 // commands run concurrently (globally slot-capped) so a slow downloader never blocks other chats
 const dispatch = (msg: WAMessage, m: SerializedMessage, jid: string): void => {
@@ -199,6 +202,14 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
     const parts = bid.slice('antidelete:'.length).split(':').filter(Boolean)
     return { cmd: await getCommand('antidelete'), queryText: parts.join(' '), args: parts }
   }
+  if (bid?.startsWith('welcome:')) {
+    const parts = bid.slice('welcome:'.length).split(':').filter(Boolean)
+    return { cmd: await getCommand('welcome'), queryText: parts.join(' '), args: parts }
+  }
+  if (bid?.startsWith('goodbye:')) {
+    const parts = bid.slice('goodbye:'.length).split(':').filter(Boolean)
+    return { cmd: await getCommand('goodbye'), queryText: parts.join(' '), args: parts }
+  }
   const direct = prefixBody(text)
   if (direct !== undefined) {
     const [rawName, ...rest] = direct.split(/\s+/)
@@ -252,6 +263,39 @@ const blockedByOwner = async (ctx: CommandContext, cmd: Command): Promise<boolea
   return true
 }
 
+// Build a minimal CommandContext for non-command flows (e.g. autodl).
+const ctxFallback = (text: string, m: SerializedMessage, sender: string, msg: WAMessage, send: Sender): CommandContext => ({
+  sock: waka,
+  prefix: botPrefixes()[0] ?? '',
+  args: [],
+  text,
+  chat: m.chat,
+  sender,
+  pushName: msg.pushName ?? undefined,
+  isGroup: m.isGroup,
+  isAdmin: false,
+  isBotAdmin: false,
+  isOwner: isOwner(sender),
+  mtype: m.mtype,
+  mimetype: m.mimetype,
+  fileName: m.fileName,
+  mentionedJid: m.mentionedJid,
+  download: m.download,
+  button: m.button,
+  quoted: m.quoted,
+  reply: send.text,
+  react: (emoji) => send.react(emoji, msg.key),
+  fromMe: m.fromMe,
+  sendSticker: send.sticker,
+  sendImage: send.image,
+  sendVideo: send.video,
+  sendGif: send.gif,
+  sendAudio: send.audio,
+  sendDocument: send.document,
+  sendButtons: (buttons, text, footer) => send.buttons(buttons, text, footer),
+  sendList: (o) => send.list(o),
+})
+
 async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string): Promise<void> {
   // When fromMe=true, sender is the chat partner's JID (not the bot's), so isOwner fails
   const sender = m.fromMe ? (waka.user?.id ?? m.sender) : m.sender
@@ -267,13 +311,38 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     if (await handleF100Answer({ sock: waka, chat: m.chat, reply: send.text }, sender, text, msg.pushName ?? undefined)) return
   }
 
-  // "max warn" input: eat the next text from the admin who tapped
+    // "max warn" input: eat the next text from the admin who tapped
   if (!m.fromMe && text.trim() && !usedPrefix(text)) {
     if (await handleAntilinkMaxInput(m.chat, sender, text, send)) return
   }
 
+  // Clear own AFK on any real activity.
+  if (!m.fromMe && text.trim()) {
+    const mine = getAfk(sender)
+    if (mine) {
+      clearAfk(sender)
+      await send.text(`Welcome back${msg.pushName ? `, ${msg.pushName}` : ''}! AFK ${formatDuration(Date.now() - mine.since)}${mine.reason ? `: ${mine.reason}` : ''}`)
+    }
+  }
+
+  // Notify if someone mentions/replies to an AFK user.
+  const targets = new Set<string>([...(m.mentionedJid || []), ...(m.quoted?.sender ? [m.quoted.sender] : [])])
+  for (const t of targets) {
+    if (t === sender) continue
+    const info = getAfk(t)
+    if (info && shouldNotifyAfk(m.chat, t)) {
+      const who = t.split(/[:@]/)[0]
+      await send.text(`${who} lagi AFK (${formatDuration(Date.now() - info.since)})${info.reason ? `: ${info.reason}` : ''}`)
+    }
+  }
+
   const { cmd, queryText, args } = await parseCommand(m, sender, text)
-  if (!cmd) return
+  if (!cmd) {
+    if (!m.fromMe && !m.button && autodlConfig(m.chat).on && text.trim() && !usedPrefix(text)) {
+      await maybeAutoDownload(ctxFallback(text, m, sender, msg, send))
+    }
+    return
+  }
   if (await blockedByCooldown(sender, cmd, send)) return
   const mode = botMode()
   // DMs are inherently targeted at the bot, mode filter should ONLY apply in groups

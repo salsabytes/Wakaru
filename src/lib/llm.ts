@@ -1,29 +1,23 @@
-﻿import { cfg } from './config.ts'
-import { wakafy } from './wakafy.ts'
+﻿import { wakafy } from './wakafy.ts'
+import { botAiApiKey, botAiBaseUrl, botAiModel, botAiPath, botAiProvider } from './aiConfig.ts'
 
 // One file for the AI: base64 data, plus name/mime when we know them.
 export type AiFileInput = { data: string; name?: string; mime?: string }
 // One chat message. `files` only when we attach media.
 export type ChatMsg = { role: string; content: string; files?: AiFileInput[] }
-
-// GPT-6 via the public Wakafy AI plugin.
-// Same API key as the downloaders. Override the path with WAKAFY_AI_PATH.
-const AI_PATH = process.env.WAKAFY_AI_PATH || '/v1/ext/salsabytes/gpt-6'
-// gpt-6 is GPT-6 on the anonymous catalog. Override with env/config.
-const AI_MODEL = process.env.WAKARU_AI_MODEL || cfg('aiModel', 'gpt-6')
-const TIMEOUT = 120_000
-// The endpoint rejects bodies over 256 KB. Stay a little under.
-const API_BODY_MAX = 250_000
-
-// The endpoint rejects messages over 32k chars total.
-// Budget under it: keep the system prompt and the newest turn, drop old ones.
-const MESSAGES_CHAR_MAX = 28_000
-const MSG_CLIP = 12_000 // per-message cap before we start dropping turns
-
 export type FlatMsg = { role: string; content: string }
 
-// Keep both ends of a long message.
-// Start = the instructions. End = the tool output the model must act on.
+// --- provider abstraction (groundwork, behavior-preserving default: wakafy) ---
+export interface LLMProvider {
+  name: string
+  ask(messages: ChatMsg[], files?: AiFileInput[]): Promise<string>
+}
+
+const TIMEOUT = 120_000
+const API_BODY_MAX = 250_000
+const MESSAGES_CHAR_MAX = 28_000
+const MSG_CLIP = 12_000
+
 const clipMiddle = (content: string, keep: number): string => {
   if (content.length <= keep) return content
   const head = Math.round(keep * 0.75)
@@ -35,15 +29,12 @@ const clipMiddle = (content: string, keep: number): string => {
 export const fitMessages = (messages: FlatMsg[], max = MESSAGES_CHAR_MAX): FlatMsg[] => {
   const total = (list: FlatMsg[]): number => list.reduce((n, m) => n + m.content.length, 0)
   if (total(messages) <= max) return messages
-  // 1) clip any single message that is too long
   let out = messages.map((m) => (m.content.length > MSG_CLIP ? { ...m, content: clipMiddle(m.content, MSG_CLIP) } : m))
-  // 2) drop the oldest turns. Never the system prompt. Never the newest message.
   while (total(out) > max && out.length > 2) {
     const start = out[0]?.role === 'system' ? 1 : 0
     if (out.length - start <= 1) break
     out = [...out.slice(0, start), ...out.slice(start + 1)]
   }
-  // 3) still too big? shrink the biggest message until it fits.
   while (total(out) > max && out.length) {
     const biggest = out.reduce((a, b) => (b.content.length > a.content.length ? b : a))
     const target = Math.max(500, biggest.content.length - Math.ceil((total(out) - max) / 2))
@@ -62,7 +53,6 @@ const cleanMessages = (messages: ChatMsg[]): FlatMsg[] =>
       content: (m.content || '').trim() || (m.files?.length ? 'Tolong analisis file ini.' : ''),
     }))
 
-// Turn our file payloads into what wakafy can read (data URL or plain object).
 const toWakafyFiles = (files: AiFileInput[]): any[] =>
   files.map((f) => {
     const data = String(f.data || '')
@@ -71,8 +61,6 @@ const toWakafyFiles = (files: AiFileInput[]): any[] =>
     return { name: f.name, mime, url }
   })
 
-// Collect files oldest-first (history, then this request) so a size trim drops
-// old media before the photo the user just sent. De-duped and capped at 4.
 const collectFiles = (messages: ChatMsg[], files: AiFileInput[] = []): AiFileInput[] => {
   const out: AiFileInput[] = []
   for (const m of messages) if (m.files?.length) out.push(...m.files)
@@ -88,49 +76,98 @@ const collectFiles = (messages: ChatMsg[], files: AiFileInput[] = []): AiFileInp
   return uniq.slice(-4)
 }
 
-async function gptChat(messages: ChatMsg[], files: AiFileInput[] = []): Promise<string> {
-  const msgs = fitMessages(cleanMessages(messages))
-  if (!msgs.length) throw new Error('ai: empty prompt')
-  let allFiles = collectFiles(messages, files)
-  const payload: any = { messages: msgs, model: AI_MODEL }
-  if (allFiles.length) payload.files = toWakafyFiles(allFiles)
-  // Drop the oldest attachments first until the request fits the API limit.
-  let dropped = 0
-  while (allFiles.length && Buffer.byteLength(JSON.stringify(payload)) > API_BODY_MAX) {
-    allFiles = allFiles.slice(1)
-    dropped++
-    if (allFiles.length) payload.files = toWakafyFiles(allFiles)
-    else delete payload.files
-  }
-  if (dropped) {
-    const last = payload.messages[payload.messages.length - 1]
-    if (last?.role === 'user') last.content += `\n\n[${dropped} lampiran tidak terkirim: melebihi batas ukuran API]`
-  }
-  if (Buffer.byteLength(JSON.stringify(payload)) > API_BODY_MAX) {
-    throw new Error('ai: pesan/lampiran kegedean buat API (maks ~250KB)')
-  }
-  const res = await wakafy.jsonPost<{ text?: string }>(AI_PATH, payload, { timeout: TIMEOUT })
-  const text = String(res?.text || '').trim()
-  if (!text) throw new Error('ai: empty response')
-  return text
+const toDataUrl = (f: AiFileInput): string => {
+  const data = String(f.data || '')
+  if (data.startsWith('data:') || /^https?:\/\//i.test(data)) return data
+  return `data:${f.mime || 'application/octet-stream'};base64,${data}`
 }
 
-// Transient API/plugin blips worth one retry (including empty upstream replies).
-const gptTransient = (msg: string): boolean =>
-  /HTTP 5\d\d|429|timeout|ECONN|ETIMEDOUT|EAI_AGAIN|socket hang up|Unusual activity|sentinel|conversation|empty response|plugin error/i.test(msg) &&
+const wakafyProvider: LLMProvider = {
+  name: 'wakafy',
+  async ask(messages, files = []) {
+    const AI_PATH = botAiPath() || '/v1/ext/salsabytes/gpt-6'
+    const AI_MODEL = botAiModel() || 'gpt-6'
+    const msgs = fitMessages(cleanMessages(messages))
+    if (!msgs.length) throw new Error('ai: empty prompt')
+    let allFiles = collectFiles(messages, files)
+    const payload: any = { messages: msgs, model: AI_MODEL }
+    if (allFiles.length) payload.files = toWakafyFiles(allFiles)
+    let dropped = 0
+    while (allFiles.length && Buffer.byteLength(JSON.stringify(payload)) > API_BODY_MAX) {
+      allFiles = allFiles.slice(1)
+      dropped++
+      if (allFiles.length) payload.files = toWakafyFiles(allFiles)
+      else delete payload.files
+    }
+    if (dropped) {
+      const last = payload.messages[payload.messages.length - 1]
+      if (last?.role === 'user') last.content += `\n\n[${dropped} lampiran tidak terkirim: melebihi batas ukuran API]`
+    }
+    if (Buffer.byteLength(JSON.stringify(payload)) > API_BODY_MAX) {
+      throw new Error('ai: pesan/lampiran kegedean buat API (maks ~250KB)')
+    }
+    const res = await wakafy.jsonPost<{ text?: string }>(AI_PATH, payload, { timeout: TIMEOUT })
+    const text = String(res?.text || '').trim()
+    if (!text) throw new Error('ai: empty response')
+    return text
+  },
+}
+
+// Optional OpenAI-compatible chat completions backend (groundwork).
+const openaiCompatProvider: LLMProvider = {
+  name: 'openai-compatible',
+  async ask(messages, files = []) {
+    const baseUrl = botAiBaseUrl().replace(/\/+$/, '')
+    if (!baseUrl) throw new Error('ai: missing aiBaseUrl/WAKARU_AI_BASE_URL for openai-compatible provider')
+    const model = botAiModel() || 'gpt-4o-mini'
+    const apiKey = botAiApiKey()
+    const allFiles = collectFiles(messages, files)
+    const msgs = fitMessages(cleanMessages(messages)).map((m, i, arr) => {
+      if (m.role === 'user' && i === arr.length - 1 && allFiles.length) {
+        const parts: any[] = [{ type: 'text', text: m.content }]
+        for (const f of allFiles) parts.push({ type: 'image_url', image_url: { url: toDataUrl(f) } })
+        return { role: 'user', content: parts }
+      }
+      return { role: m.role, content: m.content }
+    })
+    if (!msgs.length) throw new Error('ai: empty prompt')
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({ model, messages: msgs }),
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+    if (!res.ok) throw new Error(`ai: HTTP ${res.status}`)
+    const data = await res.json().catch(() => ({})) as any
+    const c = data?.choices?.[0]?.message?.content
+    const text = (typeof c === 'string' ? c : Array.isArray(c) ? c.map((x: any) => x?.text || '').join('') : '').trim()
+    if (!text) throw new Error('ai: empty response')
+    return text
+  },
+}
+
+export const getProvider = (): LLMProvider =>
+  botAiProvider() === 'openai-compatible' ? openaiCompatProvider : wakafyProvider
+
+const transient = (msg: string): boolean =>
+  /HTTP 5\d\d|http 5\d\d|429|502|503|504|gateway|timeout|ECONN|ETIMEDOUT|EAI_AGAIN|socket hang up|Unusual activity|sentinel|conversation|empty response|plugin error/i.test(msg) &&
   !/empty prompt|no such/i.test(msg)
 
-// Main entry. One backend only: the Wakafy API.
-// If GPT is down we surface the real error. No silent model swap.
+const RETRIES = 3
+
 export async function askLLM(messages: ChatMsg[], files: AiFileInput[] = []): Promise<string> {
+  const provider = getProvider()
   let lastErr: unknown
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < RETRIES; attempt++) {
     try {
-      return await gptChat(messages, files)
+      return await provider.ask(messages, files)
     } catch (e) {
       lastErr = e
-      if (attempt === 0 && gptTransient((e as Error).message)) {
-        await new Promise((r) => setTimeout(r, 500))
+      if (attempt < RETRIES - 1 && transient((e as Error).message)) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)))
         continue
       }
       break

@@ -115,10 +115,40 @@ test('parseAgentActions reads tools and fenced write bodies', () => {
   assert.equal(actions[3].arg, 'patched it')
 })
 
-test('parseAgentActions keeps a write without a fence as prose', () => {
-  const { actions, prose } = parseAgentActions('@write src/a.ts\nno fence here')
+test('parseAgentActions accepts a fence after a short intro line', () => {
+  const { actions, errors } = parseAgentActions('@write src/a.ts\nBerikut kodenya:\n```ts\nexport const a = 2\n```')
+  assert.deepEqual(errors, [])
+  assert.deepEqual(actions.map((a) => [a.tool, a.arg]), [['write', 'src/a.ts']])
+  assert.equal(actions[0].tool === 'write' && actions[0].content, 'export const a = 2')
+})
+
+test('parseAgentActions reports a write without a fence instead of dropping it', () => {
+  const { actions, errors } = parseAgentActions('@write src/a.ts\nno fence here')
   assert.equal(actions.length, 0)
-  assert.match(prose, /@write/)
+  assert.match(errors[0], /missing fenced code block/)
+})
+
+test('parseAgentActions keeps shell commands intact', () => {
+  const { actions } = parseAgentActions('@sh git log --oneline -5 # terakhir\n@bash npm test')
+  assert.deepEqual(actions.map((a) => [a.tool, a.arg]), [
+    ['sh', 'git log --oneline -5 # terakhir'],
+    ['sh', 'npm test'],
+  ])
+})
+
+test('sh runs a real command and blocks dangerous ones', async () => {
+  await withRepo(async (root) => {
+    const tools = await createFileTools(root)
+    try {
+      const ok = await tools.sh('node --version')
+      assert.equal(ok.ok, true)
+      assert.match(ok.text, /^v\d+/)
+      await assert.rejects(() => tools.sh('npm install left-pad'), /blocked for safety/)
+      await assert.rejects(() => tools.sh('rm -rf /'), /blocked for safety/)
+    } finally {
+      await tools.dispose()
+    }
+  })
 })
 
 test('parseAgentActions tolerates markdown wrapped markers', () => {
@@ -128,6 +158,22 @@ test('parseAgentActions tolerates markdown wrapped markers', () => {
     ['ls', 'src'],
     ['read', 'src/a.ts'],
     ['typecheck', ''],
+  ])
+})
+
+test('parseAgentActions strips trailing notes from tool args', () => {
+  const reply = [
+    '@read src/commands/index.ts — membaca handler dan sistem registrasi command.',
+    '@ls -r src (struktur folder)',
+    '@grep handleMessage src — cari handler',
+    '@rm src/a.ts # hapus file',
+  ].join('\n')
+  const { actions } = parseAgentActions(reply)
+  assert.deepEqual(actions.map((a) => [a.tool, a.arg]), [
+    ['read', 'src/commands/index.ts'],
+    ['ls', '-r src'],
+    ['grep', 'handleMessage src'],
+    ['rm', 'src/a.ts'],
   ])
 })
 

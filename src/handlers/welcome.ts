@@ -1,6 +1,6 @@
 import type { GroupParticipant } from 'baileys'
 import { getSock } from '../socket.ts'
-import { welcomeConfig } from '../lib/groupSettings.ts'
+import { goodbyeConfig, welcomeConfig } from '../lib/groupSettings.ts'
 import { logger } from '../lib/logger.ts'
 
 const numOf = (id: string) => id.split(/[:@]/)[0]
@@ -21,8 +21,8 @@ const render = (tpl: string, data: { mention: string; name: string; desc: string
   return { text, withPp }
 }
 
-const defaultPp = (name: string) =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=e5e7eb&color=374151&size=512&bold=true`
+const defaultPp = (_name: string) =>
+  'https://www.its.ac.id/tki/wp-content/uploads/sites/53/2025/08/pp-kosong-wa-default.jpg'
 
 const getPpUrl = async (sock: any, p: string | GroupParticipant): Promise<string | undefined> => {
   const obj = typeof p === 'string' ? {} : (p as any)
@@ -38,15 +38,16 @@ const getPpUrl = async (sock: any, p: string | GroupParticipant): Promise<string
   }
 }
 
+// Greet new members and say goodbye to leavers (per-group toggle + template).
 export async function handleGroupParticipantsUpdate(update: {
   id: string
   participants: (string | GroupParticipant)[]
   action: string
 }): Promise<void> {
-  if (update.action !== 'add') return
+  if (update.action !== 'add' && update.action !== 'remove') return
   const sock = getSock()
   if (!sock) return
-  const cfg = welcomeConfig(update.id)
+  const cfg = update.action === 'add' ? welcomeConfig(update.id) : goodbyeConfig(update.id)
   if (!cfg.on) return
 
   let gcname = 'grup ini'
@@ -65,7 +66,7 @@ export async function handleGroupParticipantsUpdate(update: {
         : ((p as any).notify || (p as any).name || numOf(jid))
     const mention = `@${numOf(jid)}`
     const { text, withPp } = render(cfg.msg, { mention, name, desc, gcname })
-    const caption = text || `halo ${mention}`
+    const caption = text || (update.action === 'add' ? `halo ${mention}` : `bye ${mention}`)
 
     try {
       if (withPp) {
@@ -75,7 +76,7 @@ export async function handleGroupParticipantsUpdate(update: {
         await sock.sendMessage(update.id, { text: caption, mentions: [jid] })
       }
     } catch (err) {
-      logger.warn('welcome: send failed', err)
+      logger.warn(update.action === 'add' ? 'welcome: send failed' : 'goodbye: send failed', err)
     }
   }
 }

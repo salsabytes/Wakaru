@@ -51,8 +51,12 @@ export const wakafy = {
   },
 
   error(status: number, snippet: string): Error {
-    // server answers errors as {"error": "..."} — unwrap it so humans see the message, not raw JSON
-    const msg = snippet.match(/"error"\s*:\s*"([^"]+)"/)?.[1] ?? snippet
+    // server answers errors as {"error": "..."} - unwrap it so humans see the message, not raw JSON/HTML
+    const html = /<html|<!doctype/i.test(snippet)
+    const htmlMsg = html
+      ? (snippet.match(/<h1[^>]*>([^<]+)</i)?.[1] || snippet.match(/<title[^>]*>([^<]+)</i)?.[1] || '').trim()
+      : ''
+    const msg = htmlMsg || snippet.match(/"error"\s*:\s*"([^"]+)"/)?.[1] || (html ? '' : snippet)
     switch (status) {
       case 400:
         return new Error(msg || 'bad url')
@@ -62,8 +66,12 @@ export const wakafy = {
         return new Error(msg || 'video too long/large')
       case 429:
         return new Error('wakafy: daily quota exceeded, resets 00:00 UTC')
+      case 502:
+      case 503:
+      case 504:
+        return new Error(`wakafy: http ${status}${msg ? ` (${msg})` : ' (server down/timeout)'}`)
       default:
-        // 404/502 carry the server's message (gone post, private, throttled)
+        // 404 carries the server's message (gone post, private, throttled)
         return new Error(msg ? `wakafy: ${msg}` : `download http ${status}`)
     }
   },

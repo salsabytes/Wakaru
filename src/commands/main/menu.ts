@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { listCommands } from '../index.ts'
+import { getCommand, listCommands } from '../index.ts'
 import { botOriginalGroup, isOwner, OWNERS } from '../../lib/config.ts'
 import { language, tx } from '../../lib/lang.ts'
 
@@ -113,9 +113,34 @@ export async function menuLinks(): Promise<{ text: string; url: string }[]> {
 
 export default {
   name: 'menu',
-  desc: 'list all commands',
+  desc: 'list all commands or explain one: .help <command>',
   aliases: ['help'],
   run: async (ctx: CommandContext) => {
+    const q = ctx.text.trim()
+    if (q) {
+      const name = q.replace(/^[./!]+/, '').toLowerCase()
+      const cmd = await getCommand(name)
+      if (!cmd) {
+        return ctx.reply(`Command \`${q}\` nggak ketemu. Ketik \`${ctx.prefix}menu\` buat lihat semua command.`)
+      }
+      const access = [
+        cmd.ownerOnly ? 'owner' : '',
+        cmd.groupOnly ? 'khusus grup' : '',
+        cmd.adminOnly ? 'admin grup' : '',
+        cmd.botAdmin ? 'butuh bot admin' : '',
+      ].filter(Boolean)
+      const lines = [
+        `*${ctx.prefix}${cmd.name}*`,
+        cmd.desc ? cmd.desc : '',
+        '',
+        `• kategori: ${cmd.category}`,
+        cmd.aliases?.length ? `• alias: ${cmd.aliases.map((a) => `${ctx.prefix}${a}`).join(', ')}` : '',
+        access.length ? `• akses: ${access.join(', ')}` : '',
+        cmd.cooldown ? `• cooldown: ${cmd.cooldown}s` : '',
+      ].filter((l) => l !== '')
+      return ctx.reply(lines.join('\n'))
+    }
+
     const t0 = performance.now()
     const commands = await listCommands()
     const menu = await renderMenu({

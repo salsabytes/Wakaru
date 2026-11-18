@@ -1,6 +1,6 @@
-import { test } from 'node:test'
+﻿import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { REPO_TASK, routeMode, routeText, takeModeOverride } from '../src/lib/aiRoute.ts'
+import { REPO_TASK, heuristicIntent, routeMode, routeText, takeModeOverride } from '../src/lib/aiRoute.ts'
 
 test('repo tasks route to repo mode', () => {
   const tasks = [
@@ -53,4 +53,31 @@ test('short follow-ups inherit the quoted repo context', () => {
   assert.equal(routeMode(routeText('hapus aja', quoted)).mode, 'repo')
   assert.equal(routeMode(routeText('ini apa?', quoted)).mode, 'chat')
   assert.equal(routeMode(routeText('hapus aja', '')).mode, 'chat')
+})
+
+test('heuristicIntent prefers safe clarification/chat for ambiguous cases', () => {
+  assert.equal(heuristicIntent('hapus pesan ini').intent, 'chat')
+  assert.equal(heuristicIntent('buat puisi hujan').intent, 'chat')
+  assert.equal(heuristicIntent('bikinin game html ular').intent, 'build')
+  assert.equal(heuristicIntent('cek src/commands/index.ts').intent, 'repo_read')
+  assert.equal(heuristicIntent('benerin bug di .play').intent, 'repo_edit')
+  assert.equal(heuristicIntent('struktur folder hp aku gimana').intent, 'clarify')
+  assert.equal(heuristicIntent('bikinin fitur stats buat liat spek server').intent, 'repo_edit')
+  assert.equal(heuristicIntent('tambahin command stats').intent, 'repo_edit')
+  assert.equal(heuristicIntent('strukturnya kayak apa').intent, 'repo_read')
+})
+
+test('heuristicIntent continues active repo task on short follow-up', () => {
+  const d = heuristicIntent('lanjut dong', { activeRepo: true })
+  assert.ok(d.intent === 'repo_read' || d.intent === 'repo_edit')
+})
+
+test('heuristicIntent keeps style/refine follow-ups on the recent repo change', () => {
+  for (const text of ['Stylenya jangan gitu', 'Iya gitu ja, edit ulang', 'warnanya kurang pas', 'tampilannya terlalu kecil']) {
+    const d = heuristicIntent(text, { recentRepo: true })
+    assert.equal(d.intent, 'repo_edit', text)
+    assert.equal(d.needs.write, true, text)
+  }
+  assert.equal(heuristicIntent('gas aja', { recentRepo: true }).intent, 'chat')
+  assert.equal(heuristicIntent('makasih ya', { recentRepo: true }).intent, 'chat')
 })

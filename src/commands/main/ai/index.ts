@@ -1,26 +1,25 @@
 ﻿import { askLLM, type AiFileInput, type ChatMsg } from '../../../lib/llm.ts'
 import { asksForListing, createFileTools, ensureListingShown, parseAgentActions, repoNudge, runAgentAction, wantsCodeChange, REPO_ROOT, type FileTools } from '../../../lib/agentFiles.ts'
 import { sendRepoPath } from '../../../lib/agentSend.ts'
+import { codegenFiles } from '../../../lib/aiCodegen.ts'
 import { fileMime, fileNameOf } from '../../../lib/fileinfo.ts'
 import { tx } from '../../../lib/lang.ts'
 import { logger } from '../../../lib/logger.ts'
 import { sendRichParts } from '../../../lib/richmsg.ts'
 import { clearPendingAiFiles, getAiHistory, getPendingAiFiles, pendingAiFilesAge, saveAiHistory, trimFilesToBudget } from '../../../lib/aiHistory.ts'
-import { handleMemoryIntent, scheduleMemoryRefresh } from '../../../lib/aiMemory.ts'
-import { AI_FREE, buildRepoSystem, buildSystem } from './prompt.ts'
-import { classifyIntent, routeMode, routeText, takeModeOverride, type AiRoute } from '../../../lib/aiRoute.ts'
+import { handleMemoryIntent, scheduleMemoryRefresh, formatMemory } from '../../../lib/aiMemory.ts'
+import { AI_FREE, buildAgentSystem } from './prompt.ts'
+import { CONTINUE_HINT, heuristicIntent, intentToMode, routeText, smartDecide, takeModeOverride, TOPIC_BREAK, type IntentDecision } from '../../../lib/aiRoute.ts'
+import { clearTask, formatTaskHint, formatTaskScratchpad, getTask, isActiveRepoTask, isRecentRepoTask, setTask, updateTask } from '../../../lib/aiTask.ts'
 import { setAiBusy } from '../../../lib/aiStatus.ts'
 import { hasRich, parseRich, richToText, waText } from './rich.ts'
 import { parseRuns, runTool } from './tools.ts'
 import { autoChecks, checkLabel, extractChecks, runChecks } from './checks.ts'
 
-const MAX_ROUNDS = AI_FREE ? 6 : 4 // how many tool/AI/check back-and-forth rounds
-const MAX_AI_FILES = 4 // max files we attach per AI request (keeps it light)
-const MAX_AI_FILE_BYTES = 20 * 1024 * 1024 // 20MB cap per file
+const MAX_ROUNDS = AI_FREE ? 6 : 4
+const MAX_AI_FILES = 4
+const MAX_AI_FILE_BYTES = 20 * 1024 * 1024
 
-// Inline text files straight into the prompt.
-// Why: the AI API may see an octet-stream attachment as an opaque blob.
-// Inline text always works.
 const TEXT_LIKE = /^(text\/|application\/(json|xml|yaml|x-yaml)|image\/svg)/
 const INLINE_TEXT_MAX = 16_000
 
@@ -38,10 +37,7 @@ const splitTextFiles = (files: AiFileInput[]): { attach: AiFileInput[]; inline: 
     }
     try {
       const text = Buffer.from(String(f.data || ''), 'base64').toString('utf8')
-      if (!text.trim()) {
-        attach.push(f)
-        continue
-      }
+      if (!text.trim()) { attach.push(f); continue }
       const clipped = text.length > INLINE_TEXT_MAX ? text.slice(0, INLINE_TEXT_MAX) + '\n[... terpotong]' : text
       inline.push(`--- ${f.name || 'file'} ---\n${clipped}`)
     } catch {
@@ -51,28 +47,18 @@ const splitTextFiles = (files: AiFileInput[]): { attach: AiFileInput[]; inline: 
   return { attach, inline }
 }
 
-// Media types the AI flow knows how to collect
 const MEDIA_TYPES = new Set(['imageMessage', 'documentMessage', 'videoMessage', 'audioMessage', 'stickerMessage'])
-
-// Old media only rides along when the user actually asks about it.
-// Otherwise every later question drags the old image back in,
-// and the model keeps talking about that image.
 const ASKS_MEDIA =
   /(gambar|foto|image|photo|picture|sticker|stiker|video|audio|suara|voice|dokumen|document|pdf|file|lampiran|attachment|screenshot|ss\b|selfie|wajah|muka|orang|baju|warna|objek|tulisan|teks\s+di|apa\s+ini|ini\s+apa|siapa|liat|lihat|baca|analisis|jelasin|jelaskan|deskripsi|describe|read\s+(this|the)|what.+?(this|image|photo|picture)|who.+?(this|that))/i
 
 const asksAboutMedia = (text: string): boolean => ASKS_MEDIA.test(String(text || ''))
 
-// Code/build asks get a live progress bubble; normal chat just replies.
 const ASKS_CODE =
   /(kode|code|ngoding|coding|program|script|javascript|typescript|\bjs\b|\bts\b|html|css|python|php|java|c\+\+|sql|react|node|npm|api|fungsi|function|bug|error|debug|fix|perbaiki|benerin|bikin(?:in|kan)?\s+(web|situs|game|aplikasi|app|bot|script|tools?)|buat(?:in|kan)?\s+(web|situs|game|aplikasi|app|bot|script|tools?)|website|landing|komponen|component|syntax|compile|build)/i
 
-// Catches "login/account" or "can't generate image" refusals so we can force real HTML.
 const REFUSAL =
   /(harus|perlu|butuh|silakan|silahkan|minta|coba).{0,40}(login|log ?in|sign ?in|sign ?up|masuk|akun|account|langganan|subscribe|upgrade|premium)|\b(login|log ?in|sign ?in)\b.{0,30}(dulu|untuk|agar|to\s+enable|to\s+use)|(fitur|feature).{0,40}(pembuatan visual|visual|gambar|image|disabled|tidak tersedia|unavailable|diaktifkan)|(tidak|nggak|tak|gak) bisa.{0,30}(buat|bikin|generate|membuat|menghasilkan).{0,20}(gambar|image|foto|visual|ilustrasi)|can'?t.{0,30}(generate|create|make|draw).{0,20}(image|picture|visual|illustration)/i
 
-// Repo "done" claims without tool calls are validated in repoNudge().
-
-// Download attached/replied media into base64 for the AI, with size checks.
 const collectAiFiles = async (ctx: CommandContext): Promise<{ files: AiFileInput[]; notes: string[] }> => {
   const sources: Array<{ mtype?: string; mimetype?: string; fileName?: string; download: () => Promise<Buffer> }> = []
   if (ctx.quoted && MEDIA_TYPES.has(ctx.quoted.mtype)) sources.push(ctx.quoted)
@@ -95,44 +81,23 @@ const collectAiFiles = async (ctx: CommandContext): Promise<{ files: AiFileInput
   return { files, notes }
 }
 
-// Live "agentic process" bubble: sent once, then edited in place every round.
-interface AiProgress {
-  update: (text: string) => Promise<void>
-}
+interface AiProgress { update: (text: string) => Promise<void> }
 
 const startProgress = async (ctx: CommandContext, text: string): Promise<AiProgress> => {
   let key: any
-  try {
-    const sent = await ctx.sock.sendMessage(ctx.chat, { text })
-    key = sent?.key
-  } catch {
-    key = undefined
-  }
+  try { key = (await ctx.sock.sendMessage(ctx.chat, { text }))?.key } catch { key = undefined }
   return {
     update: async (t: string) => {
       if (!key) return
-      try {
-        await ctx.sock.sendMessage(ctx.chat, { text: t, edit: key })
-      } catch {
-        key = undefined // editing unsupported — keep the first bubble, don't spam
-      }
+      try { await ctx.sock.sendMessage(ctx.chat, { text: t, edit: key }) } catch { key = undefined }
     },
   }
 }
 
-// Owner-only repo access. One tool session per `.ai` call, made on first use.
-interface RepoSession {
-  tools?: FileTools
-}
-
-const ensureTools = async (repo: RepoSession): Promise<FileTools> => {
-  repo.tools ??= await createFileTools(REPO_ROOT)
-  return repo.tools
-}
-
+interface RepoSession { tools?: FileTools }
+const ensureTools = async (repo: RepoSession): Promise<FileTools> => (repo.tools ??= await createFileTools(REPO_ROOT))
 const clip = (s: string, max: number): string => (s.length > max ? s.slice(0, max) + '\n[...]' : s)
 
-// Nothing ships unless typecheck AND tests pass. Otherwise roll back.
 const verifyChanges = async (tools: FileTools): Promise<string> => {
   const touched = tools.written()
   if (!touched.length) return ''
@@ -143,37 +108,67 @@ const verifyChanges = async (tools: FileTools): Promise<string> => {
       return `[!] typecheck failed - rolled back ${restored.length} file(s), repo untouched.\n${clip(check.text, 1500)}`
     }
     const tests = await tools.test()
-    if (!tests.ok) {
-      const restored = await tools.rollback()
-      return `[!] tests failed - rolled back ${restored.length} file(s), repo untouched.\n${clip(tests.text, 1500)}`
-    }
+    if (!tests.ok) return `[!] tests failed - files kept (not rolled back), fix needed:\n${clip(tests.text, 1500)}`
     return `[ok] typecheck ok - tests ok - changed: ${touched.join(', ')}`
   } catch (err) {
     return `[!] verification error: ${(err as Error).message}`
   }
 }
 
-// Run the AI + @run tool loop.
-// Returns the text to send, or null if a tool already posted something visible
-// (so we don't double-reply).
+const reloadCommandsAfter = async (files: string[]): Promise<void> => {
+  if (!files.some((p) => p.startsWith('src/commands/'))) return
+  const { reloadCommands } = await import('../../index.ts')
+  await reloadCommands().catch((err) => logger.warn('command reload failed:', err))
+}
+
+interface RunOpts {
+  canWrite: boolean
+  intent: IntentDecision
+}
+
+interface ExchangeResult {
+  text: string | null
+  toolsRun: number
+}
+
+const DENIES_TOOL_ACCESS =
+  /(tool|alat|akses|access).{0,40}(tidak tersedia|ga tersedia|nggak tersedia|tak tersedia|tidak bisa|ga bisa|nggak bisa|tak bisa|tidak ada|nggak ada|ga ada|unavailable|not available|missing|disabled)|tidak tersedia di (koneksi|sesi|sini|chat)|tidak (bisa|mampu) (mengakses|mengedit|menulis|menjalankan|memanggil)|can't (access|write|edit|run|call)|cannot (access|write|edit|run|call)|no (repo )?(access|permission)|belum bisa (mengedit|menulis|akses|mengakses)/i
+
+const deniesToolAccess = (text: string): boolean => DENIES_TOOL_ACCESS.test(String(text || ''))
+
+const nudgeMessage = (nudge: 'stall' | 'listing' | 'claim' | 'continue', denial: boolean): string => {
+  if (nudge === 'listing') {
+    return 'List it now with a real tool (@ls -r . for full structure) then answer with the paths exactly as returned (```txt tree). Do not invent.'
+  }
+  if (nudge === 'stall') {
+    return 'You DO have repo/workspace access in this session. The bot executes every @tool line and returns real output. @read/@ls/@grep/@status/@search/@fetch' +
+      ' and (when write is enabled) @edit/@write/@rm/@typecheck/@test/@done ARE available right now. Never claim otherwise. Start now with tool lines (e.g. @ls src, @read <file>).'
+  }
+  if (nudge === 'continue') {
+    return (denial ? 'Correction: write/check tools ARE available and executed by the bot in this session. Do not claim they are unavailable. ' : '') +
+      'Do not stop, do not send a status checklist, and do not wait for the user. Continue the task now: make the change with @edit/@write or @rm, run @typecheck and @test, fix failures, then finish with @done in this turn.'
+  }
+  return 'Nothing changed yet. @read the relevant files, then @edit/@write/@rm, run @typecheck and @test, and finish with @done. Do not claim tools are unavailable.'
+}
+
 const runExchange = async (
   msgs: ChatMsg[],
   ctx: CommandContext,
   showProcess = false,
   repo?: RepoSession,
-): Promise<string | null> => {
+  opts?: RunOpts,
+): Promise<ExchangeResult> => {
   const title = await tx('aiProcessTitle')
+  const canWrite = opts?.canWrite ?? !!repo
   const maxRounds = repo ? 8 : MAX_ROUNDS
   const lastRound = maxRounds - 1
   let progress: AiProgress | undefined
   let lines: string[] = []
-  let toolsRun = 0 // executed tool calls, including read-only @ls/@read
-  // Raw @ls output. Kept so a "semua folder sudah dicek" summary can't hide the
-  // structure the user asked for. The model's text is never our only source.
+  let toolsRun = 0
   const lsSeen = new Map<string, string>()
   const firstUserText = [...msgs].reverse().find((m) => m.role === 'user')?.content || ''
   const wantsListing = !!repo && asksForListing(firstUserText)
-  const wantsChange = !!repo && wantsCodeChange(firstUserText)
+  const wantsChange = !!repo && canWrite && (wantsCodeChange(firstUserText) || opts?.intent?.intent === 'repo_edit')
   const finish = (text: string): string => (wantsListing ? ensureListingShown(text, [...lsSeen.values()]) : text)
 
   const ensure = async (): Promise<AiProgress> => {
@@ -187,30 +182,30 @@ const runExchange = async (
   const done = async (): Promise<void> => {
     if (progress) await show(lines.length ? await tx('aiCheckDone') : await tx('aiDone'))
   }
-  // One progress line per tool step so the user sees what's happening.
   const stepLabel = (tool: string, arg: string): string => {
     if (tool === 'ls') return `📂 ls ${arg || '.'}`
     if (tool === 'read') return `📄 read ${arg}`
-    if (tool === 'grep') return `🔍 grep ${arg}`
-    if (tool === 'search') return `🌐 searching: ${arg}`
-    if (tool === 'fetch') return `🌐 reading: ${arg}`
-    if (tool === 'write') return `✏️ write ${arg}`
+    if (tool === 'grep') return `🔎 grep ${arg}`
+    if (tool === 'search') return `🌐 search: ${arg}`
+    if (tool === 'fetch') return `🌐 fetch: ${arg}`
+    if (tool === 'status') return '📊 status'
+    if (tool === 'write') return `✍️ write ${arg}`
+    if (tool === 'edit') return `✏️ edit ${arg}`
     if (tool === 'rm') return `🗑️ rm ${arg}`
     if (tool === 'send') return `📤 send ${arg}`
     if (tool === 'typecheck') return '🧪 typecheck'
     if (tool === 'test') return `🧪 test ${arg}`.trim()
-    return `▶ ${tool} ${arg}`.trim()
+    return `⚙️ ${tool} ${arg}`.trim()
   }
   const logStep = (line: string): void => {
     lines.push(line)
-    // phone-readable: keep only the latest steps
     while (lines.length > 12) lines.shift()
   }
   if (showProcess) await ensure()
   let refusalFixed = false
   let nudges = 0
-  // True once a file is written/removed in this run.
   let wrote = false
+
   for (let round = 0; round < maxRounds; round++) {
     let reply: string
     try {
@@ -221,7 +216,7 @@ const runExchange = async (
         reply = (await askLLM(msgs)).trim()
       } else throw err
     }
-    // Block login/image-gen excuses: force a real HTML/SVG/Canvas answer on first refusal.
+
     const asked = [...msgs].reverse().find((m) => m.role === 'user')?.content || ''
     if (!refusalFixed && round === 0 && ASKS_CODE.test(asked) && REFUSAL.test(reply) && !reply.includes('```')) {
       refusalFixed = true
@@ -236,88 +231,78 @@ const runExchange = async (
       })
       continue
     }
-    // Owner repo tools: read/search/edit files, then see real tsc/test errors.
+
     if (repo) {
       const agent = parseAgentActions(reply)
-      // No tool calls in the reply? Nudge the model to keep working (not stall/chatter).
-      if (!agent.actions.length && nudges < 2) {
-        const nudge = repoNudge(reply, toolsRun, wantsChange && !wrote)
-        if (nudge) {
+      const unfinished = wantsChange && !wrote
+      const maxNudges = unfinished ? (toolsRun === 0 ? 1 : 3) : 3
+      if (!agent.actions.length) {
+        if (agent.errors.length && nudges < maxNudges && round < lastRound) {
           nudges++
           msgs.push({ role: 'assistant', content: reply })
-          msgs.push({
-            role: 'user',
-            content: nudge === 'stall'
-              ? 'You DO have repo access in this session: the bot runs every @tool line you send ' +
-                'and replies with the real output. Do not describe a plan and never say access is ' +
-                'unavailable. Start now with tool lines (for example: @ls src, then @read <file>).'
-              : nudge === 'listing'
-                ? 'You have not listed anything yet, so you have no real paths. Run the tool now: ' +
-                  '@ls -r . (one call for the whole subtree), then answer with the paths exactly ' +
-                  'as the tool returned them (a ```txt tree). Do not invent directories.'
-                : nudge === 'continue'
-                  ? 'Reading was only the first step and you have not changed anything yet. Do not ' +
-                    'send progress chatter ("sebentar", "aku lanjutkan", "udah aman") and do not wait ' +
-                    'for the user. Now @write the new or changed file with its full content, run ' +
-                    '@typecheck and @test, then finish with @done in this same turn.'
-                  : 'You have not run any tool yet, so nothing changed. Do the work now: @read the ' +
-                    'relevant file, then @rm to delete or @write to change it, then @typecheck and ' +
-                    '@test, and finish with @done.',
-          })
+          msgs.push({ role: 'user', content: `Your tool call was rejected (malformed), nothing ran:\n${agent.errors.join('\n')}\n\nEmit the marker again in exactly that format in the same reply. Do not stop.` })
+          continue
+        }
+        const nudge = repoNudge(reply, toolsRun, unfinished)
+        const denial = deniesToolAccess(reply) ||
+          /status fitur|belum akan mengklaim|tool.{0,20}(edit|write|typecheck|test).{0,30}(tidak|unavailable)|belum berhasil (?:dibuat|diterapkan|diubah)|tidak ada operasi (?:edit|write|tulis)|executor (?:repo|repository) (?:tidak|nggak|belum)|tidak akan mengarang/i.test(reply)
+        const stalled = denial && toolsRun === 0
+        if ((nudge || (denial && unfinished) || stalled) && nudges < maxNudges && round < lastRound) {
+          nudges++
+          msgs.push({ role: 'assistant', content: reply })
+          msgs.push({ role: 'user', content: nudgeMessage(nudge || (unfinished ? 'continue' : 'stall'), denial) })
           continue
         }
       }
       if (agent.actions.length) {
         const tools = await ensureTools(repo)
         await ensure()
-        const results: string[] = []
+        const results: string[] = agent.errors.map((e) => `[tool error] ${e}`)
         let doneText: string | undefined
-        let failed = false
-        for (const action of agent.actions.slice(0, 6)) {
+        let failed = agent.errors.length > 0
+        let retry = false
+        for (const action of agent.actions.slice(0, 8)) {
           const running = action.tool !== 'done'
-          if (running) await show(`⏳ ${stepLabel(action.tool, action.arg)}`)
-          // @send is the one tool with a visible side effect: it posts the file itself.
-          const out = action.tool === 'send'
-            ? await sendRepoPath(ctx, tools.root, action.arg)
-            : await runAgentAction(tools, action)
+          if (running) await show(`⏳ ${stepLabel(action.tool, (action as any).arg || '')}`)
+          let out: string
+          if (!canWrite && (action.tool === 'write' || action.tool === 'edit' || action.tool === 'rm' || action.tool === 'sh')) {
+            out = `[${action.tool}] error: ${action.tool === 'sh' ? 'terminal' : 'write'} not allowed for this request (read/explain only). Ask the user to confirm changes with @repo if needed.`
+            failed = true
+          } else if (action.tool === 'send') {
+            out = await sendRepoPath(ctx, tools.root, action.arg)
+          } else {
+            out = await runAgentAction(tools, action)
+          }
           results.push(out)
           if (action.tool === 'ls') lsSeen.set(action.arg, out)
-          const bad = /^\[(?:typecheck|test)\] FAILED/m.test(out) || /^\[\w+\] error:/m.test(out)
+          const bad = /^\[(?:typecheck|test|sh)\] FAILED/m.test(out) || /^\[\w+\] error:/m.test(out)
           if (bad) failed = true
           if (running) {
             toolsRun++
-            wrote ||= action.tool === 'write' || action.tool === 'rm'
-            logStep(`${bad ? '❌' : '✅'} ${stepLabel(action.tool, action.arg)}`)
+            wrote ||= action.tool === 'write' || action.tool === 'edit' || action.tool === 'rm'
+            logStep(`${bad ? '❌' : '✅'} ${stepLabel(action.tool, (action as any).arg || '')}`)
           }
           if (action.tool === 'done') {
-            // Never accept "done" while the last check still failed.
-            if (!failed) doneText = action.arg
+            if (!failed && !(wantsChange && !wrote)) doneText = action.arg
+            else if (wantsChange && !wrote && nudges < maxNudges && round < lastRound) {
+              nudges++
+              retry = true
+              msgs.push({ role: 'assistant', content: reply })
+              msgs.push({ role: 'user', content: nudgeMessage('continue', deniesToolAccess(action.arg)) })
+            }
             break
           }
         }
-        if (doneText !== undefined) {
-          await done()
-          return finish(doneText)
-        }
-        if (round === lastRound) {
-          await done()
-          return clip(results.join('\n\n'), 3500)
-        }
-        // every step is logged with ✅/❌. Next round the model thinks again.
+        if (retry) continue
+        if (doneText !== undefined) { await done(); return { text: finish(doneText), toolsRun } }
+        if (round === lastRound) { await done(); return { text: clip(results.join('\n\n'), 3500), toolsRun } }
         await show(await tx('aiThinking'))
         msgs.push({ role: 'assistant', content: reply })
-        msgs.push({
-          role: 'user',
-          content:
-            `Tool results:\n${clip(results.join('\n\n'), 12_000)}\n\n` +
-            'Continue. Use @done when finished.',
-        })
+        msgs.push({ role: 'user', content: `Tool results:\n${clip(results.join('\n\n'), 12_000)}\n\nContinue. Use @done when finished.` })
         continue
       }
     }
-    // Verification: explicit ```check-* blocks, plus auto-checks on any JS/HTML
-    // fence (some models ignore the instruction).
-    // The real result goes back to the model so it can fix its own code.
+
     const parsed = extractChecks(reply)
     const clean = parsed.checks.length ? parsed.clean : reply
     const checks = parsed.checks.length ? parsed.checks : autoChecks(reply)
@@ -325,10 +310,7 @@ const runExchange = async (
       await ensure()
       const checked = await runChecks(checks)
       lines = checked.map((r) => `${r.ok ? '✅' : '❌'} ${checkLabel(r.kind)}`)
-      if (round === lastRound) {
-        await done()
-        return finish(clean || checked.map((r) => r.text).join('\n'))
-      }
+      if (round === lastRound) { await done(); return { text: finish(clean || checked.map((r) => r.text).join('\n')), toolsRun } }
       if (!checked.every((r) => r.ok)) {
         await show(await tx('aiCheckFixing'))
         msgs.push({ role: 'assistant', content: reply })
@@ -337,17 +319,16 @@ const runExchange = async (
           content:
             `code check results:\n${checked.map((r) => r.text).join('\n')}\n\n` +
             'Fix the real error and send the final version (re-check if needed). ' +
-            'Check blocks are invisible to the user — always include the final working code in your reply.',
+            'Check blocks are invisible to the user - always include the final working code in your reply.',
         })
         continue
       }
       await done()
     }
+
     const runs = parseRuns(clean)
-    if (!runs.length) {
-      await done()
-      return finish(clean || reply)
-    }
+    if (!runs.length) { await done(); return { text: finish(clean || reply), toolsRun } }
+
     if (progress) await show(await tx('aiTools', { name: runs.map((r) => r.name).join(', ') }))
     const results: string[] = []
     let sent = false
@@ -358,38 +339,29 @@ const runExchange = async (
       sent ||= out.sent
       failed ||= out.failed
     }
-    if (sent && !failed) {
-      await done()
-      return null
-    }
+    if (sent && !failed) { await done(); return { text: null, toolsRun } }
     msgs.push({ role: 'assistant', content: reply })
     const resultPrompt = AI_FREE
       ? `tool results:\n${results.join('\n')}\nReply to the user naturally.`
       : `tool results:\n${results.join('\n')}\nReply to the user in ONE short message.`
     msgs.push({ role: 'user', content: resultPrompt })
-    if (round === lastRound) {
-      await done()
-      return results.join('\n')
-    }
+    if (round === lastRound) { await done(); return { text: results.join('\n'), toolsRun } }
   }
   await done()
-  return ''
+  return { text: '', toolsRun }
 }
 
 export default {
   name: 'ai',
-  desc: 'chat or DO things: .ai <msg> - runs commands, reads files, and (owner) reads/edits the repo with typecheck+test rollback; @repo/@chat force a mode',
+  desc: 'chat or DO things: .ai <msg> - runs commands, answers, and (owner) can read/edit this repo with verification; @repo/@chat force a mode',
   aliases: ['agent'],
   run: async (ctx: CommandContext) => {
-    // 1) Read the text, collect files (this msg / replied / pending).
-    // Owner can force a mode with "@repo ..." or "@chat ...".
     const { text: typed, forced } = takeModeOverride(ctx.text.trim(), ctx.isOwner)
     let query = typed
     ctx.sock.sendPresenceUpdate('composing', ctx.chat).catch(() => {})
     const { files: directFiles, notes } = await collectAiFiles(ctx)
     const histKey = `${ctx.chat}:${ctx.sender}`
-    // Media the user just sent (photo, then ".ai keren ga?") still counts.
-    // So the natural flow works without media keywords.
+
     const mediaAge = pendingAiFilesAge(histKey)
     const wantsMedia = asksAboutMedia(query) || (mediaAge !== undefined && mediaAge < 3 * 60_000)
     const pendingFiles = directFiles.length || !wantsMedia ? [] : getPendingAiFiles(histKey)
@@ -397,21 +369,12 @@ export default {
     if (!query && (files.length || inline.length)) query = 'Tolong analisis file ini.'
     if (!query) return ctx.reply(await tx('aiUsage', { prefix: ctx.prefix }))
 
-    // 1b) Memory intent: "remember ..." / "forget my memory". Fast and deterministic.
     const memIntent = handleMemoryIntent(histKey, query)
     if (memIntent) {
       if (pendingFiles.length) clearPendingAiFiles(histKey)
-      const msg = memIntent === 'forgot'
-        ? 'Oke, ingatan aku soal kamu di chat ini sudah aku hapus ya.'
-        : 'Oke, aku ingat itu ya.'
-      return ctx.reply(msg)
+      return ctx.reply(memIntent === 'forgot' ? 'Oke, ingatan aku soal kamu di chat ini sudah aku hapus ya.' : 'Oke, aku ingat itu ya.')
     }
 
-    // 2) Build the prompt: system + history + this message (+ files), then ask.
-    let finalText: string | null = ''
-    // If the user replied to a message, put it straight in the prompt.
-    // Why: the AI then sees the exact replied content, even when it is old or
-    // missing from the store.
     let quotedBlock = ''
     if (ctx.quoted) {
       const qRawType = String((ctx.quoted as any).mtype || '')
@@ -421,9 +384,7 @@ export default {
       const isText = qRawType === 'conversation' || qRawType === 'extendedTextMessage'
       const label = qType && !isText ? `[${qType}] ` : ''
       const content = qText ? `${label}${qText}` : (qType && !isText ? `[${qType}${ctx.quoted.fileName ? ': ' + ctx.quoted.fileName : ''}]` : '')
-      if (content) {
-        quotedBlock = `[Replied message${qFrom ? ` from ${qFrom}` : ''}]\n${content.slice(0, 1200)}\n\n`
-      }
+      if (content) quotedBlock = `[Replied message${qFrom ? ` from ${qFrom}` : ''}]\n${content.slice(0, 1200)}\n\n`
     }
     const baseText = quotedBlock ? `${quotedBlock}${query}` : query
     const extra = [
@@ -431,31 +392,75 @@ export default {
       inline.length ? `[isi file]\n${inline.join('\n\n')}` : '',
     ].filter(Boolean)
     const userText = extra.length ? `${baseText}\n\n${extra.join('\n\n')}` : baseText
-    // Route on typed/replied intent (not file contents) so attachments don't force repo mode.
-    const routeTextNow = routeText(query, ctx.quoted?.text)
-    let route: AiRoute
-    if (!ctx.isOwner) {
-      route = { mode: 'chat', why: 'not owner' }
-    } else if (forced) {
-      route = { mode: forced, why: 'manual override' }
+
+    // --- intent decision (context-aware, task-aware) ---
+    const recentMsgs = getAiHistory(histKey).slice(-4).map((m) => `${m.role}: ${String(m.content || '').slice(0, 300)}`).join('\n')
+    const routeTextNow = routeText(query, ctx.quoted?.text, recentMsgs)
+    let decision: IntentDecision
+    const activeTaskStr = formatTaskScratchpad(histKey)
+    const recentRepo = !activeTaskStr && isRecentRepoTask(histKey)
+    if (forced) {
+      decision = heuristicIntent(routeTextNow, { forced, activeRepo: isActiveRepoTask(histKey), recentRepo })
     } else {
-      // LLM decides; heuristics only if the classifier fails.
-      try {
-        route = { mode: await classifyIntent(routeTextNow), why: 'ai intent' }
-      } catch {
-        route = { ...routeMode(routeTextNow), why: 'heuristic (classifier unavailable)' }
-      }
+      decision = await smartDecide({
+        text: routeTextNow,
+        quoted: ctx.quoted?.text,
+        history: recentMsgs,
+        memory: formatMemory(histKey),
+        activeTask: activeTaskStr || undefined,
+        recentTask: recentRepo ? formatTaskHint(histKey) : undefined,
+        hasPendingMedia: wantsMedia || !!files.length,
+        isOwner: ctx.isOwner,
+      })
     }
-    const repo: RepoSession | undefined = ctx.isOwner && route.mode === 'repo' ? {} : undefined
-    if (ctx.isOwner) logger.info(`ai mode: ${route.mode} (${route.why})`)
+
+    // clarify instead of guessing wrong
+    if (!forced && decision.intent === 'clarify') {
+      return ctx.reply(decision.clarify || 'Maksud kamu soal repo/kode Wakaru ini, atau hal lain? Balas pakai `@repo ...` atau `@chat ...` ya.')
+    }
+
+    const repoEnabled = ctx.isOwner && (decision.intent === 'repo_read' || decision.intent === 'repo_edit' || decision.intent === 'research')
+    const prevTask = getTask(histKey)
+    const continuingRepoTask = !!(prevTask && prevTask.status === 'active' && isActiveRepoTask(histKey))
+    const wantsChangeReq = wantsCodeChange(query) || decision.intent === 'repo_edit'
+    const explainReq = /(jelas(?:in|kan)|explain|gimana cara|bagaimana cara|cara kerja|how (?:do|does|to|it))/i.test(query)
+    let canWrite = repoEnabled && (
+      decision.intent === 'repo_edit' ||
+      (forced === 'repo' && wantsChangeReq) ||
+      (continuingRepoTask && !!prevTask?.needsWrite) ||
+      (wantsChangeReq && !explainReq)
+    )
+    if (repoEnabled && canWrite && decision.intent === 'repo_read') {
+      decision = { ...decision, intent: 'repo_edit', reason: `${decision.reason} (code change requested)`, needs: { ...decision.needs, repo: true, write: true } }
+    }
+
+    // task memory
+    if (decision.intent === 'repo_read' || decision.intent === 'repo_edit' || (decision.intent === 'research' && repoEnabled)) {
+      const continuing = continuingRepoTask && (decision.intent === 'repo_read' || decision.intent === 'repo_edit' || decision.intent === 'research')
+      const intentForTask = canWrite ? 'repo_edit' : decision.intent
+      setTask(histKey, {
+        intent: intentForTask,
+        goal: continuing ? prevTask!.goal : query.slice(0, 200),
+        plan: continuing ? prevTask!.plan : [],
+        step: continuing ? prevTask!.step : 0,
+        status: 'active',
+        needsWrite: canWrite,
+        touched: continuing ? prevTask!.touched : [],
+        notes: continuing ? prevTask!.notes : [],
+      })
+    } else if (decision.intent === 'chat' || decision.intent === 'build' || decision.intent === 'bot_action') {
+      const refine = recentRepo && !TOPIC_BREAK.test(query) && CONTINUE_HINT.test(query)
+      if (!refine && isActiveRepoTask(histKey)) clearTask(histKey)
+    }
+
+    if (ctx.isOwner) logger.info(`ai intent=${decision.intent} conf=${decision.confidence} repo=${repoEnabled} write=${canWrite} (${decision.reason})`)
+
+    let finalText: string | null = ''
+    let toolsRun = 0
+    const repo: RepoSession | undefined = repoEnabled ? {} : undefined
     try {
-      const system = repo ? await buildRepoSystem(ctx) : await buildSystem(ctx)
-      // Old media in history is only re-sent when the user asks about media.
-      // Budget 0 strips it, so unrelated chats stop seeing the image.
-      const history = trimFilesToBudget(
-        getAiHistory(histKey),
-        wantsMedia ? MAX_AI_FILES - files.length : 0,
-      )
+      const system = await buildAgentSystem(ctx, { repoEnabled, canWrite, intent: decision, activeTask: formatTaskScratchpad(histKey) || undefined })
+      const history = trimFilesToBudget(getAiHistory(histKey), wantsMedia ? MAX_AI_FILES - files.length : 0)
       const msgs: ChatMsg[] = [
         system,
         ...history,
@@ -463,51 +468,83 @@ export default {
       ]
       setAiBusy(true)
       try {
-        // Progress bubble is for repo/agent work; plain chat replies stay clean.
-        finalText = await runExchange(msgs, ctx, !!repo, repo)
+        const ex = await runExchange(msgs, ctx, repoEnabled || decision.intent === 'research', repo, { canWrite, intent: decision })
+        finalText = ex.text
+        toolsRun = ex.toolsRun
       } catch (err) {
-        finalText = `x ${(err as Error).message}`
+        finalText = `❌ ${(err as Error).message}`
       } finally {
         setAiBusy(false)
       }
     } catch (err) {
-      finalText = `x ${(err as Error).message}`
+      finalText = `❌ ${(err as Error).message}`
     }
 
-    // Owner edits are kept only when typecheck AND tests pass. Else rollback.
     if (repo?.tools) {
       try {
         const changed = repo.tools.written()
         if (changed.length) {
           const verified = await verifyChanges(repo.tools)
           finalText = finalText === null ? verified : `${finalText}\n\n${verified}`
-          // Commands are cached at startup. Drop the old map so a deleted or
-          // rewritten command works without a restart.
-          if (verified.startsWith('[ok]') && changed.some((p) => p.startsWith('src/commands/'))) {
-            const { reloadCommands } = await import('../../index.ts')
-            await reloadCommands().catch((err) => logger.warn('command reload failed:', err))
+          if (verified.startsWith('[ok]')) {
+            updateTask(histKey, { status: 'done', touched: changed, notes: ['verified ok'] })
+            if (changed.some((p) => p.startsWith('src/commands/'))) {
+              const { reloadCommands } = await import('../../index.ts')
+              await reloadCommands().catch((err) => logger.warn('command reload failed:', err))
+            }
+          } else {
+            updateTask(histKey, { status: 'blocked', notes: [verified.slice(0, 200)] })
           }
+        } else if (repoEnabled && finalText && !/^❌/.test(finalText)) {
+          updateTask(histKey, { status: 'done' })
         }
       } finally {
         await repo.tools.dispose()
       }
+    } else if (repoEnabled && finalText && !/^❌/.test(finalText)) {
+      if (canWrite && wantsCodeChange(routeTextNow) && (deniesToolAccess(finalText) || (/status|belum diterapkan|belum ada file/i.test(finalText) && !toolsRun))) {
+        updateTask(histKey, { status: 'blocked', notes: ['model stalled/denied'] })
+        finalText = '⚠️ Aku sempat berhenti tanpa menjalankan perubahan, padahal akses repo & tool (read/write/typecheck/test) aktif. Coba kirim lagi pesan yang sama ya (aku akan lanjut kerjakan).'
+      } else updateTask(histKey, { status: 'done' })
     }
 
-    // Tool already posted output; don't duplicate it.
+    let codegenOk = false
+    const finalStr = finalText ?? ''
+    const hardError = finalStr.startsWith('❌') && !finalStr.includes('sempat berhenti')
+    if (repoEnabled && canWrite && finalText && !hardError && wantsChangeReq && !repo?.tools?.written().length) {
+      ctx.sock.sendPresenceUpdate('composing', ctx.chat).catch(() => {})
+      const tools = await createFileTools(REPO_ROOT)
+      try {
+        const gen = await codegenFiles({ task: userText, tools, ask: (m) => askLLM(m) })
+        finalText = gen.text
+        codegenOk = gen.ok
+        if (gen.ok) {
+          updateTask(histKey, { status: 'done', touched: gen.files, notes: ['auto-codegen ok'] })
+          await reloadCommandsAfter(gen.files)
+        } else {
+          updateTask(histKey, { status: 'active', needsWrite: true, notes: ['auto-codegen gagal'] })
+        }
+      } finally {
+        await tools.dispose()
+      }
+    }
+
+    if (!codegenOk && repoEnabled && canWrite && finalText && wantsChangeReq && !repo?.tools?.written().length) {
+      updateTask(histKey, { status: 'active', needsWrite: true, notes: ['belum ada file berubah - wajib @write/@edit lalu @typecheck/@test'] })
+      const note = '\n\n---\n⚠️ Belum ada file yang benar-benar berubah di repo. Balas *lanjut* atau ulangi permintaan, nanti aku kerjakan lagi.'
+      if (!finalText.includes('Belum ada file yang benar-benar berubah')) finalText += note
+    }
+
     if (finalText === null) return
 
-    // 3) Save history, clear used pending files, refresh memory in background.
     if (finalText.trim()) {
       saveAiHistory(histKey, userText, finalText, files)
       if (pendingFiles.length) clearPendingAiFiles(histKey)
-      // Async, non-blocking: update durable memory when it is worth it.
       scheduleMemoryRefresh(histKey, getAiHistory(histKey), askLLM)
     } else {
-      // Empty model reply: never leave the typing indicator stuck.
       finalText = await tx('aiEmpty')
     }
 
-    // 4) Send it: rich card if present, else plain text.
     const waSafe = waText(finalText)
     if (!waSafe.trim()) return
     const parts = parseRich(finalText)

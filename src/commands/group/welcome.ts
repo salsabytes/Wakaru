@@ -1,5 +1,35 @@
 import { DEFAULT_WELCOME, setWelcome, toggleWelcome, welcomeConfig } from '../../lib/groupSettings.ts'
+import type { Button } from '../../lib/buttons.ts'
 import { tx } from '../../lib/lang.ts'
+
+const onOff = (w: string): boolean | undefined =>
+  w === 'on' || w === 'enable' || w === '1' ? true : w === 'off' || w === 'disable' || w === '0' ? false : undefined
+
+const panel = async (chat: string, prefix: string): Promise<{ text: string; buttons: Button[] }> => {
+  const c = welcomeConfig(chat)
+  const text = [
+    await tx('welcomeTitle'),
+    '',
+    await tx('statusLine', { status: await tx(c.on ? 'toggleOn' : 'toggleOff') }),
+    await tx('templateLine', { template: c.msg }),
+    '',
+    await tx('welcomePlaceholders'),
+    await tx('welcomeHint', { prefix }),
+  ].join('\n')
+  return {
+    text,
+    buttons: [{ id: 'welcome:toggle', text: await tx(c.on ? 'disableButton' : 'enableButton') }],
+  }
+}
+
+const sendPanel = async (ctx: CommandContext): Promise<void> => {
+  const { text, buttons } = await panel(ctx.chat, ctx.prefix)
+  try {
+    await ctx.sendButtons(buttons, text)
+  } catch {
+    await ctx.reply(text)
+  }
+}
 
 export default {
   name: 'welcome',
@@ -10,43 +40,19 @@ export default {
     const raw = ctx.text.trim()
     const sub = raw.toLowerCase()
 
-    if (!sub) {
-      const c = welcomeConfig(ctx.chat)
-      const status = c.on ? 'ON' : 'OFF'
-      return ctx.reply(
-        [
-          `welcome: ${status}`,
-          `template: ${c.msg}`,
-          '',
-          `pakai: ${ctx.prefix}welcome <teks>`,
-          `matikan: ${ctx.prefix}welcome off  |  nyalakan: ${ctx.prefix}welcome on`,
-          '',
-          'placeholder:',
-          '`pp` kirim foto profil',
-          '`mention` tag member baru',
-          '`name` nama/pushname member',
-          '`desc` deskripsi grup',
-          '`gcname` nama grup',
-          'contoh: .welcome `pp` halo `mention`, selamat datang di `gcname`!',
-        ].join('\n'),
-      )
-    }
-
-    if (sub === 'off' || sub === 'disable' || sub === '0') {
-      toggleWelcome(ctx.chat, false)
-      return ctx.reply('welcome: OFF')
-    }
-    if (sub === 'on' || sub === 'enable' || sub === '1') {
-      toggleWelcome(ctx.chat, true)
-      return ctx.reply('welcome: ON')
-    }
     if (sub === 'reset') {
       setWelcome(ctx.chat, DEFAULT_WELCOME)
-      return ctx.reply('welcome direset ke default')
+      return ctx.reply(await tx('welcomeReset'))
     }
 
-    // set custom template and enable
-    setWelcome(ctx.chat, raw)
-    return ctx.reply('welcome disimpan & ON')
+    if (sub && !onOff(sub) && sub !== 'toggle') {
+      setWelcome(ctx.chat, raw)
+      return ctx.reply(await tx('welcomeSaved'))
+    }
+
+    const value = onOff(sub)
+    if (sub === 'toggle' || value !== undefined) toggleWelcome(ctx.chat, value)
+
+    return sendPanel(ctx)
   },
 } satisfies Command

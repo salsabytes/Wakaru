@@ -1,0 +1,164 @@
+import type { ChatMsg } from './llm.ts'
+import type { FileTools } from './agentFiles.ts'
+
+const CONTEXT_MAX = 5000
+const BLOCKS_MAX = 8
+const OUT_MAX = 1500
+
+const clip = (s: string, max: number): string => (s.length > max ? s.slice(0, max) + '\n[...]' : s)
+
+const CONTEXT_FILES = [
+  'AGENTS.md',
+  'package.json',
+  'src/commands/index.ts',
+  'src/commands/main/setlang.ts',
+  'src/commands/main/menu.ts',
+]
+
+const collectRepoContext = async (tools: FileTools): Promise<string> => {
+  const parts: string[] = []
+  for (const rel of CONTEXT_FILES) {
+    try {
+      const body = await tools.read(rel)
+      parts.push(`--- ${rel} ---\n${clip(body, CONTEXT_MAX)}`)
+    } catch {}
+  }
+  try {
+    const tree = await tools.list('src/commands', true)
+    parts.push(`--- structure: src/commands ---\n${clip(tree, 2500)}`)
+  } catch {}
+  return parts.join('\n\n')
+}
+
+const OPEN = /^```[a-zA-Z0-9+#_-]*\s*(?:path|file)\s*[=:]\s*("[^"]+"|'[^']+'|\S+)\s*$/i
+const CLOSE = /^```\s*$/
+
+export const parseFileBlocks = (text: string): Array<{ path: string; content: string }> => {
+  const lines = String(text ?? '').split(/\r?\n/)
+  const out = new Map<string, string>()
+  for (let i = 0; i < lines.length; i++) {
+    const m = OPEN.exec(lines[i].trim())
+    if (!m) continue
+    const path = m[1].replace(/^["']|["']$/g, '').trim()
+    const body: string[] = []
+    let j = i + 1
+    while (j < lines.length && !CLOSE.test(lines[j].trim())) body.push(lines[j++])
+    if (path && body.length) out.set(path, body.join('\n'))
+    i = j
+  }
+  return [...out.entries()].map(([path, content]) => ({ path, content }))
+}
+
+const DELETE_RE = /^\s*(?:[-*+]\s+)?(?:delete|hapus|remove)\s+(?:path\s*[=:]\s*)?("[^"]+"|'[^']+'|\S+)\s*$/i
+
+export const parseDeletes = (text: string): string[] => {
+  const out: string[] = []
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const m = DELETE_RE.exec(line)
+    if (!m) continue
+    const p = m[1].replace(/^["']|["']$/g, '').trim()
+    if (!p.includes('/') && !/\.\w+$/.test(p)) continue
+    if (!out.includes(p)) out.push(p)
+  }
+  return out
+}
+
+const SYSTEM = (context: string): string => `You generate code for the Wakaru repo (TypeScript, Node >= 23.6, Baileys bot).
+You are NOT an interactive agent. There is no plugin manager, no skill system, no separate executor, and no login. Never refuse and never say you lack access: the harness writes your files, then runs typecheck and tests.
+
+OUTPUT FORMAT (mandatory) - every file as one block, full content, no placeholders or "...":
+\`\`\`ts path=src/commands/main/stats.ts
+<complete file content>
+\`\`\`
+Optional last line: SUMMARY: <one sentence>
+
+DELETE (remove files) - one bare line per file, outside any fence:
+DELETE path=src/commands/main/stats.ts
+Removing a feature or command means deleting its file. NEVER replace a file with "export {}", an empty stub, or a TODO.
+
+RULES:
+- Only write under src/ or test/ (or README.md / AGENTS.md).
+- ESM TypeScript: imports need the .ts extension, no semicolons, 2-space indent, no comments.
+- No new dependencies; node builtins are fine (import os from 'node:os').
+- Commands live in src/commands/<category>/<name>.ts and are auto-registered: export default { name, desc?, aliases?, run(ctx) } satisfies Command. CommandContext is global (do not import it).
+- ctx.reply(text) sends text to the chat. Keep the file self-contained and small.
+- Server/device specs = node:os (cpus, totalmem, freemem, type, release, arch, hostname, uptime) + process (version, uptime, memoryUsage).
+- Do not touch unrelated files. If the task needs no code change, output nothing.
+
+REPO CONTEXT:
+${context}`
+
+const buildMessages = (context: string, task: string, errors: string): ChatMsg[] => [
+  { role: 'system', content: SYSTEM(context) },
+  {
+    role: 'user',
+    content: errors
+      ? `Task: ${task}\n\nPrevious attempt failed. Fix it and output the affected files again (complete content):\n${errors}`
+      : `Task: ${task}`,
+  },
+]
+
+export interface CodegenResult {
+  ok: boolean
+  text: string
+  files: string[]
+}
+
+export const codegenFiles = async (o: {
+  task: string
+  tools: FileTools
+  ask: (msgs: ChatMsg[]) => Promise<string>
+  maxRounds?: number
+}): Promise<CodegenResult> => {
+  const context = await collectRepoContext(o.tools)
+  const maxRounds = o.maxRounds ?? 3
+  let errors = ''
+  for (let round = 0; round < maxRounds; round++) {
+    let reply = ''
+    try {
+      reply = await o.ask(buildMessages(context, o.task, errors))
+    } catch (err) {
+      return { ok: false, text: `[!] model call failed: ${(err as Error).message}`, files: [] }
+    }
+    const blocks = parseFileBlocks(reply).slice(0, BLOCKS_MAX)
+    const deletes = parseDeletes(reply).slice(0, BLOCKS_MAX)
+    if (!blocks.length && !deletes.length) {
+      errors =
+        'No file blocks or DELETE lines found. Output at least one:\n```ts path=src/commands/<category>/<name>.ts\n<complete file>\n```\nor, to remove a file:\nDELETE path=src/commands/<category>/<name>.ts'
+      continue
+    }
+    const written = blocks.map((b) => b.path)
+    const all = [...deletes, ...written]
+    try {
+      for (const p of deletes) await o.tools.remove(p)
+      for (const b of blocks) await o.tools.write(b.path, b.content)
+    } catch (err) {
+      errors = `change rejected: ${(err as Error).message}`
+      await o.tools.rollback()
+      continue
+    }
+    const check = await o.tools.typecheck()
+    if (!check.ok) {
+      errors = `typecheck FAILED - fix real errors:\n${clip(check.text, 2500)}`
+      await o.tools.rollback()
+      continue
+    }
+    const tests = await o.tools.test()
+    if (!tests.ok) {
+      errors = `tests FAILED - fix real failures:\n${clip(tests.text, 2500)}`
+      continue
+    }
+    const cmd = written.map((p) => /^src\/commands\/(?:[^/]+\/)*([^/]+)\.ts$/.exec(p)?.[1]).find(Boolean)
+    return {
+      ok: true,
+      text: `✅ ${all.map((p) => `\`${p}\`${deletes.includes(p) ? ' (deleted)' : ''}`).join(', ')}\ntypecheck ok · tests ok${cmd ? `\nCoba \`.${cmd}\`` : ''}`,
+      files: all,
+    }
+  }
+  await o.tools.rollback()
+  return {
+    ok: false,
+    text: `[!] Aku sudah coba ${maxRounds}× generate + verifikasi, masih gagal (repo tidak diubah):\n${clip(errors || 'unknown error', OUT_MAX)}`,
+    files: [],
+  }
+}
