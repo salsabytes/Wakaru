@@ -51,6 +51,35 @@ export const parseFileBlocks = (text: string): Array<{ path: string; content: st
 
 const DELETE_RE = /^\s*(?:[-*+]\s+)?(?:delete|hapus|remove)\s+(?:path\s*[=:]\s*)?("[^"]+"|'[^']+'|\S+)\s*$/i
 
+export const resolveDeletePath = (files: Iterable<string>, want: string): string | null => {
+  const set = files instanceof Set ? files : new Set(files)
+  if (set.has(want)) return want
+  const base = want.split('/').pop() ?? want
+  const dir = want.slice(0, Math.max(0, want.length - base.length))
+  const sameBase = [...set].filter((f) => f.split('/').pop() === base)
+  if (sameBase.length === 1) return sameBase[0]
+  if (sameBase.length > 1) {
+    const sameDir = sameBase.filter((f) => f.startsWith(dir))
+    if (sameDir.length === 1) return sameDir[0]
+    return null
+  }
+  const stem = base.replace(/\.\w+$/, '')
+  const byStem = [...set].filter((f) => (f.split('/').pop() ?? '').replace(/\.\w+$/, '') === stem)
+  return byStem.length === 1 ? byStem[0] : null
+}
+
+const repoFiles = async (tools: FileTools): Promise<Set<string>> => {
+  const out = new Set<string>()
+  for (const dir of ['src', 'test']) {
+    const text = await tools.list(dir, true).catch(() => '')
+    for (const line of String(text).split('\n')) {
+      const m = /^f\s+(.+)$/.exec(line.trim())
+      if (m) out.add(m[1].trim())
+    }
+  }
+  return out
+}
+
 export const parseDeletes = (text: string): string[] => {
   const out: string[] = []
   for (const line of String(text ?? '').split(/\r?\n/)) {
@@ -74,7 +103,7 @@ Optional last line: SUMMARY: <one sentence>
 
 DELETE (remove files) - one bare line per file, outside any fence:
 DELETE path=src/commands/main/stats.ts
-Removing a feature or command means deleting its file. NEVER replace a file with "export {}", an empty stub, or a TODO.
+Removing a feature or command means deleting its file. NEVER replace a file with "export {}", an empty stub, or a TODO. Copy the path from the structure listing; a filename-only match is allowed, but a wrong folder is rejected.
 
 RULES:
 - Only write under src/ or test/ (or README.md / AGENTS.md).
@@ -128,9 +157,22 @@ export const codegenFiles = async (o: {
       continue
     }
     const written = blocks.map((b) => b.path)
-    const all = [...deletes, ...written]
+    const known = deletes.length ? await repoFiles(o.tools) : new Set<string>()
+    const resolved: string[] = []
+    const missing: string[] = []
+    for (const p of deletes) {
+      const hit = resolveDeletePath(known, p)
+      if (hit) resolved.push(hit)
+      else missing.push(p)
+    }
+    if (missing.length) {
+      const near = [...known].filter((f) => missing.some((m) => f.split('/').pop() === m.split('/').pop())).slice(0, 6)
+      errors = `File not found: ${missing.join(', ')}.${near.length ? ` Existing matches: ${near.join(', ')}.` : ''} Delete an existing path only (DELETE path=<exact path>).`
+      continue
+    }
+    const all = [...resolved, ...written]
     try {
-      for (const p of deletes) await o.tools.remove(p)
+      for (const p of resolved) await o.tools.remove(p)
       for (const b of blocks) await o.tools.write(b.path, b.content)
     } catch (err) {
       errors = `change rejected: ${(err as Error).message}`
@@ -151,7 +193,7 @@ export const codegenFiles = async (o: {
     const cmd = written.map((p) => /^src\/commands\/(?:[^/]+\/)*([^/]+)\.ts$/.exec(p)?.[1]).find(Boolean)
     return {
       ok: true,
-      text: `✅ ${all.map((p) => `\`${p}\`${deletes.includes(p) ? ' (deleted)' : ''}`).join(', ')}\ntypecheck ok · tests ok${cmd ? `\nCoba \`.${cmd}\`` : ''}`,
+      text: `✅ ${all.map((p) => `\`${p}\`${resolved.includes(p) ? ' (deleted)' : ''}`).join(', ')}\ntypecheck ok · tests ok${cmd ? `\nCoba \`.${cmd}\`` : ''}`,
       files: all,
     }
   }

@@ -519,7 +519,25 @@ export const runAgentAction = async (tools: FileTools, a: AgentAction): Promise<
     if (a.tool === 'status') return `[status]\n${await tools.gitStatus()}`
     if (a.tool === 'write') return `[write] ${await tools.write(a.arg, a.content)}`
     if (a.tool === 'edit') return `[edit] ${await tools.edit(a.arg, a.search, a.replace)}`
-    if (a.tool === 'rm') return `[rm] ${await tools.remove(a.arg)}`
+    if (a.tool === 'rm') {
+      try {
+        return `[rm] ${await tools.remove(a.arg)}`
+      } catch (err) {
+        const msg = (err as Error).message
+        if (!/not found/i.test(msg)) throw err
+        const base = a.arg.split('/').pop() ?? a.arg
+        const near: string[] = []
+        for (const dir of ['src', 'test']) {
+          const text = await tools.list(dir, true).catch(() => '')
+          for (const line of text.split('\n')) {
+            const p = /^f\s+(.+)$/.exec(line.trim())?.[1]?.trim()
+            if (!p || p.split('/').pop() !== base || near.includes(p)) continue
+            near.push(p)
+          }
+        }
+        throw new AgentPathError(`${msg}${near.length ? ` - existing: ${near.slice(0, 5).join(', ')} (use the exact path)` : ''}`)
+      }
+    }
     if (a.tool === 'send') return `[send] error: no chat session`
     if (a.tool === 'typecheck') { const r = await tools.typecheck(); return `[typecheck] ${r.ok ? 'ok' : 'FAILED'}\n${r.text}` }
     if (a.tool === 'test') { const r = await tools.test(a.arg); return `[test] ${r.ok ? 'ok' : 'FAILED'}\n${r.text}` }

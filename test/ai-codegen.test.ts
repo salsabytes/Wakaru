@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { codegenFiles, parseDeletes, parseFileBlocks } from '../src/lib/aiCodegen.ts'
+import { codegenFiles, parseDeletes, parseFileBlocks, resolveDeletePath } from '../src/lib/aiCodegen.ts'
 import type { FileTools } from '../src/lib/agentFiles.ts'
 
 const stub = (over: Partial<FileTools> = {}): FileTools => ({
@@ -53,11 +53,24 @@ test('parseDeletes reads DELETE lines and skips prose', () => {
   assert.deepEqual(parseDeletes(text), ['src/commands/main/stats.ts', 'src/commands/main/a.ts'])
 })
 
+test('resolveDeletePath fixes a guessed parent folder', () => {
+  const files = ['src/commands/owner/test.ts', 'src/commands/main/menu.ts']
+  assert.equal(resolveDeletePath(files, 'src/commands/main/test.ts'), 'src/commands/owner/test.ts')
+  assert.equal(resolveDeletePath(files, 'src/commands/main/menu.ts'), 'src/commands/main/menu.ts')
+  assert.equal(resolveDeletePath(files, 'src/commands/main/nope.ts'), null)
+})
+
+test('resolveDeletePath refuses ambiguous names', () => {
+  const files = ['src/a/test.ts', 'src/b/test.ts']
+  assert.equal(resolveDeletePath(files, 'src/c/test.ts'), null)
+})
+
 test('codegenFiles deletes a feature file instead of emptying it', async () => {
   const removed: string[] = []
   const gen = await codegenFiles({
     task: 'hapus command .stats',
     tools: stub({
+      list: async (rel) => (rel === 'src' ? 'f src/commands/main/stats.ts' : ''),
       remove: async (rel) => {
         removed.push(rel)
         return `deleted ${rel}`
@@ -70,6 +83,23 @@ test('codegenFiles deletes a feature file instead of emptying it', async () => {
   assert.deepEqual(gen.files, ['src/commands/main/stats.ts'])
   assert.match(gen.text, /deleted/)
   assert.doesNotMatch(gen.text, /Coba/)
+})
+
+test('codegenFiles resolves a guessed delete path by basename', async () => {
+  const removed: string[] = []
+  const gen = await codegenFiles({
+    task: 'hapus fitur test',
+    tools: stub({
+      list: async (rel) => (rel === 'src' ? 'f src/commands/owner/test.ts' : ''),
+      remove: async (rel) => {
+        removed.push(rel)
+        return `deleted ${rel}`
+      },
+    }),
+    ask: async () => 'DELETE path=src/commands/main/test.ts',
+  })
+  assert.equal(gen.ok, true)
+  assert.deepEqual(removed, ['src/commands/owner/test.ts'])
 })
 
 test('codegenFiles writes generated blocks and verifies', async () => {
