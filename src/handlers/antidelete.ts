@@ -1,8 +1,8 @@
 import { WAMessageStubType, type BaileysEventMap, type WAMessage, type WASocket } from 'baileys'
-import { antideleteConfig } from '../lib/groupSettings.ts'
+import { antideleteConfig } from '../lib/wa/groupSettings.ts'
 import { tx } from '../lib/lang.ts'
 import { logger } from '../lib/logger.ts'
-import { messageStore } from '../lib/store.ts'
+import { messageStore } from '../lib/wa/store.ts'
 
 const RESTORED_TTL = 5 * 60_000
 const RESTORED_MAX = 1000

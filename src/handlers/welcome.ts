@@ -1,6 +1,6 @@
 import type { GroupParticipant } from 'baileys'
 import { getSock } from '../socket.ts'
-import { goodbyeConfig, welcomeConfig } from '../lib/groupSettings.ts'
+import { goodbyeConfig, welcomeConfig } from '../lib/wa/groupSettings.ts'
 import { logger } from '../lib/logger.ts'
 
 const numOf = (id: string) => id.split(/[:@]/)[0]

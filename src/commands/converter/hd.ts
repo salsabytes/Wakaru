@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
 import { tx } from '../../lib/lang.ts'
-import { isExpiredMedia } from '../../lib/media.ts'
-import { upscaleImage } from '../../lib/scrapers/upscale.ts'
+import { isExpiredMedia } from '../../lib/wa/media.ts'
+import { upscaleImage } from '../../lib/download/scrapers/upscale.ts'
 
 const exec = promisify(execFile)
 

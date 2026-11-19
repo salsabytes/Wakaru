@@ -1,5 +1,5 @@
 import type { WAMessageKey } from 'baileys'
-import { messageStore, recentByChat } from '../../lib/store.ts'
+import { messageStore, recentByChat } from '../../lib/wa/store.ts'
 
 // Only the bot's own messages can be deleted.
 export const isOwn = (m: { key?: WAMessageKey }): boolean => !!m.key?.fromMe

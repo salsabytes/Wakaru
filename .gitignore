@@ -8,11 +8,12 @@ native/*/target/
 bin/
 
 config.json
-flowchart.md
+docs/flowchart.md
+docs/flowchart.svg
 .agents
+.freebuff/
 .hermes/
 .codegraph.json
 AGENTS.md
 .vscode/
 src/commands/owner/wahtml.ts
-flowchart.svg

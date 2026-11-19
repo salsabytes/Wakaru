@@ -1,6 +1,6 @@
 import { getCommand } from '../../index.ts'
 import { isOwner } from '../../../lib/config.ts'
-import { fmtBytes, mediaDuration, oversizedDoc } from '../../../lib/media.ts'
+import { fmtBytes, mediaDuration, oversizedDoc } from '../../../lib/wa/media.ts'
 
 const mediaMeta = (label: string, buf: Buffer): string => {
   const parts = [label]

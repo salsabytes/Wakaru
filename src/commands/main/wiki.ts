@@ -1,6 +1,6 @@
 import { language, tx } from '../../lib/lang.ts'
 import { logger } from '../../lib/logger.ts'
-import { searchWiki } from '../../lib/wiki.ts'
+import { searchWiki } from '../../lib/api/wiki.ts'
 
 export default {
   name: 'wiki',

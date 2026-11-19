@@ -1,7 +1,7 @@
-import { wakafy } from '../../lib/wakafy.ts'
-import { requireUrl, sendMediaOrCarousel } from '../../lib/media.ts'
+import { wakafy } from '../../lib/api/wakafy.ts'
+import { requireUrl, sendMediaOrCarousel } from '../../lib/wa/media.ts'
 import { botMaxDownloadMB } from '../../lib/config.ts'
-import { scraperErrorKey } from '../../lib/scrapers/index.ts'
+import { scraperErrorKey } from '../../lib/download/scrapers/index.ts'
 import { logger } from '../../lib/logger.ts'
 import { tx } from '../../lib/lang.ts'
 

@@ -1,4 +1,4 @@
-import { groupGuards, resolveTargets } from '../../lib/group.ts'
+import { groupGuards, resolveTargets } from '../../lib/wa/group.ts'
 import { tx } from '../../lib/lang.ts'
 
 export default {

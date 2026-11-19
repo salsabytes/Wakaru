@@ -1,5 +1,5 @@
-import { sendRichMulti, type RichPart } from '../../lib/richmsg.ts'
-import { wakafy } from '../../lib/wakafy.ts'
+import { sendRichMulti, type RichPart } from '../../lib/wa/richmsg.ts'
+import { wakafy } from '../../lib/api/wakafy.ts'
 
 type Q = { soal: string; jawaban: string[] }
 type Game = { chat: string; q: Q; open: boolean[]; by: (string | null)[]; at: number }

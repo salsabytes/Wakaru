@@ -1,14 +1,14 @@
-﻿import type { ChatMsg } from '../../../lib/llm.ts'
+﻿import type { ChatMsg } from '../../../lib/ai/llm.ts'
 import { language, langName } from '../../../lib/lang.ts'
 import { cfg } from '../../../lib/config.ts'
 import { listCommands } from '../../index.ts'
-import { messageStore, recentByChat } from '../../../lib/store.ts'
+import { messageStore, recentByChat } from '../../../lib/wa/store.ts'
 import { fetchContributors } from '../../../lib/contributors.ts'
-import { describeMessage, formatMemory } from '../../../lib/aiMemory.ts'
-import { getGrounding } from '../../../lib/aiKnowledge.ts'
-import { AGENT_RULES } from '../../../lib/agentFiles.ts'
-import { formatTaskScratchpad } from '../../../lib/aiTask.ts'
-import type { IntentDecision } from '../../../lib/aiRoute.ts'
+import { describeMessage, formatMemory } from '../../../lib/ai/aiMemory.ts'
+import { getGrounding } from '../../../lib/ai/aiKnowledge.ts'
+import { AGENT_RULES } from '../../../lib/ai/agentFiles.ts'
+import { formatTaskScratchpad } from '../../../lib/ai/aiTask.ts'
+import type { IntentDecision } from '../../../lib/ai/aiRoute.ts'
 
 const PARTICIPANT_MAX = 80
 const RECENT_MAX = 10

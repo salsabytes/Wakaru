@@ -1,10 +1,10 @@
 import { inspect } from 'node:util'
 import { getCommand } from '../index.ts'
-import { wakafy } from '../../lib/wakafy.ts'
-import { fetchBuffer, UA } from '../../lib/http.ts'
-import { sendHtml, sendRichParts } from '../../lib/richmsg.ts'
-import { sendCarousel, sendButtons } from '../../lib/buttons.ts'
-import { sendMediaOrCarousel } from '../../lib/media.ts'
+import { wakafy } from '../../lib/api/wakafy.ts'
+import { fetchBuffer, UA } from '../../lib/api/http.ts'
+import { sendHtml, sendRichParts } from '../../lib/wa/richmsg.ts'
+import { sendCarousel, sendButtons } from '../../lib/wa/buttons.ts'
+import { sendMediaOrCarousel } from '../../lib/wa/media.ts'
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (
   ...args: string[]

@@ -1,4 +1,4 @@
-import { htmlToText, type RichPart } from '../../../lib/richmsg.ts'
+import { htmlToText, type RichPart } from '../../../lib/wa/richmsg.ts'
 
 /**
  * Parse AI replies into "rich parts" (plain text, tables, code blocks).

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { logger } from '../../lib/logger.ts'
 import { tx } from '../../lib/lang.ts'
-import { isExpiredMedia } from '../../lib/media.ts'
+import { isExpiredMedia } from '../../lib/wa/media.ts'
 
 const exec = promisify(execFile)
 

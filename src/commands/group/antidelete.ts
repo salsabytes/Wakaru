@@ -1,5 +1,5 @@
-import { antideleteConfig, toggleAntidelete } from '../../lib/groupSettings.ts'
-import type { Button } from '../../lib/buttons.ts'
+import { antideleteConfig, toggleAntidelete } from '../../lib/wa/groupSettings.ts'
+import type { Button } from '../../lib/wa/buttons.ts'
 import { tx } from '../../lib/lang.ts'
 
 const onOff = (w: string): boolean | undefined =>

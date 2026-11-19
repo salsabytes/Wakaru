@@ -1,8 +1,8 @@
-import { wakafy } from '../../lib/wakafy.ts'
-import { requireUrl } from '../../lib/media.ts'
-import { sendCarousel } from '../../lib/buttons.ts'
-import { fetchBuffer, UA } from '../../lib/http.ts'
-import { scraperErrorKey } from '../../lib/scrapers/index.ts'
+import { wakafy } from '../../lib/api/wakafy.ts'
+import { requireUrl } from '../../lib/wa/media.ts'
+import { sendCarousel } from '../../lib/wa/buttons.ts'
+import { fetchBuffer, UA } from '../../lib/api/http.ts'
+import { scraperErrorKey } from '../../lib/download/scrapers/index.ts'
 import { logger } from '../../lib/logger.ts'
 import { tx } from '../../lib/lang.ts'
 

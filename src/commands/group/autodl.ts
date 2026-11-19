@@ -1,4 +1,4 @@
-import { autodlConfig, toggleAutodl } from '../../lib/groupSettings.ts'
+import { autodlConfig, toggleAutodl } from '../../lib/wa/groupSettings.ts'
 
 const onOff = (w: string): boolean | undefined =>
   w === 'on' || w === 'enable' || w === '1' ? true : w === 'off' || w === 'disable' || w === '0' ? false : undefined

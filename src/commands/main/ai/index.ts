@@ -1,17 +1,17 @@
-﻿import { askLLM, type AiFileInput, type ChatMsg } from '../../../lib/llm.ts'
-import { asksForListing, createFileTools, ensureListingShown, parseAgentActions, repoNudge, runAgentAction, wantsCodeChange, REPO_ROOT, type FileTools } from '../../../lib/agentFiles.ts'
-import { sendRepoPath } from '../../../lib/agentSend.ts'
-import { codegenFiles } from '../../../lib/aiCodegen.ts'
+﻿import { askLLM, type AiFileInput, type ChatMsg } from '../../../lib/ai/llm.ts'
+import { asksForListing, createFileTools, ensureListingShown, parseAgentActions, repoNudge, runAgentAction, wantsCodeChange, REPO_ROOT, type FileTools } from '../../../lib/ai/agentFiles.ts'
+import { sendRepoPath } from '../../../lib/ai/agentSend.ts'
+import { codegenFiles } from '../../../lib/ai/aiCodegen.ts'
 import { fileMime, fileNameOf } from '../../../lib/fileinfo.ts'
 import { tx } from '../../../lib/lang.ts'
 import { logger } from '../../../lib/logger.ts'
-import { sendRichParts } from '../../../lib/richmsg.ts'
-import { clearPendingAiFiles, getAiHistory, getPendingAiFiles, pendingAiFilesAge, saveAiHistory, trimFilesToBudget } from '../../../lib/aiHistory.ts'
-import { handleMemoryIntent, scheduleMemoryRefresh, formatMemory } from '../../../lib/aiMemory.ts'
+import { sendRichParts } from '../../../lib/wa/richmsg.ts'
+import { clearPendingAiFiles, getAiHistory, getPendingAiFiles, pendingAiFilesAge, saveAiHistory, trimFilesToBudget } from '../../../lib/ai/aiHistory.ts'
+import { handleMemoryIntent, scheduleMemoryRefresh, formatMemory } from '../../../lib/ai/aiMemory.ts'
 import { AI_FREE, buildAgentSystem } from './prompt.ts'
-import { CONTINUE_HINT, heuristicIntent, intentToMode, routeText, smartDecide, takeModeOverride, TOPIC_BREAK, type IntentDecision } from '../../../lib/aiRoute.ts'
-import { clearTask, formatTaskHint, formatTaskScratchpad, getTask, isActiveRepoTask, isRecentRepoTask, setTask, updateTask } from '../../../lib/aiTask.ts'
-import { setAiBusy } from '../../../lib/aiStatus.ts'
+import { CONTINUE_HINT, intentToMode, routeText, smartDecide, takeModeOverride, TOPIC_BREAK, type IntentDecision } from '../../../lib/ai/aiRoute.ts'
+import { clearTask, formatTaskHint, formatTaskScratchpad, getTask, isActiveRepoTask, isRecentRepoTask, setTask, updateTask } from '../../../lib/ai/aiTask.ts'
+import { setAiBusy } from '../../../lib/ai/aiStatus.ts'
 import { hasRich, parseRich, richToText, waText } from './rich.ts'
 import { parseRuns, runTool } from './tools.ts'
 import { autoChecks, checkLabel, extractChecks, runChecks } from './checks.ts'
@@ -45,6 +45,13 @@ const splitTextFiles = (files: AiFileInput[]): { attach: AiFileInput[]; inline: 
     }
   }
   return { attach, inline }
+}
+
+const describeAiMsg = (m: ChatMsg): string => {
+  const raw = String(m.content || '')
+  const text = raw.replace(/\s+/g, ' ').trim()
+  const tag = /```html/i.test(raw) ? '[html reply] ' : /```/.test(raw) ? '[code reply] ' : ''
+  return `${m.role}: ${tag}${text.slice(0, 500)}`
 }
 
 const MEDIA_TYPES = new Set(['imageMessage', 'documentMessage', 'videoMessage', 'audioMessage', 'stickerMessage'])
@@ -86,10 +93,14 @@ interface AiProgress { update: (text: string) => Promise<void> }
 const startProgress = async (ctx: CommandContext, text: string): Promise<AiProgress> => {
   let key: any
   try { key = (await ctx.sock.sendMessage(ctx.chat, { text }))?.key } catch { key = undefined }
+  let chain: Promise<void> = Promise.resolve()
   return {
-    update: async (t: string) => {
-      if (!key) return
-      try { await ctx.sock.sendMessage(ctx.chat, { text: t, edit: key }) } catch { key = undefined }
+    update: (t: string) => {
+      chain = chain.then(async () => {
+        if (!key) return
+        try { await ctx.sock.sendMessage(ctx.chat, { text: t, edit: key }) } catch { key = undefined }
+      })
+      return chain
     },
   }
 }
@@ -206,15 +217,51 @@ const runExchange = async (
   let nudges = 0
   let wrote = false
 
+  let previewTimer: ReturnType<typeof setTimeout> | undefined
+  let previewText = ''
+  let liveStatus = ''
+  let liveTail = ''
+  const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+  const composePreview = (full: string): string => {
+    const body = full.length > 1400 ? `…${full.slice(-1400)}` : full
+    return [title, ...lines, '', body.trim()].join('\n')
+  }
+  const queuePreview = (full: string): void => {
+    previewText = composePreview(full)
+    if (previewTimer) return
+    previewTimer = setTimeout(() => {
+      previewTimer = undefined
+      void progress?.update(previewText)
+    }, 700)
+  }
+  const queueLive = (chunk: string): void => {
+    liveTail = `${liveTail}${stripAnsi(chunk)}`.slice(-1400)
+    if (previewTimer) return
+    previewTimer = setTimeout(() => {
+      previewTimer = undefined
+      const body = [title, ...lines, liveStatus, liveTail.trim()].filter((l) => l !== '').join('\n')
+      void progress?.update(body)
+    }, 900)
+  }
+  const stopPreview = (): void => {
+    if (previewTimer) {
+      clearTimeout(previewTimer)
+      previewTimer = undefined
+    }
+  }
+
   for (let round = 0; round < maxRounds; round++) {
     let reply: string
+    const onDelta = progress ? (full: string): void => queuePreview(full) : undefined
     try {
-      reply = (await askLLM(msgs)).trim()
+      reply = (await askLLM(msgs, [], onDelta)).trim()
     } catch (err) {
       if (round === 0) {
         await new Promise((r) => setTimeout(r, 1500))
-        reply = (await askLLM(msgs)).trim()
+        reply = (await askLLM(msgs, [], onDelta)).trim()
       } else throw err
+    } finally {
+      stopPreview()
     }
 
     const asked = [...msgs].reverse().find((m) => m.role === 'user')?.content || ''
@@ -263,7 +310,13 @@ const runExchange = async (
         let retry = false
         for (const action of agent.actions.slice(0, 8)) {
           const running = action.tool !== 'done'
-          if (running) await show(`⏳ ${stepLabel(action.tool, (action as any).arg || '')}`)
+          if (running) {
+            liveStatus = `⏳ ${stepLabel(action.tool, (action as any).arg || '')}`
+            liveTail = ''
+            await show(liveStatus)
+          }
+          const terminal = action.tool === 'sh' || action.tool === 'typecheck' || action.tool === 'test'
+          const onData = running && terminal ? (chunk: string): void => queueLive(chunk) : undefined
           let out: string
           if (!canWrite && (action.tool === 'write' || action.tool === 'edit' || action.tool === 'rm' || action.tool === 'sh')) {
             out = `[${action.tool}] error: ${action.tool === 'sh' ? 'terminal' : 'write'} not allowed for this request (read/explain only). Ask the user to confirm changes with @repo if needed.`
@@ -271,8 +324,9 @@ const runExchange = async (
           } else if (action.tool === 'send') {
             out = await sendRepoPath(ctx, tools.root, action.arg)
           } else {
-            out = await runAgentAction(tools, action)
+            out = await runAgentAction(tools, action, onData)
           }
+          stopPreview()
           results.push(out)
           if (action.tool === 'ls') lsSeen.set(action.arg, out)
           const bad = /^\[(?:typecheck|test|sh)\] FAILED/m.test(out) || /^\[\w+\] error:/m.test(out)
@@ -280,7 +334,10 @@ const runExchange = async (
           if (running) {
             toolsRun++
             wrote ||= action.tool === 'write' || action.tool === 'edit' || action.tool === 'rm'
+            liveStatus = ''
+            liveTail = ''
             logStep(`${bad ? '❌' : '✅'} ${stepLabel(action.tool, (action as any).arg || '')}`)
+            await show(await tx('aiThinking'))
           }
           if (action.tool === 'done') {
             if (!failed && !(wantsChange && !wrote)) doneText = action.arg
@@ -394,25 +451,24 @@ export default {
     const userText = extra.length ? `${baseText}\n\n${extra.join('\n\n')}` : baseText
 
     // --- intent decision (context-aware, task-aware) ---
-    const recentMsgs = getAiHistory(histKey).slice(-4).map((m) => `${m.role}: ${String(m.content || '').slice(0, 300)}`).join('\n')
+    // The classifier reads the real conversation (incl. earlier replies) so edit/refine
+    // follow-ups ("edit yang tadi", "ganti warnanya") are understood, not guessed by regex.
+    const recentMsgs = getAiHistory(histKey).slice(-10).map(describeAiMsg).join('\n')
     const routeTextNow = routeText(query, ctx.quoted?.text, recentMsgs)
     let decision: IntentDecision
     const activeTaskStr = formatTaskScratchpad(histKey)
     const recentRepo = !activeTaskStr && isRecentRepoTask(histKey)
-    if (forced) {
-      decision = heuristicIntent(routeTextNow, { forced, activeRepo: isActiveRepoTask(histKey), recentRepo })
-    } else {
-      decision = await smartDecide({
-        text: routeTextNow,
-        quoted: ctx.quoted?.text,
-        history: recentMsgs,
-        memory: formatMemory(histKey),
-        activeTask: activeTaskStr || undefined,
-        recentTask: recentRepo ? formatTaskHint(histKey) : undefined,
-        hasPendingMedia: wantsMedia || !!files.length,
-        isOwner: ctx.isOwner,
-      })
-    }
+    decision = await smartDecide({
+      text: query,
+      quoted: ctx.quoted?.text,
+      history: recentMsgs,
+      memory: formatMemory(histKey),
+      activeTask: activeTaskStr || undefined,
+      recentTask: recentRepo ? formatTaskHint(histKey) : undefined,
+      hasPendingMedia: wantsMedia || !!files.length,
+      isOwner: ctx.isOwner,
+      forced,
+    })
 
     // clarify instead of guessing wrong
     if (!forced && decision.intent === 'clarify') {

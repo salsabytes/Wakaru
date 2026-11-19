@@ -1,5 +1,5 @@
-import { downloadSpotify } from '../../lib/scrapers/index.ts'
-import { requireUrl, sendMedia } from '../../lib/media.ts'
+import { downloadSpotify } from '../../lib/download/scrapers/index.ts'
+import { requireUrl, sendMedia } from '../../lib/wa/media.ts'
 import { tx } from '../../lib/lang.ts'
 
 export default {

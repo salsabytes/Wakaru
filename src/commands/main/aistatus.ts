@@ -1,4 +1,4 @@
-import { isAiBusy } from '../../lib/aiStatus.ts'
+import { isAiBusy } from '../../lib/ai/aiStatus.ts'
 
 export default {
   name: 'aistatus',

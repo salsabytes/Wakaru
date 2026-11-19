@@ -1,6 +1,6 @@
-import { downloadTikTok, scraperErrorKey } from '../../lib/scrapers/index.ts'
-import { oversizedDoc, requireUrl, asDoc } from '../../lib/media.ts'
-import { videoPlayability } from '../../lib/sender.ts'
+import { downloadTikTok, scraperErrorKey } from '../../lib/download/scrapers/index.ts'
+import { oversizedDoc, requireUrl, asDoc } from '../../lib/wa/media.ts'
+import { videoPlayability } from '../../lib/wa/sender.ts'
 import { tx } from '../../lib/lang.ts'
 import { logger } from '../../lib/logger.ts'
 

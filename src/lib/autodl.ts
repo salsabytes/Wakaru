@@ -1,10 +1,10 @@
-import { wakafy } from './wakafy.ts'
-import { downloadTikTok, scraperErrorKey } from './scrapers/index.ts'
-import { oversizedDoc, asDoc, sendMediaOrCarousel, isExpiredMedia } from './media.ts'
-import { downloadYouTube } from './youtube-dl.ts'
+import { wakafy } from './api/wakafy.ts'
+import { downloadTikTok, scraperErrorKey } from './download/scrapers/index.ts'
+import { oversizedDoc, asDoc, sendMediaOrCarousel, isExpiredMedia } from './wa/media.ts'
+import { downloadYouTube } from './download/youtube-dl.ts'
 import { logger } from './logger.ts'
 import { tx } from './lang.ts'
-import { videoPlayability } from './sender.ts'
+import { videoPlayability } from './wa/sender.ts'
 
 const URL_RE = /https?:\/\/[^\s<>"')\]]+/i
 

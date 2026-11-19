@@ -1,5 +1,5 @@
-import { downloadSoundCloud, scraperErrorKey } from '../../lib/scrapers/index.ts'
-import { oversizedDoc, requireUrl } from '../../lib/media.ts'
+import { downloadSoundCloud, scraperErrorKey } from '../../lib/download/scrapers/index.ts'
+import { oversizedDoc, requireUrl } from '../../lib/wa/media.ts'
 import { tx } from '../../lib/lang.ts'
 import { logger } from '../../lib/logger.ts'
 

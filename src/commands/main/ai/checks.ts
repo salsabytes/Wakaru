@@ -1,4 +1,4 @@
-import { checkCode, extractResources, probeUrl, runCode, type SandboxResult } from '../../../lib/agentSandbox.ts'
+import { checkCode, extractResources, probeUrl, runCode, type SandboxResult } from '../../../lib/ai/agentSandbox.ts'
 
 /**
  * Agentic verification blocks the AI can put in its reply:

@@ -1,12 +1,12 @@
 import type { WAMessage } from 'baileys'
-import { searchYouTube, type YtResult } from '../../lib/scrapers/index.ts'
-import { downloadYouTube } from '../../lib/youtube-dl.ts'
-import { oversizedDoc } from '../../lib/media.ts'
+import { searchYouTube, type YtResult } from '../../lib/download/scrapers/index.ts'
+import { downloadYouTube } from '../../lib/download/youtube-dl.ts'
+import { oversizedDoc } from '../../lib/wa/media.ts'
 import { withSlot, cooldownLeft } from '../../lib/queue.ts'
 import { tx } from '../../lib/lang.ts'
 import { logger } from '../../lib/logger.ts'
-import type { SerializedMessage } from '../../lib/serialize.ts'
-import type { Sender } from '../../lib/sender.ts'
+import type { SerializedMessage } from '../../lib/wa/serialize.ts'
+import type { Sender } from '../../lib/wa/sender.ts'
 
 export interface PendingPlay {
   results: YtResult[]

@@ -1,0 +1,123 @@
+import { makeSender, type Sender } from './sender.ts'
+import { tx } from '../lang.ts'
+import { sendCarousel } from './buttons.ts'
+
+const requireUrl = async (ctx: CommandContext, name: string, usage: string): Promise<string | undefined> => {
+  const url = ctx.text.trim()
+  if (!url) {
+    await ctx.reply(await tx('usage', { prefix: ctx.prefix, name, usage }))
+    return undefined
+  }
+  await ctx.react('⏳')
+  return url
+}
+
+export { requireUrl }
+
+export const isExpiredMedia = (err: unknown): boolean => {
+  const e = err as { output?: { statusCode?: number }; status?: unknown; code?: unknown; message?: unknown }
+  if (typeof e?.message === 'string' && e.message.includes('reupload timeout')) return true
+  const s = e?.output?.statusCode ?? (typeof e?.status === 'number' ? e.status : undefined)
+  if (s === 403 || s === 404 || s === 410) return true
+  const c = e?.code
+  return c === 'ENOTFOUND' || c === 'EAI_AGAIN' || c === 'ETIMEDOUT' || c === 'ECONNRESET'
+}
+
+const fmtDur = (sec: number): string => {
+  const s = Math.max(0, Math.round(sec))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+export const fmtBytes = (n: number): string =>
+  n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.round(n / 1e3)} KB`
+
+// sniff-based duration; mp3 assumes CBR (VBR durations will be off, fine for a summary)
+export const mediaDuration = (buf: Buffer): string | undefined => {
+  const mvhd = buf.indexOf(Buffer.from('mvhd'))
+  if (mvhd > 0 && mvhd + 36 <= buf.length) {
+    // mvhd box: [size]['mvhd'][version+flags][creation][modification][timescale][duration]
+    const v1 = buf[mvhd + 4] === 1
+    const ts = buf.readUInt32BE(mvhd + (v1 ? 24 : 16))
+    const du = v1 ? Number(buf.readBigUInt64BE(mvhd + 28)) : buf.readUInt32BE(mvhd + 20)
+    const sec = du / ts
+    if (ts && du && sec < 86_400) return fmtDur(sec) // reject garbage from false 'mvhd' matches
+  }
+  let off = 0
+  if (buf.subarray(0, 3).toString() === 'ID3') {
+    off = 10 + ((buf[6] & 0x7f) << 21 | (buf[7] & 0x7f) << 14 | (buf[8] & 0x7f) << 7 | (buf[9] & 0x7f))
+  }
+  if (buf[off] === 0xff && (buf[off + 1] & 0xe0) === 0xe0) {
+    const ver = (buf[off + 1] >> 3) & 0x03
+    const layer = (buf[off + 1] >> 1) & 0x03
+    const kbps = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320][(buf[off + 2] >> 4) & 0x0f]
+    const srate = [44100, 48000, 32000][(buf[off + 2] >> 2) & 0x03]
+    if (ver === 3 && layer === 1 && kbps && srate) return fmtDur(((buf.length - off) * 8) / (kbps * 1000))
+  }
+  return undefined
+}
+
+export interface OutMedia {
+  type: 'image' | 'video' | 'audio'
+  buf: Buffer
+  caption?: string
+}
+
+const INLINE_MAX = 64 * 1024 * 1024
+const DOC_MAX = 2 * 1024 * 1024 * 1024
+
+export const asDoc = (m: OutMedia): { buf: Buffer; name: string; mime: string } => {
+  const base = (m.caption ?? m.type).replace(/[^\w\- ]+/g, '').trim().slice(0, 60) || m.type
+  // audio may be progressive m4a (ftyp) or legacy mp3 — sniff, don't assume
+  const mp4 = m.type === 'audio' && m.buf.subarray(4, 8).toString() === 'ftyp'
+  const mime = m.type === 'video' ? 'video/mp4' : m.type === 'audio' ? (mp4 ? 'audio/mp4' : 'audio/mpeg') : 'image/jpeg'
+  const ext = m.type === 'video' ? 'mp4' : m.type === 'audio' ? (mp4 ? 'm4a' : 'mp3') : 'jpg'
+  return { buf: m.buf, name: `${base}.${ext}`, mime }
+}
+
+export const oversizedDoc = (m: OutMedia): { buf: Buffer; name: string; mime: string } | undefined =>
+  m.buf.length > INLINE_MAX && m.buf.length <= DOC_MAX ? asDoc(m) : undefined
+
+export async function sendMedia(ctx: CommandContext, media: OutMedia[]): Promise<void> {
+  const dm = media.length > 1 && ctx.isGroup
+  const sendOne = async (s: Sender) => {
+    for (const [i, m] of media.entries()) {
+      const caption = i === 0 ? m.caption : undefined
+      if (m.buf.length > DOC_MAX) throw new Error(`file too large (${(m.buf.length / 1e9).toFixed(1)}GB > 2GB max)`)
+      const doc = oversizedDoc(m)
+      if (doc) await s.document(doc.buf, doc.name, doc.mime)
+      else if (m.type === 'video') await s.video(m.buf, caption)
+      else if (m.type === 'audio') await s.audio(m.buf, caption)
+      else await s.image(m.buf, caption)
+    }
+  }
+  try {
+    await sendOne(makeSender(ctx.sock, dm ? ctx.sender : ctx.chat))
+  } catch (err) {
+    if (dm) {
+      await sendOne(makeSender(ctx.sock, ctx.chat))
+      return
+    }
+    throw err
+  }
+  if (dm) await ctx.reply(await tx('sentToDm', { n: media.length }))
+}
+
+// show 2-10 image items as a carousel card; fall back to normal media for singles, videos, mixed types, or >10
+export async function sendMediaOrCarousel(
+  ctx: CommandContext,
+  r: { title: string; media: { type: OutMedia['type']; buf: Buffer; url?: string }[] },
+): Promise<void> {
+  const images = r.media.length >= 2 && r.media.length <= 10 && r.media.every((m) => m.type === 'image' && m.url) ? r.media : null
+  if (images) {
+    await sendCarousel(ctx.sock, ctx.chat, {
+      text: r.title,
+      cards: images.map((m, i) => ({
+        image: m.buf,
+        body: `📷 ${i + 1}/${images.length}`,
+        buttons: [{ text: 'Download', url: m.url! }],
+      })),
+    })
+    return
+  }
+  await sendMedia(ctx, r.media.map((m, i) => ({ type: m.type, buf: m.buf, caption: i === 0 ? r.title : undefined })))
+}

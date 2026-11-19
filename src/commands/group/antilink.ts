@@ -5,9 +5,9 @@ import {
   setAntilinkKick,
   setAntilinkMaxWarn,
   toggleAntilink,
-} from '../../lib/groupSettings.ts'
-import type { Button } from '../../lib/buttons.ts'
-import type { Sender } from '../../lib/sender.ts'
+} from '../../lib/wa/groupSettings.ts'
+import type { Button } from '../../lib/wa/buttons.ts'
+import type { Sender } from '../../lib/wa/sender.ts'
 import { tx } from '../../lib/lang.ts'
 
 const onOff = (w: string): boolean | undefined =>

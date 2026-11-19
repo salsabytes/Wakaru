@@ -1,6 +1,6 @@
 import type { WASocket } from 'baileys'
-import type { MediaMeta } from '../lib/serialize.ts'
-import type { ListContent } from '../lib/buttons.ts'
+import type { MediaMeta } from '../lib/wa/serialize.ts'
+import type { ListContent } from '../lib/wa/buttons.ts'
 
 declare global {
   interface Command {

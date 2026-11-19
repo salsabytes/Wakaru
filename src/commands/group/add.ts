@@ -1,4 +1,4 @@
-import { groupGuards } from '../../lib/group.ts'
+import { groupGuards } from '../../lib/wa/group.ts'
 import { tx } from '../../lib/lang.ts'
 
 export default {

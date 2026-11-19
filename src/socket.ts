@@ -14,7 +14,7 @@ import {
   type GroupMetadata,
   type WASocket,
 } from 'baileys'
-import { getMessage } from './lib/store.ts'
+import { getMessage } from './lib/wa/store.ts'
 import { botMarkOnline } from './lib/config.ts'
 import { flushAll, whenIdle } from './lib/disk.ts'
 import { logger } from './lib/logger.ts'
