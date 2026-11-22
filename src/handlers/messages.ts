@@ -1,4 +1,4 @@
-import type { BaileysEventMap, WAMessage } from 'baileys'
+﻿import type { BaileysEventMap, WAMessage } from 'baileys'
 import { waka } from '../socket.ts'
 import { messageStore } from '../lib/wa/store.ts'
 import { getCommand } from '../commands/index.ts'
@@ -10,7 +10,7 @@ import { tx } from '../lib/lang.ts'
 import { OWNERS, botBare, botMode, botPrefixes, isOwner, prefixBody, usedPrefix } from '../lib/config.ts'
 import { aiHasHistory } from '../lib/ai/aiHistory.ts'
 import { rememberAiMedia } from '../lib/ai/aiMediaMemory.ts'
-import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
+import { pendingPlay, handlePlayPick, parsePick } from '../lib/play.ts'
 import { pendingF100, handleF100Answer } from '../lib/f100.ts'
 import { handleAntilinkMaxInput } from '../commands/group/antilink.ts'
 import { participantMaps } from '../lib/wa/group.ts'
@@ -92,7 +92,7 @@ const serialize = async (msg: WAMessage): Promise<SerializedMessage> => {
   return m
 }
 
-// WA server backfills missed messages as fresh 'notify' upserts after reconnect —
+// WA server backfills missed messages as fresh 'notify' upserts after reconnect â€”
 // without an age check the AI answers hours-old chats. 90s grace absorbs clock jitter.
 const isStale = (msg: WAMessage): boolean => {
   const ts = Number(msg.messageTimestamp ?? 0)
@@ -123,7 +123,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
       if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
       if (await checkAntilink(msg, m, m.chat)) continue
       if (!m.button) continue
-      logger.info(`🔘 ${m.chat} [append]: ${m.button.text || m.button.id}`)
+      logger.info(`ðŸ”˜ ${m.chat} [append]: ${m.button.text || m.button.id}`)
       dispatch(msg, m, m.chat)
     }
     return
@@ -151,7 +151,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
       continue
     }
     if (await checkAntilink(msg, m, m.chat)) continue
-    logger.info(m.button ? `🔘 ${m.chat}: ${m.button.text || m.button.id}` : `💬 ${m.chat}: ${m.text}`)
+    logger.info(m.button ? `ðŸ”˜ ${m.chat}: ${m.button.text || m.button.id}` : `ðŸ’¬ ${m.chat}: ${m.text}`)
     dispatch(msg, m, m.chat)
   }
 }
@@ -171,6 +171,10 @@ const aiFallback = async (m: SerializedMessage, sender: string, text: string): P
   // A caption on a document ("baca ini") is meant for the AI even without a prefix.
   const hasDoc = m.mtype === 'documentMessage'
   const queryText = text.trim()
+  const hasPendingPlay = !!pendingPlay(m.chat, sender)
+  if (hasPendingPlay && (isReplyToBot || !!parsePick(queryText) || /^(batal|cancel|gajadi|gak jadi|nggak jadi)$/i.test(queryText))) {
+    return { cmd: undefined, queryText, args: [] }
+  }
   if (!isReplyToBot && !hasDoc && !(isLink && aiHasHistory(`${m.chat}:${sender}`))) return { cmd: undefined, queryText, args: [] }
   if (!queryText) return { cmd: undefined, queryText, args: [] }
   return { cmd: await getCommand('ai'), queryText, args: queryText.split(/\s+/) }
@@ -210,7 +214,7 @@ const parseCommand = async (m: SerializedMessage, sender: string, text: string):
         args: rest,
       }
     }
-    // Unknown word with a prefix (or bare attempt) — still let reply-to-bot and
+    // Unknown word with a prefix (or bare attempt) â€” still let reply-to-bot and
     // link follow-ups reach the AI.
     if (botPrefixes().length) return aiFallback(m, sender, text)
   }
@@ -259,7 +263,7 @@ const ctxFallback = (text: string, m: SerializedMessage, sender: string, msg: WA
   text,
   chat: m.chat,
   sender,
-  pushName: msg.pushName ?? undefined,
+  pushName: m.pushName ?? msg.pushName ?? undefined,
   isGroup: m.isGroup,
   isAdmin: false,
   isBotAdmin: false,
@@ -290,13 +294,20 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   const text = m.text
   const send = makeSender(waka, jid, msg)
 
-  // only pick-shaped messages are consumed; anything else falls through below
+  // only active play sessions/buttons are consumed; plain "1" with no session falls through
+  const playBtn = !!m.button?.id?.startsWith('play:')
   const pick = !usedPrefix(text) ? pendingPlay(m.chat, sender) : undefined
-  if (pick && (await handlePlayPick(msg, m, sender, send))) return
-  if (m.button?.id.startsWith('play:')) return send.text(await tx('stalePlay'))
+  if (pick || playBtn) {
+    try {
+      if (await handlePlayPick(msg, m, sender, send)) return
+    } catch (err) {
+      logger.error('play handler error:', err)
+      return send.text(await tx('playFailed', { msg: String((err as Error)?.message ?? err).slice(0, 200) }))
+    }
+  }
 
   if (pendingF100(m.chat) && !m.fromMe && !usedPrefix(text) && text.trim()) {
-    if (await handleF100Answer({ sock: waka, chat: m.chat, reply: send.text, msgKey: msg.key }, sender, text, msg.pushName ?? undefined)) return
+    if (await handleF100Answer({ sock: waka, chat: m.chat, reply: send.text, msgKey: msg.key }, sender, text, m.pushName ?? msg.pushName ?? undefined)) return
   }
 
     // "max warn" input: eat the next text from the admin who tapped
@@ -381,7 +392,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     text: queryText,
     chat: m.chat,
     sender,
-    pushName: msg.pushName ?? undefined,
+  pushName: m.pushName ?? msg.pushName ?? undefined,
     isGroup: m.isGroup,
     isAdmin,
     isBotAdmin,
