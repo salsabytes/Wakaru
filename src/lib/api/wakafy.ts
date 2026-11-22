@@ -99,12 +99,14 @@ export const wakafy = {
 
   // POST a JSON body (ext plugins / AI). Callers cap the body size themselves:
   // /v1/ext rejects anything over 256 KB.
-  async jsonPost<T>(path: string, body: unknown, opts: { timeout?: number } = {}): Promise<T> {
+  async jsonPost<T>(path: string, body: unknown, opts: { timeout?: number; signal?: AbortSignal } = {}): Promise<T> {
     const res = await fetch(this.url(path), {
       method: 'POST',
       headers: { ...this.headers(), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(opts.timeout ?? 60_000),
+      signal: opts.signal
+        ? AbortSignal.any([opts.signal, AbortSignal.timeout(opts.timeout ?? 60_000)])
+        : AbortSignal.timeout(opts.timeout ?? 60_000),
     })
     if (!res.ok) {
       const snippet = await res.text().then((t) => t.slice(0, 500)).catch(() => '')
@@ -118,13 +120,15 @@ export const wakafy = {
   async streamPost(
     path: string,
     body: unknown,
-    opts: { timeout?: number; onEvent?: (ev: WakafyStreamEvent) => void } = {},
+    opts: { timeout?: number; onEvent?: (ev: WakafyStreamEvent) => void; signal?: AbortSignal } = {},
   ): Promise<{ text: string }> {
     const res = await fetch(this.url(path), {
       method: 'POST',
       headers: { ...this.headers(), 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(opts.timeout ?? 120_000),
+      signal: opts.signal
+        ? AbortSignal.any([opts.signal, AbortSignal.timeout(opts.timeout ?? 120_000)])
+        : AbortSignal.timeout(opts.timeout ?? 120_000),
     })
     if (!res.ok) {
       const snippet = await res.text().then((t) => t.slice(0, 500)).catch(() => '')

@@ -15,11 +15,18 @@ type Game = {
   judge: Map<string, number>
   hints: number[]
   hintTarget?: number
+  // kapan terakhir kita bilang "juri belum jawab" — biar gak spam pas AI ngadat
+  busyAt: number
 }
 const games = new Map<string, Game>()
 const TTL = 3 * 60_000
 const GAMES_MAX = 500
 const AI_TIMEOUT = 6000
+// juri butuh lebih napas daripada gerbang soal: kalau dia keliru, pemain yang kena
+const JUDGE_TIMEOUT = 10_000
+const JUDGE_CACHE_MAX = 200
+// gak ada verdict: kasih jeda sebelum orang yang sama diomelin "sabar" lagi
+const BUSY_NOTICE_MS = 8000
 
 
 const pruneGames = (): void => {
@@ -203,9 +210,49 @@ const exactMatch = (g: Game, text: string): number => {
   return -1
 }
 
-const aiMatchIdx = async (g: Game, text: string): Promise<number> => {
+// true kalau beda cuma satu edit (sisip/hapus/ganti), tanpa alokasi matrix
+const oneEditApart = (a: string, b: string): boolean => {
+  if (a === b) return true
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a]
+  if (l.length - s.length > 1) return false
+  let i = 0
+  while (i < s.length && s[i] === l[i]) i++
+  // panjang sama = satu huruf ketuker, beda satu = satu huruf nyelip
+  return s.length === l.length ? s.slice(i + 1) === l.slice(i + 1) : s.slice(i) === l.slice(i + 1)
+}
+
+const FUZZY_MIN = 5
+
+// Lapis 1: prefilter lokal yang HANYA punya hak menerima.
+// Ini pernah bikin jawaban bener nyangkut karena lokal dikasih hak menolak.
+// Sekarang tiap hasil "gak yakin" wajib balik undefined → diteruskan ke juri AI,
+// dan yang boleh bilang "salah" cuma AI.
+const localMatch = (g: Game, text: string): number | undefined => {
+  const t = norm(text)
+  if (!t) return undefined
+  const tw = t.split(' ').filter(Boolean)
+  if (!tw.length) return undefined
+  // dua pass: baris yang belum kebuka didahulukan biar gak jadi ♻️ padahal ada yang baru
+  for (const skipOpen of [true, false]) {
+    for (let i = 0; i < g.q.jawaban.length; i++) {
+      if (skipOpen && g.open[i]) continue
+      const a = norm(g.q.jawaban[i])
+      if (!a) continue
+      const aw = a.split(' ').filter(Boolean)
+      if (aw.length !== 1) continue
+      // jawaban satu kata muncul utuh di kalimat tebakan: "bakso" ⊂ "makan bakso"
+      if (aw[0].length >= 3 && tw.includes(aw[0])) return i
+      // typo satu huruf pada kata tunggal yang cukup panjang: "nyamok" → "nyamuk"
+      if (tw.length === 1 && aw[0].length >= FUZZY_MIN && oneEditApart(aw[0], t)) return i
+    }
+  }
+  return undefined
+}
+
+// index >= 0 = cocok, -1 = AI bilang jelas gak cocok, undefined = belum ada verdict
+const aiMatchIdx = async (g: Game, text: string): Promise<number | undefined> => {
   const candidates = g.q.jawaban.map((a, i) => ({ i, a }))
-  if (!candidates.length || text.trim().length < 2) return -1
+  if (!candidates.length || text.trim().length < 2) return undefined
   const prompt = [
     'Kamu juri Family 100 Indonesia. Tentukan apakah tebakan pemain maksudnya sama dengan salah satu jawaban di papan.',
     'Fokus pada maksud/inti jawaban, bukan kemiripan string.',
@@ -217,19 +264,23 @@ const aiMatchIdx = async (g: Game, text: string): Promise<number> => {
     `Tebakan pemain: ${text}`,
     'Balas JSON saja: {"index":0} jika tidak cocok, atau {"index":N} jika maksudnya sama dengan jawaban N.',
   ].join('\n')
+  // abort beneran: request yang kalah timeout dulu tetep hidup 120s dan numpuk
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), JUDGE_TIMEOUT)
   try {
-    const raw = await Promise.race([
-      askLLM([{ role: 'user', content: prompt }]),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('f100 ai timeout')), AI_TIMEOUT)),
-    ])
+    const raw = await askLLM([{ role: 'user', content: prompt }], [], undefined, ac.signal)
     const m = String(raw).match(/\{[\s\S]*\}/)
     const obj = JSON.parse(m?.[0] ?? String(raw)) as { index?: unknown }
     const idx = Number(obj.index)
-    if (!Number.isInteger(idx) || idx <= 0) return -1
+    // jawaban ngaco/gak kebaca = belum ada verdict, bukan "salah"
+    if (!Number.isInteger(idx)) return undefined
+    if (idx <= 0) return -1
     const real = idx - 1
-    return real >= 0 && real < g.q.jawaban.length ? real : -1
+    return real >= 0 && real < g.q.jawaban.length ? real : undefined
   } catch {
-    return -1
+    return undefined
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -255,21 +306,46 @@ export const handleF100Answer = async (
   if (!g) return false
   const guess = norm(text)
   if (guess.length < 2) return false
+
+  const verdict = (i: number): Match => ({ kind: g.open[i] ? 'already' : 'hit', index: i })
+  const remember = (i: number): Match => {
+    const m = verdict(i)
+    // cap cache per ronde: grup rame bisa numbuh tanpa batas
+    if (g.judge.size >= JUDGE_CACHE_MAX) g.judge.delete(g.judge.keys().next().value!)
+    g.judge.set(guess, i)
+    return m
+  }
+
   const cached = g.judge.get(guess)
-  let match: Match
+  let match: Match | undefined
   if (cached !== undefined) {
-    match = cached === -1
-      ? { kind: 'miss', index: -1 }
-      : g.open[cached] ? { kind: 'already', index: cached } : { kind: 'hit', index: cached }
+    match = cached === -1 ? { kind: 'miss', index: -1 } : verdict(cached)
   } else {
     const exact = exactMatch(g, text)
-    if (exact >= 0) {
-      match = { kind: g.open[exact] ? 'already' : 'hit', index: exact }
-    } else {
-      const ai = await aiMatchIdx(g, text)
-      match = ai >= 0 ? { kind: g.open[ai] ? 'already' : 'hit', index: ai } : { kind: 'miss', index: -1 }
+    if (exact >= 0) match = remember(exact)
+    else {
+      const local = localMatch(g, text)
+      if (local !== undefined) match = remember(local)
+      else {
+        const ai = await aiMatchIdx(g, text)
+        if (ai === undefined) {
+          // gak ada verdict: JANGAN react ❌ dan JANGAN cache. Dulu di sini miss
+          // permanen dicap sekali timeout, jadi jawaban bener gak pernah dicek lagi.
+          g.at = Date.now()
+          // reaksi selalu dikasih (per pesan, murah); teksnya di-gate biar grup
+          // ramai gak kebanjiran "sabar" tiap kali juri ngadat
+          await reactAnswer(g, ctx, '⏳')
+          if (!g.busyAt || Date.now() - g.busyAt > BUSY_NOTICE_MS) {
+            g.busyAt = Date.now()
+            await ctx.reply('Juri AI lagi sibuk, belum bisa nilai. Coba kirim lagi bentar.').catch(() => {})
+          }
+          return true
+        }
+        match = ai === -1 ? { kind: 'miss', index: -1 } : remember(ai)
+        // cuma "jelas gak cocok" versi AI yang layak di-cache
+        if (ai === -1 && !g.judge.has(guess)) g.judge.set(guess, -1)
+      }
     }
-    g.judge.set(guess, match.kind === 'hit' || match.kind === 'already' ? match.index : -1)
   }
   g.at = Date.now()
   if (match.kind !== 'hit') {
@@ -298,7 +374,7 @@ export const startF100 = async (ctx: CommandContext): Promise<void> => {
     await ctx.react('').catch(() => {})
     return
   }
-  const ng: Game = { chat: ctx.chat, q, open: q.jawaban.map(() => false), by: q.jawaban.map(() => null), at: Date.now(), reactKeys: [], reactSeq: 0, judge: new Map(), hints: q.jawaban.map(() => 0) }
+  const ng: Game = { chat: ctx.chat, q, open: q.jawaban.map(() => false), by: q.jawaban.map(() => null), at: Date.now(), reactKeys: [], reactSeq: 0, judge: new Map(), hints: q.jawaban.map(() => 0), busyAt: 0 }
   pruneGames()
   games.set(ctx.chat, ng)
   try {

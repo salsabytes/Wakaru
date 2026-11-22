@@ -10,7 +10,7 @@ export type FlatMsg = { role: string; content: string }
 // --- provider abstraction (groundwork, behavior-preserving default: wakafy) ---
 export interface LLMProvider {
   name: string
-  ask(messages: ChatMsg[], files?: AiFileInput[], onDelta?: (full: string) => void): Promise<string>
+  ask(messages: ChatMsg[], files?: AiFileInput[], onDelta?: (full: string) => void, signal?: AbortSignal): Promise<string>
 }
 
 const TIMEOUT = 120_000
@@ -44,6 +44,11 @@ export const fitMessages = (messages: FlatMsg[], max = MESSAGES_CHAR_MAX): FlatM
   }
   return out
 }
+
+// Deadline for one call must win over the 120s default and stay cancellable, or a
+// caller-side race leaves the request alive and it keeps occupying the backend.
+const callSignal = (timeout: number, signal?: AbortSignal): AbortSignal =>
+  signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout)
 
 const cleanMessages = (messages: ChatMsg[]): FlatMsg[] =>
   messages
@@ -101,7 +106,7 @@ const cleanPreview = (s: string): string => {
 
 const wakafyProvider: LLMProvider = {
   name: 'wakafy',
-  async ask(messages, files = [], onDelta) {
+  async ask(messages, files = [], onDelta, signal) {
     const AI_PATH = botAiPath() || '/v1/ext/salsabytes/gpt-6'
     const AI_MODEL = botAiModel() || 'gpt-6'
     const msgs = fitMessages(cleanMessages(messages))
@@ -124,7 +129,7 @@ const wakafyProvider: LLMProvider = {
       throw new Error('ai: pesan/lampiran kegedean buat API (maks ~250KB)')
     }
     if (!onDelta) {
-      const res = await wakafy.jsonPost<{ text?: string }>(AI_PATH, payload, { timeout: TIMEOUT })
+      const res = await wakafy.jsonPost<{ text?: string }>(AI_PATH, payload, { timeout: TIMEOUT, signal })
       const text = String(res?.text || '').trim()
       if (!text) throw new Error('ai: empty response')
       return text
@@ -137,7 +142,7 @@ const wakafyProvider: LLMProvider = {
       if (ev.done && typeof ev.text === 'string') acc = ev.text
       if (ev.delta !== undefined || ev.reset !== undefined || ev.done) onDelta(cleanPreview(acc))
     }
-    const res = await wakafy.streamPost(AI_PATH, payload, { timeout: TIMEOUT, onEvent: emit })
+    const res = await wakafy.streamPost(AI_PATH, payload, { timeout: TIMEOUT, onEvent: emit, signal })
     const text = String(res?.text || '').trim()
     if (!text) throw new Error('ai: empty response')
     return text
@@ -147,7 +152,7 @@ const wakafyProvider: LLMProvider = {
 // Optional OpenAI-compatible chat completions backend (groundwork).
 const openaiCompatProvider: LLMProvider = {
   name: 'openai-compatible',
-  async ask(messages, files = []) {
+  async ask(messages, files = [], _onDelta, signal) {
     const baseUrl = botAiBaseUrl().replace(/\/+$/, '')
     if (!baseUrl) throw new Error('ai: missing aiBaseUrl/WAKARU_AI_BASE_URL for openai-compatible provider')
     const model = botAiModel() || 'gpt-4o-mini'
@@ -169,7 +174,7 @@ const openaiCompatProvider: LLMProvider = {
         ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },
       body: JSON.stringify({ model, messages: msgs }),
-      signal: AbortSignal.timeout(TIMEOUT),
+      signal: callSignal(TIMEOUT, signal),
     })
     if (!res.ok) throw new Error(`ai: HTTP ${res.status}`)
     const data = await res.json().catch(() => ({})) as any
@@ -193,6 +198,7 @@ export async function askLLM(
   messages: ChatMsg[],
   files: AiFileInput[] = [],
   onDelta?: (full: string) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   const provider = getProvider()
   let lastErr: unknown
@@ -205,9 +211,11 @@ export async function askLLM(
     : undefined
   for (let attempt = 0; attempt < RETRIES; attempt++) {
     try {
-      return await provider.ask(messages, files, stream)
+      return await provider.ask(messages, files, stream, signal)
     } catch (e) {
       lastErr = e
+      // caller gave up on this call: retrying would just burn another slot
+      if (signal?.aborted) break
       if (attempt < RETRIES - 1 && !emitted && transient((e as Error).message)) {
         await new Promise((r) => setTimeout(r, 500 * (attempt + 1)))
         continue
