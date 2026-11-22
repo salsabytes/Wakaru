@@ -87,43 +87,66 @@ const curateAnswers = async (q: Q): Promise<Q> => {
 
 const MIN_ANSWERS = 4
 const MAX_ANSWERS = 10
-const COUNT_ATTEMPTS = 8
 const QUALITY_ATTEMPTS = 3
+const FETCH_BUDGET = 15_000 // total waktu maksimal ambil kandidat bersih (ms)
+const API_TIMEOUT = 10_000 // default wakafy 60s: satu call hang bisa makan seluruh budget
+const POOL_MAX = 20
+
+// soal yang pernah lolos gerbang 4-10 — cadangan terakhir kalau API ngadat,
+// biar bot gak pernah diam total gara-gara sumber soal mati
+const pool: Q[] = []
+const keepPool = (q: Q): void => {
+  const k = norm(q.soal)
+  if (pool.some((p) => norm(p.soal) === k)) return
+  pool.push(q)
+  if (pool.length > POOL_MAX) pool.shift()
+}
+const fromPool = (): Q | undefined => (pool.length ? pool[Math.floor(Math.random() * pool.length)] : undefined)
 
 // gerbang non-LLM (bentuk respon + jumlah jawaban 4-10 + panjang soal).
-// API murah, jadi boleh diulang banyak; API error/timeout dihitung attempt gagal
-const fetchClean = async (): Promise<Q | undefined> => {
-  for (let attempt = 0; attempt < COUNT_ATTEMPTS; attempt++) {
+// Berbasis budget waktu, bukan jumlah attempt: API cepat = dapat banyak kandidat,
+// API lemot = berhenti tanpa bikin pemain nunggu kelamaan
+const fetchClean = async (deadline: number): Promise<Q | undefined> => {
+  let errors = 0
+  while (Date.now() < deadline) {
+    const left = deadline - Date.now()
     let res: ApiQ
     try {
-      res = await wakafy.json<ApiQ>('/v1/ext/salsabytes/family100')
+      // timeout dipotong sisa budget biar satu call lemot gak lewat deadline
+      res = await wakafy.json<ApiQ>('/v1/ext/salsabytes/family100', {}, { timeout: Math.min(API_TIMEOUT, left) })
     } catch {
+      // API keliatan mati dan pool ada isinya: jangan tunggu budget habis
+      if (++errors >= 2 && pool.length) return
       continue
     }
+    errors = 0
     const soal = String(res.soal ?? '').trim()
     const jawaban = (res.jawaban ?? []).map((a) => String(a).trim()).filter(Boolean)
     if (!res.ok || !soal || !jawaban.length) continue
     // syarat keras: papan cuma boleh 4-10 baris
     if (jawaban.length < MIN_ANSWERS || jawaban.length > MAX_ANSWERS) continue
     if (soal.replace(/\s+/g, ' ').trim().length < 8) continue
-    return { soal, jawaban }
+    const q: Q = { soal, jawaban }
+    keepPool(q)
+    return q
   }
   return
 }
 
 // gerbang LLM terpisah: verdict "jelek" cuma berarti ambil kandidat baru, jadi
-// jatah attempt jumlah jawaban tidak termakan. Attempt habis = pakai kandidat
-// terakhir (fail-open: gameplay dulu, perfeksionisme belakangan)
+// budget ambil kandidat tidak termakan. Habis = pakai kandidat terakhir, dan
+// kalau API benar-benar mati, pakai soal dari pool (fail-open sejauh mungkin)
 const fetchQuestion = async (): Promise<Q | undefined> => {
-  let q = await fetchClean()
-  if (!q) return
-  for (let attempt = 1; attempt < QUALITY_ATTEMPTS; attempt++) {
+  const deadline = Date.now() + FETCH_BUDGET
+  let q = await fetchClean(deadline)
+  for (let attempt = 1; attempt < QUALITY_ATTEMPTS && q; attempt++) {
     if (await isGoodQuestion(q)) break
-    const next = await fetchClean()
+    const next = await fetchClean(deadline)
     if (!next) break
     q = next
   }
-  return curateAnswers(q)
+  q ??= fromPool()
+  return q ? curateAnswers(q) : undefined
 }
 
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim()
@@ -305,10 +328,17 @@ export const stopF100 = async (ctx: CommandContext): Promise<void> => {
 }
 
 // probe pipeline soal tanpa socket/key WA: F100_SELFTEST=1 bun src/lib/f100.ts
+// tambah F100_SELFTEST_DEGRADE=1 buat buktiin fallback pool saat API mati
 if (process.env.F100_SELFTEST) {
   for (let i = 0; i < 5; i++) {
     const q = await fetchQuestion()
     console.log(q ? `ok ${q.jawaban.length} jawaban | ${q.soal}` : 'gagal: tidak dapat soal')
+  }
+  if (process.env.F100_SELFTEST_DEGRADE) {
+    wakafy.base = 'http://127.0.0.1:9' // API dimatikan
+    const t = Date.now()
+    const q = await fetchQuestion()
+    console.log(q ? `pool fallback ok (${Date.now() - t}ms) ${q.jawaban.length} jawaban | ${q.soal}` : 'pool fallback gagal: kosong')
   }
   await new Promise((r) => setTimeout(r, 200))
   process.exit(0)
