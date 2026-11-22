@@ -25,6 +25,7 @@ export interface SerializedMessage {
   mimetype?: string
   fileName?: string
   text: string
+  pushName?: string
   mentionedJid: string[]
   download: () => Promise<Buffer>
   button?: { id: string; text: string }
@@ -132,6 +133,13 @@ export function serializeMessage(msg: WAMessage): SerializedMessage {
     mimetype: content.mimetype,
     fileName: typeof content.fileName === 'string' ? content.fileName : undefined,
     text,
+    pushName: (() => {
+      const n = typeof msg.pushName === 'string' ? msg.pushName.trim() : ''
+      if (!n) return undefined
+      if (/^\+?\d[\d\s-]*$/.test(n)) return undefined
+      if (/^[\d:@.]+$/.test(n)) return undefined
+      return n
+    })(),
     mentionedJid: ctxt?.mentionedJid ?? [],
     ...(button ? { button } : {}),
     download,
