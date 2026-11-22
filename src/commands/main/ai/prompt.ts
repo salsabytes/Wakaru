@@ -3,6 +3,7 @@ import { language, langName } from '../../../lib/lang.ts'
 import { cfg } from '../../../lib/config.ts'
 import { listCommands } from '../../index.ts'
 import { messageStore, recentByChat } from '../../../lib/wa/store.ts'
+import { resolveJid } from '../../../lib/wa/lid.ts'
 import { fetchContributors } from '../../../lib/contributors.ts'
 import { describeMessage, formatMemory } from '../../../lib/ai/aiMemory.ts'
 import { getGrounding } from '../../../lib/ai/aiKnowledge.ts'
@@ -80,14 +81,18 @@ async function buildContext(ctx: CommandContext): Promise<string> {
         if (meta.subject) lines.push(`group subject (from WhatsApp): ${clip(meta.subject, 120)}`)
         const desc = String((meta as any).desc || '').trim()
         lines.push(`group description (from WhatsApp, factual): ${desc ? clip(desc, DESC_MAX) : '(none set)'}`)
-        const me = meta.participants.find((p) => p.id.split(/[:@]/)[0] === ctx.sender.split(/[:@]/)[0])
+        const pnOf = (p: any): string => p.phoneNumber ?? (String(p.id).endsWith('@lid') ? '' : p.id)
+        const me = meta.participants.find((p) =>
+          [p.id, p.lid, p.phoneNumber].some((x) => x && x.split(/[:@]/)[0] === ctx.sender.split(/[:@]/)[0]),
+        )
         if (me?.notify) lines.push(`current sender name in group: ${me.notify}`)
         const members = meta.participants
           .slice(0, PARTICIPANT_MAX)
           .map((p) => {
-            const num = p.id.split(/[:@]/)[0]
+            const jid = pnOf(p) || p.id
+            const num = jid.split(/[:@]/)[0]
             const name = p.notify || (p as any).name || num
-            return `${name} | ${num} | ${p.id}`
+            return `${name} | ${num} | ${jid}`
           })
           .join('\n')
         if (members) lines.push(`group members (name | number | id). To tag someone write @number in your message:\n${members}`)
@@ -97,10 +102,13 @@ async function buildContext(ctx: CommandContext): Promise<string> {
 
   const recent = recentByChat(ctx.chat, RECENT_MAX)
   if (recent.length) {
-    const chatLines = recent.map((m) => {
-      const who = String(m.key?.participant ?? m.key?.remoteJid ?? '?').split('@')[0]
-      return `${who}: ${describeMessage(m, 180)}`
-    })
+    const chatLines = await Promise.all(
+      recent.map(async (m) => {
+        const jid = await resolveJid(ctx.sock, String(m.key?.participant ?? m.key?.remoteJid ?? ''), ctx.chat)
+        const who = jid.split(/[:@]/)[0] || '?'
+        return `${who}: ${describeMessage(m, 180)}`
+      }),
+    )
     lines.push(`recent messages in this chat (oldest -> newest, background context):\n${chatLines.join('\n')}`)
   }
   return lines.join('\n')

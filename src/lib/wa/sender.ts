@@ -99,14 +99,13 @@ export const makeSender = (sock: WASocket, chat: string, quoted?: WAMessage) => 
       new Promise<undefined>((r) => setTimeout(() => r(undefined), 3_000)),
     ])
     if (!met) return [...new Set(nums.map(pn))]
-    const lidMode = String(met.addressingMode) === 'lid'
     const byNumber = new Map<string, string>()
     for (const p of met.participants) {
-      const jid = lidMode || p.id.endsWith('@lid')
-        ? (p.lid ?? (p.id.endsWith('@lid') ? p.id : (p.phoneNumber ?? p.id)))
-        : (p.phoneNumber ?? p.id)
       for (const n of [p.id, p.lid, p.phoneNumber]) {
-        if (n) byNumber.set(n.split(/[:@]/)[0], jid)
+        if (!n) continue
+        const bare = n.split(/[:@]/)[0]
+        // mention JID must match the @number in text for WA to render a tag
+        byNumber.set(bare, n.includes('@') ? n : pn(n))
       }
     }
     return [...new Set(nums.map((n) => byNumber.get(n) ?? pn(n)))]

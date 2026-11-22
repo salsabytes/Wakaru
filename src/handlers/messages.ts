@@ -11,9 +11,10 @@ import { OWNERS, botBare, botMode, botPrefixes, isOwner, prefixBody, usedPrefix 
 import { aiHasHistory } from '../lib/ai/aiHistory.ts'
 import { rememberAiMedia } from '../lib/ai/aiMediaMemory.ts'
 import { pendingPlay, handlePlayPick } from '../commands/downloader/play.ts'
-import { pendingF100, handleF100Answer } from '../commands/game/family100.ts'
+import { pendingF100, handleF100Answer } from '../lib/f100.ts'
 import { handleAntilinkMaxInput } from '../commands/group/antilink.ts'
 import { participantMaps } from '../lib/wa/group.ts'
+import { resolveJid, resolveLid } from '../lib/wa/lid.ts'
 import { addAntilinkWarn, antilinkConfig, autodlConfig, resetAntilinkWarns } from '../lib/wa/groupSettings.ts'
 import { clearAfk, getAfk, setAfk, shouldNotifyAfk } from '../lib/afk.ts'
 import { formatDuration } from '../lib/time.ts'
@@ -71,33 +72,17 @@ const checkAntilink = async (msg: WAMessage, m: SerializedMessage, jid: string):
   return true
 }
 
-const lidCache = new Map<string, string>()
-const LID_CACHE_MAX = 1000
-
-const resolveJid = async (jid: string) => {
-  if (!jid.endsWith('@lid') && !jid.endsWith('@hosted.lid')) return jid
-  const cached = lidCache.get(jid)
-  if (cached) return cached
-  const pn = await waka.signalRepository.lidMapping.getPNForLID(jid)
-  if (pn) {
-    lidCache.set(jid, pn)
-    if (lidCache.size > LID_CACHE_MAX) {
-      lidCache.delete(lidCache.keys().next().value!)
-    }
-  }
-  return pn ?? jid
-}
-
-const isLid = (jid: string): boolean => jid.endsWith('@lid') || jid.endsWith('@hosted.lid')
-
-// LID→PN resolved once at the boundary; mentionedJid stays raw — WhatsApp sends mentions as-is
+// Every JID is resolved once at the boundary so no @lid leaks into commands.
 const serialize = async (msg: WAMessage): Promise<SerializedMessage> => {
   const m = serializeMessage(msg)
-  // Stanza often carries the PN alternative; use it when the LID map is cold,
-  // otherwise owner checks fail and the AI loses repo access.
-  const alt = [msg.key?.participantAlt, msg.key?.remoteJidAlt].find((x) => x?.endsWith('@s.whatsapp.net'))
-  m.sender = isLid(m.sender) && alt ? alt : await resolveJid(m.sender)
-  if (m.quoted?.sender) m.quoted.sender = await resolveJid(m.quoted.sender)
+  const chat = msg.key?.remoteJid
+  m.sender = await resolveLid(waka, m.sender, msg.key?.participantAlt, chat)
+  m.chat = await resolveLid(waka, m.chat, msg.key?.remoteJidAlt)
+  m.mentionedJid = await Promise.all((m.mentionedJid ?? []).map((j) => resolveLid(waka, j, undefined, chat)))
+  if (m.quoted) {
+    m.quoted.sender = await resolveLid(waka, m.quoted.sender, undefined, chat)
+    m.quoted.chat = await resolveLid(waka, m.quoted.chat)
+  }
   // own group messages arrive with a @lid participant when the LID mapping is
   // cold, so fromMe=false slipped past the filter and antilink removed them.
   if (!m.fromMe && m.isGroup && waka.user?.id) {
@@ -116,7 +101,10 @@ const isStale = (msg: WAMessage): boolean => {
 
 export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.upsert']): Promise<void> {
   for (const msg of upsert.messages) {
-    if (msg.key?.id) messageStore.set(msg.key.id, msg)
+    if (msg.key?.id) {
+      const chat = await resolveLid(waka, msg.key.remoteJid ?? '', msg.key.remoteJidAlt)
+      messageStore.set(msg.key.id, msg, chat)
+    }
   }
 
   if (upsert.type !== 'notify') {
@@ -133,10 +121,10 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
         }
       }
       if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
-      if (await checkAntilink(msg, m, jid)) continue
+      if (await checkAntilink(msg, m, m.chat)) continue
       if (!m.button) continue
-      logger.info(`🔘 ${jid} [append]: ${m.button.text || m.button.id}`)
-      dispatch(msg, m, jid)
+      logger.info(`🔘 ${m.chat} [append]: ${m.button.text || m.button.id}`)
+      dispatch(msg, m, m.chat)
     }
     return
   }
@@ -157,14 +145,14 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
         const name = m.fileName || 'file'
         const prefix = botPrefixes()[0] ?? '.'
         void (async () => {
-          await makeSender(waka, jid, msg).text(await tx('docReceived', { name, prefix }))
+          await makeSender(waka, m.chat, msg).text(await tx('docReceived', { name, prefix }))
         })().catch(() => {})
       }
       continue
     }
-    if (await checkAntilink(msg, m, jid)) continue
-    logger.info(m.button ? `🔘 ${jid}: ${m.button.text || m.button.id}` : `💬 ${jid}: ${m.text}`)
-    dispatch(msg, m, jid)
+    if (await checkAntilink(msg, m, m.chat)) continue
+    logger.info(m.button ? `🔘 ${m.chat}: ${m.button.text || m.button.id}` : `💬 ${m.chat}: ${m.text}`)
+    dispatch(msg, m, m.chat)
   }
 }
 
@@ -308,7 +296,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   if (m.button?.id.startsWith('play:')) return send.text(await tx('stalePlay'))
 
   if (pendingF100(m.chat) && !m.fromMe && !usedPrefix(text) && text.trim()) {
-    if (await handleF100Answer({ sock: waka, chat: m.chat, reply: send.text }, sender, text, msg.pushName ?? undefined)) return
+    if (await handleF100Answer({ sock: waka, chat: m.chat, reply: send.text, msgKey: msg.key }, sender, text, msg.pushName ?? undefined)) return
   }
 
     // "max warn" input: eat the next text from the admin who tapped
@@ -325,15 +313,41 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
     }
   }
 
-  // Notify if someone mentions/replies to an AFK user.
-  const targets = new Set<string>([...(m.mentionedJid || []), ...(m.quoted?.sender ? [m.quoted.sender] : [])])
-  for (const t of targets) {
-    if (t === sender) continue
-    const info = getAfk(t)
-    if (info && shouldNotifyAfk(m.chat, t)) {
-      const who = t.split(/[:@]/)[0]
-      await send.text(`${who} lagi AFK (${formatDuration(Date.now() - info.since)})${info.reason ? `: ${info.reason}` : ''}`)
+  // Notify if someone mentions/replies to an AFK user. contextInfo.mentionedJid
+  // is sometimes empty in LID groups, so also read the @number out of the text.
+  const textMentions = [...text.matchAll(/@(\d{5,})/g)].map((x) => `${x[1]}@s.whatsapp.net`)
+  const targets = new Set<string>([
+    ...(m.mentionedJid || []),
+    ...(m.quoted?.sender ? [m.quoted.sender] : []),
+    ...textMentions,
+  ])
+  let afkMeta: Awaited<ReturnType<typeof waka.groupMetadata>> | undefined
+  let afkMetaLoaded = false
+  for (const raw of targets) {
+    // AFK may have been stored under the PN or the LID, so try every id.
+    let key = await resolveJid(waka, raw, m.chat)
+    let info = getAfk(key)
+    if (!info && m.isGroup) {
+      if (!afkMetaLoaded) {
+        afkMeta = await waka.groupMetadata(m.chat).catch(() => undefined)
+        afkMetaLoaded = true
+      }
+      if (afkMeta) {
+        const p = participantMaps(afkMeta).byPart.get(raw.split(/[:@]/)[0])
+        for (const id of p ? [p.id, p.phoneNumber, p.lid] : []) {
+          if (!id) continue
+          const found = getAfk(id)
+          if (found) {
+            info = found
+            key = id
+            break
+          }
+        }
+      }
     }
+    if (!info || key === sender || !shouldNotifyAfk(m.chat, key)) continue
+    const who = (await resolveJid(waka, key, m.chat)).split(/[:@]/)[0]
+    await send.text(`@${who} lagi AFK (${formatDuration(Date.now() - info.since)})${info.reason ? `: ${info.reason}` : ''}`)
   }
 
   const { cmd, queryText, args } = await parseCommand(m, sender, text)

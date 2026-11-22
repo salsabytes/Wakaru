@@ -9,27 +9,30 @@ const byChat = new Map<string, WAMessage[]>()
 
 // The global cap evicts messages across every chat, which used to starve the AI
 // context in busy groups. Keep a small window per chat (LRU-capped) as well.
-const remember = (msg: WAMessage): void => {
+// `alias` is the resolved (PN) chat id, so lookups by either the raw @lid or the
+// resolved JID both find the message.
+const remember = (msg: WAMessage, alias?: string): void => {
   const id = msg.key?.id
   if (!id) return
   store.set(id, msg)
   if (store.size > MAX) store.delete(store.keys().next().value!)
 
-  const chat = msg.key?.remoteJid
-  if (!chat) return
-  const list = byChat.get(chat) ?? []
-  const dup = list.findIndex((x) => x.key?.id === id)
-  if (dup !== -1) list.splice(dup, 1)
-  list.push(msg)
-  if (list.length > PER_CHAT_MAX) list.splice(0, list.length - PER_CHAT_MAX)
-  byChat.delete(chat)
-  byChat.set(chat, list)
+  const chats = new Set([msg.key?.remoteJid, alias].filter(Boolean) as string[])
+  for (const chat of chats) {
+    const list = byChat.get(chat) ?? []
+    const dup = list.findIndex((x) => x.key?.id === id)
+    if (dup !== -1) list.splice(dup, 1)
+    list.push(msg)
+    if (list.length > PER_CHAT_MAX) list.splice(0, list.length - PER_CHAT_MAX)
+    byChat.delete(chat)
+    byChat.set(chat, list)
+  }
   if (byChat.size > CHAT_MAX) byChat.delete(byChat.keys().next().value!)
 }
 
 export const messageStore = {
-  set(id: string, msg: WAMessage): void {
-    remember(msg)
+  set(id: string, msg: WAMessage, alias?: string): void {
+    remember(msg, alias)
     saveJson('messages.json') // throttled — boot restores the recent window across restarts
   },
   get(id: string): WAMessage | undefined {

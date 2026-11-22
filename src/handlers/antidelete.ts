@@ -3,6 +3,7 @@ import { antideleteConfig } from '../lib/wa/groupSettings.ts'
 import { tx } from '../lib/lang.ts'
 import { logger } from '../lib/logger.ts'
 import { messageStore } from '../lib/wa/store.ts'
+import { resolveJid } from '../lib/wa/lid.ts'
 
 const RESTORED_TTL = 5 * 60_000
 const RESTORED_MAX = 1000
@@ -23,10 +24,10 @@ const alreadyRestored = (id: string): boolean => {
 const isViewOnce = (msg: WAMessage): boolean =>
   !!(msg.message?.viewOnceMessage || msg.message?.viewOnceMessageV2 || msg.message?.viewOnceMessageV2Extension)
 
-const who = (msg: WAMessage): string => {
+const who = async (sock: WASocket | undefined, msg: WAMessage, chat?: string): Promise<string> => {
   const name = String(msg.pushName ?? '').trim().slice(0, 40)
   if (name) return name
-  const jid = msg.key?.participant ?? msg.key?.remoteJid ?? ''
+  const jid = await resolveJid(sock, msg.key?.participant ?? msg.key?.remoteJid ?? '', chat)
   return jid.split(/[:@]/)[0] || 'anggota'
 }
 
@@ -57,7 +58,7 @@ export async function handleMessagesUpdate(
     if (alreadyRestored(id)) continue
 
     try {
-      await sock.sendMessage(chat, { text: await tx('antideleteNotice', { who: who(stored) }) })
+      await sock.sendMessage(chat, { text: await tx('antideleteNotice', { who: await who(sock, stored, chat) }) })
       await sock.sendMessage(chat, { forward: stored })
     } catch (err) {
       logger.warn('antidelete: restore failed', (err as Error)?.message ?? err)
