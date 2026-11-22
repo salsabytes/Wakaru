@@ -25,7 +25,8 @@ const isViewOnce = (msg: WAMessage): boolean =>
   !!(msg.message?.viewOnceMessage || msg.message?.viewOnceMessageV2 || msg.message?.viewOnceMessageV2Extension)
 
 const who = async (sock: WASocket | undefined, msg: WAMessage, chat?: string): Promise<string> => {
-  const name = String(msg.pushName ?? '').trim().slice(0, 40)
+  const rawName = String(msg.pushName ?? '').trim()
+  const name = rawName && !/^\+?\d[\d\s-]*$/.test(rawName) && !/^[\d:@.]+$/.test(rawName) ? rawName.slice(0, 40) : ''
   if (name) return name
   const jid = await resolveJid(sock, msg.key?.participant ?? msg.key?.remoteJid ?? '', chat)
   return jid.split(/[:@]/)[0] || 'anggota'
