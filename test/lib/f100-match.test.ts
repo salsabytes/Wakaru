@@ -151,6 +151,10 @@ test('judge outage leaves no verdict: no cross, nothing cached, retry still work
   assert.notEqual(lastReaction(chat), '❌', 'a judge failure must never be shown as a wrong answer')
   assert.ok(fresh(chat).every((r) => r.text !== '❌'))
   assert.equal(lastReaction(chat), '⏳')
+  assert.ok(
+    replies.some((t) => t.includes('belum dinilai') && t.includes('coba kirim lagi nanti')),
+    `expected a "not judged yet" notice, got: ${JSON.stringify(replies.slice(-3))}`,
+  )
 
   aiMode = 'ok'
   await guess(chat, 'rend angg') // same guess: proves the failure was not cached

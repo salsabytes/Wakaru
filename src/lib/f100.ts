@@ -337,7 +337,7 @@ export const handleF100Answer = async (
           await reactAnswer(g, ctx, '⏳')
           if (!g.busyAt || Date.now() - g.busyAt > BUSY_NOTICE_MS) {
             g.busyAt = Date.now()
-            await ctx.reply('Juri AI lagi sibuk, belum bisa nilai. Coba kirim lagi bentar.').catch(() => {})
+            await ctx.reply('juri lagi sibuk, jawabanmu belum dinilai — coba kirim lagi nanti ya').catch(() => {})
           }
           return true
         }
