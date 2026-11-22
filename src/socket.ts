@@ -36,8 +36,19 @@ let isAskingPairingCode = false
 let reconnectAttempts = 0
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-const question = (text: string) => new Promise<string>((resolve) => rl.question(text, resolve))
+// stdin stays untouched until a pairing code is actually needed. A module-level
+// readline interface keeps the event loop alive forever, so anything importing
+// this file (command registry discovery under `node --test`) hung on exit.
+let pairingRl: readline.Interface | undefined
+const question = (text: string): Promise<string> => {
+  pairingRl ??= readline.createInterface({ input: process.stdin, output: process.stdout })
+  const rl = pairingRl
+  return new Promise<string>((resolve) => rl.question(text, resolve))
+}
+const closeQuestion = (): void => {
+  pairingRl?.close()
+  pairingRl = undefined
+}
 
 let onMessageHandler: (upsert: BaileysEventMap['messages.upsert']) => void | undefined
 type UpdateHandler = (updates: BaileysEventMap['messages.update']) => void
@@ -141,6 +152,6 @@ export async function shutdown(signal: string): Promise<void> {
   } catch (err) {
     logger.error('Failed to close connection:', err)
   }
-  rl.close()
+  closeQuestion()
   process.exit(0)
 }
