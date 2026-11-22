@@ -85,22 +85,45 @@ const curateAnswers = async (q: Q): Promise<Q> => {
   }
 }
 
-const fetchQuestion = async (): Promise<Q> => {
-  let last: Q | undefined
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await wakafy.json<ApiQ>('/v1/ext/salsabytes/family100')
+const MIN_ANSWERS = 4
+const MAX_ANSWERS = 10
+const COUNT_ATTEMPTS = 8
+const QUALITY_ATTEMPTS = 3
+
+// gerbang non-LLM (bentuk respon + jumlah jawaban 4-10 + panjang soal).
+// API murah, jadi boleh diulang banyak; API error/timeout dihitung attempt gagal
+const fetchClean = async (): Promise<Q | undefined> => {
+  for (let attempt = 0; attempt < COUNT_ATTEMPTS; attempt++) {
+    let res: ApiQ
+    try {
+      res = await wakafy.json<ApiQ>('/v1/ext/salsabytes/family100')
+    } catch {
+      continue
+    }
     const soal = String(res.soal ?? '').trim()
     const jawaban = (res.jawaban ?? []).map((a) => String(a).trim()).filter(Boolean)
-    if (!res.ok || !soal || !jawaban.length) throw new Error('respon API tidak valid')
-    let q = { soal, jawaban }
-    last = q
-    if (q.jawaban.length < 2) continue
-    if (q.soal.replace(/\s+/g, ' ').trim().length < 8) continue
-    if (!(await isGoodQuestion(q))) continue
-    return curateAnswers(q)
+    if (!res.ok || !soal || !jawaban.length) continue
+    // syarat keras: papan cuma boleh 4-10 baris
+    if (jawaban.length < MIN_ANSWERS || jawaban.length > MAX_ANSWERS) continue
+    if (soal.replace(/\s+/g, ' ').trim().length < 8) continue
+    return { soal, jawaban }
   }
-  if (!last) throw new Error('respon API tidak valid')
-  return curateAnswers(last)
+  return
+}
+
+// gerbang LLM terpisah: verdict "jelek" cuma berarti ambil kandidat baru, jadi
+// jatah attempt jumlah jawaban tidak termakan. Attempt habis = pakai kandidat
+// terakhir (fail-open: gameplay dulu, perfeksionisme belakangan)
+const fetchQuestion = async (): Promise<Q | undefined> => {
+  let q = await fetchClean()
+  if (!q) return
+  for (let attempt = 1; attempt < QUALITY_ATTEMPTS; attempt++) {
+    if (await isGoodQuestion(q)) break
+    const next = await fetchClean()
+    if (!next) break
+    q = next
+  }
+  return curateAnswers(q)
 }
 
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim()
@@ -246,11 +269,10 @@ export const startF100 = async (ctx: CommandContext): Promise<void> => {
   const g = pendingF100(ctx.chat)
   if (g) { await ctx.reply('Masih ada ronde aktif. Jawab langsung, `.f100 stop` untuk mengakhiri, atau `.f100 surrender` untuk menyerah dan buka jawaban.'); return }
   await ctx.react('⏳').catch(() => {})
-  let q: Q
-  try {
-    q = await fetchQuestion()
-  } catch (err) {
-    await ctx.reply(`❌ Gagal ambil soal Family 100: ${(err as Error).message}`)
+  const q = await fetchQuestion()
+  if (!q) {
+    // sumber soal lagi ngadat: lepas ⏳ dan diem, jangan lempar error ke chat
+    await ctx.react('').catch(() => {})
     return
   }
   const ng: Game = { chat: ctx.chat, q, open: q.jawaban.map(() => false), by: q.jawaban.map(() => null), at: Date.now(), reactKeys: [], reactSeq: 0, judge: new Map(), hints: q.jawaban.map(() => 0) }
@@ -280,4 +302,14 @@ export const stopF100 = async (ctx: CommandContext): Promise<void> => {
   if (!g) { await ctx.reply('Tidak ada game Family 100 aktif.'); return }
   games.delete(ctx.chat)
   await renderF100(ctx, { ...g, open: g.open.map(() => true) }, 'Ronde dihentikan. Jawaban dibuka.')
+}
+
+// probe pipeline soal tanpa socket/key WA: F100_SELFTEST=1 bun src/lib/f100.ts
+if (process.env.F100_SELFTEST) {
+  for (let i = 0; i < 5; i++) {
+    const q = await fetchQuestion()
+    console.log(q ? `ok ${q.jawaban.length} jawaban | ${q.soal}` : 'gagal: tidak dapat soal')
+  }
+  await new Promise((r) => setTimeout(r, 200))
+  process.exit(0)
 }
