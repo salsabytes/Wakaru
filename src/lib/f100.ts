@@ -10,7 +10,8 @@ type Game = {
   open: boolean[]
   by: (string | null)[]
   at: number
-  lastReactKey?: WAMessageKey
+  reactKeys: WAMessageKey[]
+  reactSeq: number
   judge: Map<string, number>
   hints: number[]
   hintTarget?: number
@@ -187,11 +188,15 @@ const aiMatchIdx = async (g: Game, text: string): Promise<number> => {
 }
 
 const reactAnswer = async (g: Game, ctx: Pick<CommandContext, 'sock' | 'chat'> & { msgKey?: WAMessageKey }, emoji: string) => {
-  if (g.lastReactKey) await ctx.sock.sendMessage(ctx.chat, { react: { text: '', key: g.lastReactKey } }).catch(() => {})
-  if (ctx.msgKey) {
-    await ctx.sock.sendMessage(ctx.chat, { react: { text: emoji, key: ctx.msgKey } }).catch(() => {})
-    g.lastReactKey = ctx.msgKey
-  } else g.lastReactKey = undefined
+  const key = ctx.msgKey
+  // swap is sync (sebelum await) biar jawaban yang masuk bersamaan gak saling nimpa
+  const seq = ++g.reactSeq
+  const prev = g.reactKeys
+  g.reactKeys = key ? [key] : []
+  await Promise.all(prev.map((k) => ctx.sock.sendMessage(ctx.chat, { react: { text: '', key: k } }).catch(() => {})))
+  if (key) await ctx.sock.sendMessage(ctx.chat, { react: { text: emoji, key } }).catch(() => {})
+  // udah ada jawaban lebih baru: unreact-nya bisa kelewat sebelum react ini kekirim, jadi bersihin lagi
+  if (key && seq !== g.reactSeq) await ctx.sock.sendMessage(ctx.chat, { react: { text: '', key } }).catch(() => {})
 }
 
 export const handleF100Answer = async (
@@ -248,7 +253,7 @@ export const startF100 = async (ctx: CommandContext): Promise<void> => {
     await ctx.reply(`❌ Gagal ambil soal Family 100: ${(err as Error).message}`)
     return
   }
-  const ng: Game = { chat: ctx.chat, q, open: q.jawaban.map(() => false), by: q.jawaban.map(() => null), at: Date.now(), judge: new Map(), hints: q.jawaban.map(() => 0) }
+  const ng: Game = { chat: ctx.chat, q, open: q.jawaban.map(() => false), by: q.jawaban.map(() => null), at: Date.now(), reactKeys: [], reactSeq: 0, judge: new Map(), hints: q.jawaban.map(() => 0) }
   pruneGames()
   games.set(ctx.chat, ng)
   try {
