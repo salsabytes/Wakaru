@@ -33,7 +33,7 @@ const sendPanel = async (ctx: CommandContext): Promise<void> => {
 
 export default {
   name: 'goodbye',
-  desc: 'set pesan goodbye grup (kirim pp + teks). placeholder: `pp` `mention` `name` `desc` `gcname`',
+  desc: 'set pesan goodbye grup (kirim pp + teks). placeholder: `pp` `mention` `desc` `gcname`',
   aliases: ['leave'],
   groupOnly: true,
   adminOnly: true,
