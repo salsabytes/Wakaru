@@ -11,7 +11,7 @@
 
 <p><a href="README.md">English</a> · <b>Bahasa Indonesia</b> · <a href="README.ja.md">日本語</a></p>
 
-<img src="https://media.tenor.com/ZafC06r3sksAAAAC/anime-anime-girl.gif" alt="Wakaru" width="480" />
+<img src="https://media.giphy.com/media/pwkpuW7xF9BflrrYpB/giphy.gif" alt="Wakaru" width="480" />
 
 </div>
 
