@@ -78,7 +78,6 @@ async function relayInteractive(sock: WASocket, jid: string, interactiveMessage:
     },
   ]
 
-  if (!isJidGroup(jid)) additionalNodes.push({ tag: 'bot', attrs: { biz_bot: '1' } })
   await sock.relayMessage(jid, msg.message!, { messageId: msg.key.id!, additionalNodes })
   return msg
 }
