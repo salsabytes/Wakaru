@@ -1,154 +1,144 @@
 <div align="center">
 
-# ✨ Wakaru
+# Wakaru (分かる)
 
-**分かる — 小さくて話の通じるWhatsAppボット。**
+**「わかる。」** — [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript で作られた小さな WhatsApp ボット。
 
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
 [![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
 [![WhatsApp](https://img.shields.io/badge/WhatsApp-join-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)
 
-<p>🌐 <a href="README.md">English</a> · <a href="README.id.md">Bahasa Indonesia</a> · <b>日本語</b></p>
+<p><a href="README.md">English</a> · <a href="README.id.md">Bahasa Indonesia</a> · <b>日本語</b></p>
 
-<img src="https://media.tenor.com/ZafC06r3sksAAAAC/anime-anime-girl.gif" alt="Wakaru — anime girl banner" width="500" />
+<img src="https://media.tenor.com/ZafC06r3sksAAAAC/anime-anime-girl.gif" alt="Wakaru" width="480" />
 
 </div>
 
----
+Wakaru は Node.js 上で TypeScript を直接実行します（ビルド不要）。チャット、メディアダウンロード、ステッカー、グループ管理、そして bot コマンドを実行できる agentic `.ai` を備えています。オーナー向けには、このリポジトリを安全に確認・編集するモードもあります。
 
-## 🚀 起動
+## 機能
+
+- **Agentic AI (`.ai`)** — チャット、チャットごとの文脈保持、`@run:<cmd>` による bot コマンド実行。オーナーモードでは `@read/@ls/@grep/@write/@edit/@rm/@typecheck/@test/@done` を使い、`src/`・`test/`・docs に限定して repo を編集できます。検証失敗時は自動ロールバックします。
+- **ダウンローダー** — YouTube (`.play`, `.ytmp3`, `.ytmp4`)、TikTok、Instagram、Facebook、Pinterest、SoundCloud、Spotify、X/Twitter。
+- **ステッカー / メディア** — 写真/動画→ステッカー、ステッカー→画像、動画→音声、brat sticker、AI upscale (`.hd`)。
+- **グループツール** — kick/promote/demote/add、hidetag、anti-link、anti-delete、welcome/goodbye。
+- **ユーティリティ** — menu、Wikipedia、reminder、Family 100、AFK、stats など。最新一覧は WhatsApp で `.menu` を送信。
+- **軽量** — Termux で動作（root 不要）。コア機能に yt-dlp/ffmpeg は不要。ステッカーは小さな Rust sidecar を使用。
+
+## 必要環境
+
+- **Node.js >= 23.6**（`.ts` を直接実行）
+- npm
+- Rust toolchain は sticker sidecar をビルドする場合のみ（`npm run build:sticker`）
+
+## クイックスタート
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
-cd wakaru && npm run start
+cd wakaru
+npm run start
 ```
 
-1. QRが表示 → WhatsApp（設定 → リンク済みデバイス）でスキャン
-2. 以上。セッションは`sessions/`に保存
+WhatsApp の *設定 > リンク済みデバイス* から QR をスキャンしてください。セッションは `sessions/` に保存されます。
 
-> Windows? [`install.bat`](install.bat)をダブルクリック。
+**Windows:** [`install.bat`](install.bat) を実行するか、手動セットアップを使ってください。
 
 <details>
-<summary>手動セットアップ / ペアリングコード</summary>
+<summary><b>手動セットアップ / ペアリングコード</b></summary>
 
 ```bash
 git clone https://github.com/salsabytes/Wakaru.git
 cd Wakaru
 npm install
-npm run build:sticker   # 初回のみ：Rustステッカーエンジンをコンパイル
-npm run start           # or: npm run start:pairing
+npm run build:sticker   # 任意、初回のみ
+npm run start           # QR
+# または: npm run start:pairing
+# または: PAIRING_CODE=1 npm run start
 ```
 
-コードでログイン：`npm run start:pairing` or `PAIRING_CODE=1`を設定。
-
 </details>
 
----
+## 設定
 
-## 💡 できること
-
-- 🧠 `.ai` — 会話＋コマンド代行（`@run:`）、文脈を記憶
-- 🎬 ダウンローダー — YouTube、TikTok、IG、FB、Pinterest、SoundCloud、Spotify、X
-- 🖼️ ステッカー＆メディア — 写真・動画→ステッカー、ステッカー→画像、動画→音声、AIアップスケール
-- 👥 グループ管理 — kick / promote / demote / add、グループごとのリンク対策＆削除対策
-- ⏰ リマインダー＆ゲーム — `.remind` と Family 100
-- 📱 Termuxで動く、root不要。yt-dlp・ffmpegなし
-
----
-
-## 📜 コマンド
-
-ライブ一覧はWhatsAppで`.menu`（エイリアス付き）。
-
-<details>
-<summary>全コマンドを表示</summary>
-
-**チャット**
-`.ai` — エージェント会話 · `.menu` — 一覧 · `.wiki` — Wikipedia検索 · `.setlang` — 言語切替 · `.remind` — リマインダー
-
-**ステッカー＆メディア**（写真・動画・ステッカーに返信）
-`.sticker` — →ステッカー · `.toimg` — ステッカー→画像 · `.brat` — テキスト→ミーム · `.toaudio` — 動画→音声 · `.hd` — 2x AIアップスケール
-
-**ダウンローダー**
-`.play` — YouTube検索→mp3/mp4 · `.ytmp3` / `.ytmp4` — リンク→音声・動画
-`.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
-
-**グループ**（管理者／ownerのみ）
-`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — グループごとのリンク対策 · `.antidelete` — 削除メッセージを復元
-
-**ゲーム**
-`.family100` — Family 100 クイズ
-
-**ownerのみ**
-`.mode`（public/self/private） · `.prefix` · `.limit`（10–2048MB） · `.update`
-
-複数ファイル（IGカルーセル、Pinterest）は**プライベートチャット**に届きます。
-
-</details>
-
----
-
-## ⚙️ 設定
-
-`config.json`は初回起動時に自動生成。必要なのはこれだけ：
+初回起動時に `config.json` が作成されます（gitignored）。最小例:
 
 ```json
-{ "owners": ["6281234567890"], "language": "id" }
+{
+  "owners": ["6281234567890"],
+  "language": "id"
+}
 ```
 
-番号を追加 → オーナーコマンドが開放。その他は[`config.example.json`](config.example.json)参照（`mode`、`prefixes`、`maxDownloadMB`、`stickerPack`…）。
+| Key | 説明 |
+|---|---|
+| `owners` | owner 専用コマンドを使える番号/JID。空の場合は owner コマンド無効。 |
+| `language` | 既定の返答言語（`id`, `en`, `ja` など）。 |
+| `mode` | `public`, `self`, `private`。 |
+| `prefixes` | コマンド prefix。 |
+| `maxDownloadMB` | ダウンロードサイズ上限。 |
+| `markOnline` | 接続時に bot をオンライン表示に保つ。 |
 
-<details>
-<summary>応用</summary>
+全オプションは [`config.example.json`](config.example.json) を参照。多くは WhatsApp から `.setlang`, `.mode`, `.prefix`, `.limit` または `.ai` で変更できます。
 
-- `.ai`脳：無料・キー不要 — 公開Wakafy API（`/v1/ext/salsabytes/gpt-6`）経由のGPT-6、フォールバックモデルなし、隣接リポジトリ不要
-- WhatsAppからライブ変更：`.setlang`、`.mode`、`.prefix`、`.limit` — or `.ai`に頼むだけ
-- Env：`SESSION_DIR`（既定`sessions`）、`PAIRING_CODE=1`、`WAKAFY_API_KEY`（任意 — 公開フリーキー`@waka:alpha`内蔵、登録不要。自分のキーを使う場合のみ設定）
-- 更新：WhatsAppから`.update`（バックアップ→取得→再構築→再起動、失敗時はロールバック）
+## コマンド
 
-</details>
+最新の一覧は WhatsApp で **`.menu`** を送信してください。
 
----
+| カテゴリ | 例 |
+|---|---|
+| AI / chat | `.ai`, `.menu`, `.wiki`, `.setlang`, `.remind`, `.afk` |
+| Media / sticker | `.sticker`, `.toimg`, `.brat`, `.toaudio`, `.hd` |
+| Downloader | `.play`, `.ytmp3`, `.ytmp4`, `.tiktok`, `.instagram`, `.facebook`, `.pinterest`, `.soundcloud`, `.spotify`, `.twitter` |
+| Group | `.kick`, `.promote`, `.demote`, `.add`, `.hidetag`, `.antilink`, `.antidelete`, `.welcome`, `.goodbye` |
+| Game | `.family100` |
+| Owner | `.mode`, `.prefix`, `.limit`, `.update`, `.eval`, `.aistatus` |
 
-## ❓ 困ったら
+## AI メモ
 
-<details>
-<summary>2インスタンスが蹴り合う（440）？</summary>
+- `.ai <message>` は通常チャット、または bot コマンド実行（`@run:<cmd>`）ができます。
+- Owner repo mode はこの workspace 専用です。編集は `src/`、`test/`、docs に限定され、typecheck/test で検証され、失敗時はロールバックされます。
+- `@repo ...` / `@chat ...` でモードを強制できます。
+- Backend: Wakafy AI API。`WAKAFY_API_KEY` は任意（public key 内蔵）。`WAKARU_AI_MODEL`、`WAKARU_AI_FREE`、`aiFree` で挙動を調整できます。
 
-`sessions/`の共有は厳禁。1フォルダ＝1ボット。
+## 開発
 
-</details>
+```bash
+npm install
+npm run typecheck
+npm test
+npm run start
+npm run build:sticker
+```
 
-<details>
-<summary>ログアウトされた？</summary>
+- app code はビルド不要。import は明示的な `.ts` 拡張子を使います。
+- コマンドは `src/commands/<category>/<name>.ts` に置き、default export から自動登録されます。
+- 共通ヘルパーは `src/lib/` に置きます。
 
-`sessions/`を削除して再スキャン。
+## トラブルシューティング
 
-</details>
+- **2つのインスタンスが競合 (`440` / `connectionReplaced`)** — 同じ `sessions/` フォルダで 2 つ起動しないでください。
+- **ログアウト / 再リンクが必要** — `sessions/` を削除して再スキャン。
+- **リンク済みデバイスに返信が出ない** — 重複インスタンス確認、セッション再リンク、必要なら `config.json` の `markOnline: false` を試してください。
+- **Termux がスリープする** — `termux-wake-lock` を実行。
+- **ステッカー失敗** — `npm run build:sticker` で sidecar をビルド。`sharp` は意図的に未インストールです。
+- **`.ai` が遅い/エラー** — LLM 呼び出しは約 120 秒でタイムアウト。backend 遅延/障害時はクラッシュせずエラーを返します。
 
-<details>
-<summary>Termuxが寝る？</summary>
+## コントリビュート
 
-`termux-wake-lock`を実行。
+変更は小さく実用的に。Issue / PR 歓迎です。
 
-</details>
+- [Issue を開く](https://github.com/salsabytes/Wakaru/issues)
+- [WhatsApp グループ](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)
 
----
+## ライセンス
 
-## 🤝 コントリビュート
-
-小さく怠惰なコードベース — そのままに。バグ・要望は[issueへ](https://github.com/salsabytes/Wakaru/issues)。PR歓迎。質問は[WhatsAppグループへ](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)。
-
-[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [リリース](https://github.com/salsabytes/Wakaru/releases) · [Baileys](https://github.com/whiskeysockets/Baileys)＋TypeScript＋Node＋Rust
+[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes). Built on [Baileys](https://github.com/whiskeysockets/Baileys).
 
 ---
 
 <div align="center">
 
-## ⭐ スターください
-
-Wakaruは無料で働きます。お礼はスターひとつだけ。<br>
-スターなし＝ボットが`sessions/`で泣きます。泣かせたくないでしょ？🥺
+Wakaruが役に立ったら、⭐ をもらえると嬉しいです。
 
 </div>

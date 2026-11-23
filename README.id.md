@@ -1,154 +1,144 @@
 <div align="center">
 
-# ✨ Wakaru
+# Wakaru (分かる)
 
-**分かる — *"mengerti."* Bot WhatsApp mungil yang nyambung diajak ngobrol.**
+**“Mengerti.”** — bot WhatsApp mungil berbasis [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript.
 
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
 [![License: MIT](https://img.shields.io/github/license/salsabytes/Wakaru?style=for-the-badge&color=94A3B8)](LICENSE)
 [![WhatsApp](https://img.shields.io/badge/WhatsApp-join-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)
 
-<p>🌐 <a href="README.md">English</a> · <b>Bahasa Indonesia</b> · <a href="README.ja.md">日本語</a></p>
+<p><a href="README.md">English</a> · <b>Bahasa Indonesia</b> · <a href="README.ja.md">日本語</a></p>
 
-<img src="https://media.tenor.com/ZafC06r3sksAAAAC/anime-anime-girl.gif" alt="Wakaru — anime girl banner" width="500" />
+<img src="https://media.tenor.com/ZafC06r3sksAAAAC/anime-anime-girl.gif" alt="Wakaru" width="480" />
 
 </div>
 
----
+Wakaru menjalankan TypeScript langsung di Node.js (tanpa build step). Bisa chat, download media, bikin stiker, kelola grup, dan punya mode `.ai` agentic yang bisa menjalankan command bot — serta, untuk owner, menginspeksi/mengedit repo ini dengan aman.
 
-## 🚀 Jalanin
+## Fitur
+
+- **AI agentic (`.ai`)** — chat, ingat konteks per chat, dan jalankan command bot lewat `@run:<cmd>`. Mode owner bisa baca/edit repo dengan tool marker (`@read/@ls/@grep/@write/@edit/@rm/@typecheck/@test/@done`), dibatasi ke `src/`, `test/`, dan docs, dengan rollback otomatis kalau verifikasi gagal.
+- **Downloader** — YouTube (`.play`, `.ytmp3`, `.ytmp4`), TikTok, Instagram, Facebook, Pinterest, SoundCloud, Spotify, X/Twitter.
+- **Stiker & media** — foto/video ke stiker, stiker ke gambar, video ke audio, brat sticker, AI upscale (`.hd`).
+- **Tools grup** — kick/promote/demote/add, hidetag, anti-link, anti-delete, welcome/goodbye.
+- **Utilitas** — menu, Wikipedia, pengingat, Family 100, AFK, stats, dll. Kirim `.menu` di WhatsApp untuk daftar live.
+- **Ringan** — jalan di Termux (tanpa root). Fitur inti tidak butuh yt-dlp/ffmpeg; stiker pakai Rust sidecar kecil.
+
+## Kebutuhan
+
+- **Node.js >= 23.6** (pakai Node type-stripping untuk `.ts`)
+- npm
+- Rust toolchain hanya jika ingin build sticker sidecar (`npm run build:sticker`)
+
+## Mulai Cepat
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
-cd wakaru && npm run start
+cd wakaru
+npm run start
 ```
 
-1. QR muncul → scan dari WhatsApp (*Setelan → Perangkat tertaut*)
-2. Beres. Sesi tersimpan di `sessions/`
+Scan QR dari WhatsApp: *Setelan > Perangkat tertaut*. Sesi tersimpan di `sessions/`.
 
-> Windows? Buka [`install.bat`](install.bat), klik dua kali.
+**Windows:** jalankan [`install.bat`](install.bat), atau pakai setup manual di bawah.
 
 <details>
-<summary>Setup manual / pairing code</summary>
+<summary><b>Setup manual / pairing code</b></summary>
 
 ```bash
 git clone https://github.com/salsabytes/Wakaru.git
 cd Wakaru
 npm install
-npm run build:sticker   # sekali aja: compile engine stiker Rust
-npm run start           # atau: npm run start:pairing
+npm run build:sticker   # opsional, sekali saja
+npm run start           # QR
+# atau: npm run start:pairing
+# atau: PAIRING_CODE=1 npm run start
 ```
 
-Login pakai kode: `npm run start:pairing` atau set `PAIRING_CODE=1`.
-
 </details>
 
----
+## Konfigurasi
 
-## 💡 Bisa apa aja
-
-- 🧠 `.ai` — ngobrol + jalanin command buat kamu (`@run:`), ingat konteks
-- 🎬 Downloader — YouTube, TikTok, IG, FB, Pinterest, SoundCloud, Spotify, X
-- 🖼️ Stiker & media — foto/video → stiker, stiker → foto, video → audio, upscale AI
-- 👥 Tools grup — kick / promote / demote / add, anti-link & anti-delete per grup
-- ⏰ Pengingat & game — `.remind` dan Family 100
-- 📱 Jalan di Termux, tanpa root. Tanpa yt-dlp, tanpa ffmpeg
-
----
-
-## 📜 Commands
-
-Kirim `.menu` di WhatsApp buat liat daftar live + alias.
-
-<details>
-<summary>Lihat semua command</summary>
-
-**Ngobrol**
-`.ai` — chat agen · `.menu` — list semua · `.wiki` — cari Wikipedia · `.setlang` — ganti bahasa · `.remind` — pengingat
-
-**Stiker & media** (reply foto/video/stiker)
-`.sticker` — → stiker · `.toimg` — stiker → foto · `.brat` — teks → meme stiker · `.toaudio` — video → audio · `.hd` — upscale AI 2x
-
-**Downloader**
-`.play` — cari YouTube → mp3/mp4 · `.ytmp3` / `.ytmp4` — link → audio/video
-`.tiktok` · `.instagram` · `.facebook` · `.pinterest` · `.soundcloud` · `.spotify` · `.twitter`
-
-**Grup** (khusus admin/owner)
-`.kick` · `.promote` · `.demote` · `.add` · `.antilink` — anti-link per grup · `.antidelete` — pulihkan pesan yang dihapus
-
-**Game**
-`.family100` — kuis Family 100
-
-**Khusus owner**
-`.mode` (public/self/private) · `.prefix` · `.limit` (10–2048 MB) · `.update`
-
-Hasil multi-file (carousel IG, Pinterest) dikirim ke **chat pribadi**.
-
-</details>
-
----
-
-## ⚙️ Konfigurasi
-
-`config.json` otomatis dibuat saat boot pertama. Cuma ini yang penting:
+`config.json` dibuat otomatis saat pertama jalan (gitignored). Contoh minimal:
 
 ```json
-{ "owners": ["6281234567890"], "language": "id" }
+{
+  "owners": ["6281234567890"],
+  "language": "id"
+}
 ```
 
-Tambah nomormu → command owner kebuka. Sisanya liat [`config.example.json`](config.example.json) (`mode`, `prefixes`, `maxDownloadMB`, `stickerPack`…).
+| Key | Fungsi |
+|---|---|
+| `owners` | Nomor/JID yang boleh pakai command owner. Kosong = command owner dinonaktifkan. |
+| `language` | Bahasa balasan default (`id`, `en`, `ja`, dll.). |
+| `mode` | `public`, `self`, atau `private`. |
+| `prefixes` | Prefix command. |
+| `maxDownloadMB` | Batas ukuran download. |
+| `markOnline` | Jaga status bot tetap online saat connect. |
 
-<details>
-<summary>Lanjutan</summary>
+Lihat [`config.example.json`](config.example.json) untuk opsi lengkap. Sebagian besar bisa diubah dari WhatsApp lewat `.setlang`, `.mode`, `.prefix`, `.limit`, atau minta `.ai`.
 
-- Otak `.ai`: gratis, tanpa key — GPT-6 lewat API publik Wakafy (`/v1/ext/salsabytes/gpt-6`), tanpa model fallback, tanpa repo sebelah
-- Live dari WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` — atau tinggal minta `.ai`
-- Env: `SESSION_DIR` (default `sessions`), `PAIRING_CODE=1`, `WAKAFY_API_KEY` (opsional — key publik gratis `@waka:alpha` sudah bawaan, tanpa daftar; isi hanya kalau punya key sendiri)
-- Update: kirim `.update` dari WhatsApp (backup, pull, rebuild, restart, rollback kalau gagal)
+## Command
 
-</details>
+Kirim **`.menu`** di WhatsApp untuk daftar command terbaru.
 
----
+| Kategori | Contoh |
+|---|---|
+| AI / chat | `.ai`, `.menu`, `.wiki`, `.setlang`, `.remind`, `.afk` |
+| Media / stiker | `.sticker`, `.toimg`, `.brat`, `.toaudio`, `.hd` |
+| Downloader | `.play`, `.ytmp3`, `.ytmp4`, `.tiktok`, `.instagram`, `.facebook`, `.pinterest`, `.soundcloud`, `.spotify`, `.twitter` |
+| Grup | `.kick`, `.promote`, `.demote`, `.add`, `.hidetag`, `.antilink`, `.antidelete`, `.welcome`, `.goodbye` |
+| Game | `.family100` |
+| Owner | `.mode`, `.prefix`, `.limit`, `.update`, `.eval`, `.aistatus` |
 
-## ❓ Mentok?
+## Catatan AI
 
-<details>
-<summary>Dua instance saling tendang (440)?</summary>
+- `.ai <pesan>` bisa chat biasa atau menjalankan command bot (`@run:<cmd>`).
+- Mode repo owner hanya untuk workspace ini. Edit dibatasi ke `src/`, `test/`, dan docs; perubahan diverifikasi dengan typecheck/test dan rollback otomatis kalau gagal.
+- Pakai `@repo ...` atau `@chat ...` untuk memaksa mode.
+- Backend: Wakafy AI API. `WAKAFY_API_KEY` opsional; public key sudah built-in. `WAKARU_AI_MODEL`, `WAKARU_AI_FREE`, dan `aiFree` mengatur perilaku.
 
-Jangan pernah berbagi satu folder `sessions/`. Satu folder = satu bot.
+## Development
 
-</details>
+```bash
+npm install
+npm run typecheck
+npm test
+npm run start
+npm run build:sticker
+```
 
-<details>
-<summary>Ke-logout?</summary>
+- Kode app tidak butuh build step; import pakai ekstensi `.ts` eksplisit.
+- Command ada di `src/commands/<category>/<name>.ts` dan auto-register dari default export.
+- Helper bersama taruh di `src/lib/`.
 
-Hapus `sessions/` lalu scan ulang.
+## Troubleshooting
 
-</details>
+- **Dua instance bentrok (`440` / `connectionReplaced`)** — jangan jalankan dua bot di folder `sessions/` yang sama.
+- **Logout / perlu relink** — hapus `sessions/` lalu scan ulang.
+- **Balasan hilang di linked device** — cek tidak ada instance ganda, relink sesi, dan coba `markOnline: false` di `config.json` jika perlu.
+- **Termux tidur** — jalankan `termux-wake-lock`.
+- **Stiker gagal** — build sidecar dengan `npm run build:sticker`. `sharp` memang tidak diinstall.
+- **`.ai` lambat/error** — panggilan LLM punya timeout ~120 detik; backend lambat/down mengembalikan error, bukan crash.
 
-<details>
-<summary>Termux ketiduran?</summary>
+## Kontribusi
 
-Jalanin `termux-wake-lock`.
+Jaga perubahan tetap kecil dan praktis. Issue dan PR welcome.
 
-</details>
+- [Buka issue](https://github.com/salsabytes/Wakaru/issues)
+- [Grup WhatsApp](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)
 
----
+## Lisensi
 
-## 🤝 Kontribusi
-
-Codebase kecil yang malas — jaga tetap begitu. Nemu bug / punya ide? [Buka issue](https://github.com/salsabytes/Wakaru/issues). PR welcome. Mau nanya-nanya? Gabung ke [grup WhatsApp](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD).
-
-[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes) · [Rilis](https://github.com/salsabytes/Wakaru/releases) · Dibangun di atas [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript + Node + Rust
+[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes). Dibangun di atas [Baileys](https://github.com/whiskeysockets/Baileys).
 
 ---
 
 <div align="center">
 
-## ⭐ kasih star dong
-
-Wakaru kerja gratis, mintanya cuma satu: star.<br>
-Nggak kasih star = bot nangis di `sessions/`. Masa tega bikin bot nangis? 🥺
+Kalau Wakaru kepake, kasih ⭐ di repo ini ya.
 
 </div>

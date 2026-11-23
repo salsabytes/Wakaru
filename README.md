@@ -2,7 +2,7 @@
 
 # Wakaru (分かる)
 
-**“To understand.”** — a tiny, agentic WhatsApp bot built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript.
+**“To understand.”** — a tiny WhatsApp bot built on [Baileys](https://github.com/whiskeysockets/Baileys) + TypeScript.
 
 [![Version](https://img.shields.io/github/v/release/salsabytes/Wakaru?style=for-the-badge&color=F472B6)](https://github.com/salsabytes/Wakaru/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/salsabytes/Wakaru/install.yml?style=for-the-badge&label=install&color=818CF8)](https://github.com/salsabytes/Wakaru/actions)
@@ -15,24 +15,24 @@
 
 </div>
 
-Wakaru runs TypeScript directly on Node (no build step), talks in chat, downloads media, makes stickers, helps manage groups — and its `.ai` can act as an agent (run bot commands, and for the owner, read/edit this repo safely).
+Wakaru runs TypeScript directly on Node.js (no build step). It handles chat, media downloads, stickers, group tools, and an agentic `.ai` mode that can run bot commands — and, for owners, safely inspect/edit this repo.
 
 ## Features
 
-- **Agentic chat (`.ai`)** — answers questions, runs bot commands for you (`@run:<cmd>`), remembers context per chat. For the owner it can work on the repo (`@read/@ls/@grep/@search/@fetch/@write/@typecheck/@test/@done`), sandboxed to `src/`, `test/`, `docs` with automatic typecheck+test rollback. If something isn’t in the repo, it can research via web search/fetch.
-- **Downloaders** — YouTube (`.play`/`.ytmp3`/`.ytmp4`), TikTok, Instagram, Facebook, Pinterest, SoundCloud, Spotify, X/Twitter.
-- **Stickers & media** — photo/video → sticker, sticker → image, video → audio, brat sticker, AI upscale (`.hd`).
-- **Group tools** — kick/promote/demote/add, hidetag/tagall, anti-link & anti-delete (per group), admin/bot-admin guards.
-- **Utilities & fun** — menu, Wikipedia, reminders, Family 100, and more. Send `.menu` in chat for the live list.
-- **Lightweight** — runs on Termux (no root), no yt-dlp/ffmpeg required for core features (sticker engine is a small Rust sidecar).
+- **Agentic AI (`.ai`)** — chat, remember per-chat context, and run bot commands with `@run:<cmd>`. Owner mode can inspect/edit the repo with tool markers (`@read/@ls/@grep/@write/@edit/@rm/@typecheck/@test/@done`), sandboxed to `src/`, `test/`, and docs, with automatic rollback on failed verification.
+- **Downloaders** — YouTube (`.play`, `.ytmp3`, `.ytmp4`), TikTok, Instagram, Facebook, Pinterest, SoundCloud, Spotify, X/Twitter.
+- **Stickers & media** — photo/video to sticker, sticker to image, video to audio, brat sticker, AI upscale (`.hd`).
+- **Group tools** — kick/promote/demote/add, hidetag, anti-link, anti-delete, welcome/goodbye.
+- **Utilities** — menu, Wikipedia, reminders, Family 100, AFK, stats, and more. Send `.menu` in chat for the live list.
+- **Lightweight** — runs on Termux (no root). Core features don't need yt-dlp/ffmpeg; stickers use a small Rust sidecar.
 
 ## Requirements
 
-- **Node.js ≥ 23.6** (uses Node’s type-stripping to run `.ts` directly)
+- **Node.js >= 23.6** (uses Node type-stripping for `.ts`)
 - npm
-- (Optional, for stickers) Rust toolchain to build `native/sticker` once (`npm run build:sticker`)
+- Rust toolchain only if you want to build the sticker sidecar (`npm run build:sticker`)
 
-## Quick start
+## Quick Start
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salsabytes/Wakaru/master/install.sh | bash
@@ -40,10 +40,9 @@ cd wakaru
 npm run start
 ```
 
-1. A QR code appears — scan it from WhatsApp (*Settings → Linked devices*).
-2. Session is saved in `sessions/`.
+Scan the QR code from WhatsApp: *Settings > Linked devices*. The session is saved in `sessions/`.
 
-**Windows:** run [`install.bat`](install.bat) (double-click) or follow manual setup below.
+**Windows:** run [`install.bat`](install.bat), or use the manual setup below.
 
 <details>
 <summary><b>Manual setup / pairing code</b></summary>
@@ -52,9 +51,10 @@ npm run start
 git clone https://github.com/salsabytes/Wakaru.git
 cd Wakaru
 npm install
-npm run build:sticker   # one-time: compile the Rust sticker engine (optional)
-npm run start           # scan QR
-# or: npm run start:pairing  (or set PAIRING_CODE=1) for a pairing code
+npm run build:sticker   # optional, one-time
+npm run start           # QR
+# or: npm run start:pairing
+# or: PAIRING_CODE=1 npm run start
 ```
 
 </details>
@@ -70,66 +70,67 @@ npm run start           # scan QR
 }
 ```
 
-- **`owners`** — numbers (or JIDs) that can use owner-only commands. Empty = owner-only commands disabled.
-- **`language`** — reply language (`id`, `en`, `ja`, or other codes supported by `.ai`).
-- Other options (see [`config.example.json`](config.example.json)): `mode` (public/self/private), `prefixes`, `bare`, `maxDownloadMB`, `aiModel`, `aiFree`, `stickerPack`/`stickerAuthor`, `updateChannel`, `markOnline`.
+| Key | Purpose |
+|---|---|
+| `owners` | Numbers/JIDs allowed to use owner-only commands. Empty disables owner-only commands. |
+| `language` | Default reply language (`id`, `en`, `ja`, etc.). |
+| `mode` | `public`, `self`, or `private`. |
+| `prefixes` | Command prefixes. |
+| `maxDownloadMB` | Download size limit. |
+| `markOnline` | Keep bot presence online on connect. |
 
-Most can be changed live from WhatsApp: `.setlang`, `.mode`, `.prefix`, `.limit` (or ask `.ai`).
+See [`config.example.json`](config.example.json) for all options. Most settings can be changed from WhatsApp via `.setlang`, `.mode`, `.prefix`, `.limit`, or by asking `.ai`.
 
 ## Commands
 
-Send **`.menu`** in WhatsApp for the live, up-to-date list with aliases.
+Send **`.menu`** in WhatsApp for the live, up-to-date list.
 
 | Category | Examples |
 |---|---|
-| Chat / AI | `.ai` (chat + agent), `.menu`, `.wiki`, `.setlang`, `.remind` |
-| Stickers & media | `.sticker`, `.toimg`, `.brat`, `.toaudio`, `.hd` (reply to media) |
+| AI / chat | `.ai`, `.menu`, `.wiki`, `.setlang`, `.remind`, `.afk` |
+| Media / stickers | `.sticker`, `.toimg`, `.brat`, `.toaudio`, `.hd` |
 | Downloaders | `.play`, `.ytmp3`, `.ytmp4`, `.tiktok`, `.instagram`, `.facebook`, `.pinterest`, `.soundcloud`, `.spotify`, `.twitter` |
-| Group (admin/owner) | `.kick`, `.promote`, `.demote`, `.add`, `.hidetag`, `.antilink`, `.antidelete` |
+| Group | `.kick`, `.promote`, `.demote`, `.add`, `.hidetag`, `.antilink`, `.antidelete`, `.welcome`, `.goodbye` |
 | Games | `.family100` |
-| Owner | `.mode`, `.prefix`, `.limit`, `.update`, `.aistatus` |
+| Owner | `.mode`, `.prefix`, `.limit`, `.update`, `.eval`, `.aistatus` |
 
-> Multi-file results (e.g. IG carousels, Pinterest) are sent to your private chat.
+## AI Notes
 
-## How the AI works
-
-- `.ai <message>` chats and can invoke bot commands (`@run:<cmd>`). It keeps short per-`chat:sender` history/memory.
-- **Owner repo mode:** when you ask to change/read code, the agent can `@read/@ls/@grep/@write/@rm/@send`, then `@typecheck`/`@test`. Edits are limited to `src/`, `test/`, `docs` and are auto-rolled back unless checks pass. Use `@repo` / `@chat` to force a mode.
-- **Research:** if a requested API/pattern isn’t in this repo, it can `@search`/`@fetch` docs (e.g. Baileys) and should tell you it’s researching.
-- Backend: Wakafy AI API (`/v1/ext/salsabytes/gpt-6`, anon). Set `WAKAFY_API_KEY` only for a personal key (public free key built in). `WAKARU_AI_MODEL`, `WAKARU_AI_FREE`/`aiFree` tweak behavior.
+- `.ai <message>` can chat normally or invoke bot commands (`@run:<cmd>`).
+- Owner repo mode is for this workspace only. Edits are limited to `src/`, `test/`, and docs; writes are verified with typecheck/tests and rolled back on failure.
+- Use `@repo ...` or `@chat ...` to force mode.
+- Backend: Wakafy AI API. `WAKAFY_API_KEY` is optional; a public key is built in. `WAKARU_AI_MODEL`, `WAKARU_AI_FREE`, and `aiFree` adjust behavior.
 
 ## Development
 
 ```bash
 npm install
-npm run typecheck   # tsc --noEmit
-npm test            # node:test (test/**/*.test.ts)
-npm run start       # run the bot
+npm run typecheck
+npm test
+npm run start
 npm run build:sticker
 ```
 
-- No build step for app code; imports use explicit `.ts` extensions (ESM, strict).
-- Commands: `src/commands/<category>/<name>.ts` default-export `{ name, run(ctx), ... } satisfies Command` (auto-registered).
-- Shared helpers in `src/lib/` (stdlib-first).
+- App code has no build step; imports use explicit `.ts` extensions.
+- Commands live in `src/commands/<category>/<name>.ts` and are auto-registered from the default export.
+- Shared helpers go in `src/lib/`.
 
 ## Troubleshooting
 
-- **Two instances kick each other (440 / `connectionReplaced`)** — never run two bots on the same `sessions/` folder.
-- **Logged out / need to re-link** — delete `sessions/` and scan again.
+- **Two instances conflict (`440` / `connectionReplaced`)** — never run two bots on the same `sessions/` folder.
+- **Logged out / need relink** — delete `sessions/` and scan again.
+- **Replies missing on linked devices** — check for duplicate instances, relink the session, and try `markOnline: false` in `config.json` if needed.
 - **Termux sleeps** — run `termux-wake-lock`.
-- **Sticker fails** — build the sidecar: `npm run build:sticker` (Rust). `sharp` is intentionally not installed.
-- **`.ai` slow or errors** — LLM calls have a ~120s timeout; a slow/down backend returns an error instead of crashing. Try again or check connectivity/API limits.
+- **Sticker fails** — build the sidecar with `npm run build:sticker`. `sharp` is intentionally not installed.
+- **`.ai` slow/errors** — LLM calls have a ~120s timeout; a slow or unavailable backend returns an error instead of crashing.
 
 ## Contributing
 
-Small, lazy codebase — keep it that way. Issues and PRs welcome. Join the [WhatsApp group](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD) for questions.
+Keep changes small and practical. Issues and PRs are welcome.
 
-## License & credits
+- [Open an issue](https://github.com/salsabytes/Wakaru/issues)
+- [WhatsApp group](https://chat.whatsapp.com/J3xJXknrXUA3kuWfVXXsyD)
 
-[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes). Built on [Baileys](https://github.com/whiskeysockets/Baileys). [Releases](https://github.com/salsabytes/Wakaru/releases).
+## License
 
-<div align="center">
-
-**If Wakaru helps you, a ⭐ on the repo means a lot.**
-
-</div>
+[MIT](LICENSE) © 2026 [Salsabila R.](https://github.com/salsabytes). Built on [Baileys](https://github.com/whiskeysockets/Baileys).
