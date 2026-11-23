@@ -603,14 +603,14 @@ export default {
 
     const waSafe = waText(finalText)
     if (!waSafe.trim()) return
-    const parts = parseRich(finalText)
+    const parts = parseRich(waSafe)
     if (hasRich(parts)) {
       try {
         await sendRichParts(ctx.sock, ctx.chat, parts, { title: 'Wakaru' })
         return
       } catch (err) {
         logger.warn('ai rich send failed, plain fallback:', err)
-        await ctx.reply(richToText(parts))
+        await ctx.reply(waText(richToText(parts)))
         return
       }
     }

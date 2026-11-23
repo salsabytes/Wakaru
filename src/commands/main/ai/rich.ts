@@ -26,9 +26,20 @@ const CODE_PART_MAX = 3500
 // Every HTML reply is rendered as a live preview card, not source code.
 const HTML_PREVIEW_LANGS = new Set(['html', 'html5', 'htm', 'html-preview', 'preview'])
 
-/** WhatsApp renders *bold* with ONE star and shows [text](url) raw. */
-export const waText = (s: string): string =>
-  s.replace(/\[(.+?)\]\((https?:[^)\s]+)\)/g, '$1 $2').replace(/\*\*(.+?)\*\*/g, '*$1*')
+/** Normalize markdown to WhatsApp-friendly formatting. */
+export const waText = (s: string): string => {
+  let out = String(s ?? '')
+  out = out.replace(/\r\n/g, '\n')
+  out = out.replace(/^#{1,6}\s+(.+)$/gm, '*$1*')
+  out = out.replace(/\[(.+?)\]\((https?:[^)\s]+)\)/g, '$1 $2')
+  out = out.replace(/\*\*(.+?)\*\*/g, '*$1*')
+  out = out.replace(/__(.+?)__/g, '*$1*')
+  out = out.replace(/^\s*[*+-]\s+/gm, '- ')
+  out = out.replace(/`([^`\n]+)`/g, '$1')
+  out = out.replace(/^(-{3,}|\*{3,}|_{3,})$/gm, '')
+  out = out.replace(/\n{3,}/g, '\n\n')
+  return out.trim()
+}
 
 const cell = (s: string): string => waText(s.trim()).replace(/\s*\n\s*/g, ' ').slice(0, 120)
 
