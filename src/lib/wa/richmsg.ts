@@ -648,19 +648,30 @@ export function batchRichParts(parts: RichPart[], max = RICH_BATCH_CHARS): RichP
 const RICH_BATCH_GAP_MS = 450
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** Send rich parts as plain text for multi-device compatibility. */
+/** Send native rich parts (text/table/code). Works on Android, Web, and iPhone. */
 export async function sendRichParts(
   sock: WASocket,
   jid: string,
   parts: RichPart[],
   opts: RichExOptions = {},
 ): Promise<string | undefined> {
-  const text = partsToText(parts, opts.footer)
-  const chunks = chunkText(text.trim() || ' ')
+  const batches = batchRichParts(parts)
   let id: string | undefined
-  for (let i = 0; i < chunks.length; i++) {
-    const sent = await sock.sendMessage(jid, { text: chunks[i] })
-    id = (sent as any)?.key?.id ?? id
+  for (let i = 0; i < batches.length; i++) {
+    const last = i === batches.length - 1
+    const base = last ? opts : { ...opts, footer: undefined }
+    // HTML cards only render reliably on Android after the identical self-edit.
+    const hasHtml = batches[i].some((p) => p.type === 'html')
+    const o = hasHtml ? { ...base, withEdit: true } : base
+    try {
+      const sent = await relayRich(sock, jid, buildRichParts(batches[i], o), o, partsToText(batches[i], o.footer))
+      id = sent ?? id
+    } catch {
+      // rich failed for this batch — plain text is better than silence
+      const text = partsToText(batches[i], o.footer)
+      await sock.sendMessage(jid, { text: text.trim() ? text : '📄 (pesan rich gagal dikirim)' }).catch(() => {})
+    }
+    if (!last) await pause(RICH_BATCH_GAP_MS)
   }
   return id
 }
