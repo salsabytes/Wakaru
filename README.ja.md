@@ -11,7 +11,7 @@
 
 <p><a href="README.md">English</a> · <a href="README.id.md">Bahasa Indonesia</a> · <b>日本語</b></p>
 
-<img src="https://media.giphy.com/media/pwkpuW7xF9BflrrYpB/giphy.gif" alt="Wakaru" width="480" />
+<img src="https://media.giphy.com/media/pwkpuW7xF9BflrrYpB/giphy.gif" alt="Wakaru" width="320" />
 
 </div>
 
