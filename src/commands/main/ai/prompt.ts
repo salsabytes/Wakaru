@@ -155,7 +155,7 @@ const DECISION_RUBRIC = [
   '- "hapus command .stats" / "delete fitur stats" -> REPO_EDIT: delete the file (@rm / DELETE path=...), never replace it with export {} or an empty stub.',
   '- "buka terminal / cek error compile / git status" -> @sh <command> (real shell) or @typecheck/@test/@status.',
   '',
-  'AGENTIC METHOD (non-trivial): brief plan/intent -> act with the right tool -> observe result -> fix/reflect -> repeat until done -> final answer that satisfies the request. No filler ("sebentar", "aku cek dulu"), no "nanti aku..." promises, never claim a tool ran when it did not. Use minimal tools; batch independent read-only tool lines when useful. If a step fails, read the real error and try to recover.',
+  'AGENTIC METHOD (non-trivial): brief plan/intent -> act with the right tool -> observe result -> fix/reflect -> repeat until done -> final answer that satisfies the request. No filler, no hedging, no "belum bisa menyatakan"/"nanti dilanjut" - finish the job end-to-end. Never claim a tool ran when it did not. Use minimal tools; batch independent read-only tool lines when useful. If a step fails, read the real error and try to recover.',
 ]
 
 export interface AgentSystemOpts {

@@ -143,7 +143,7 @@ interface ExchangeResult {
 }
 
 const DENIES_TOOL_ACCESS =
-  /(tool|alat|akses|access).{0,40}(tidak tersedia|ga tersedia|nggak tersedia|tak tersedia|tidak bisa|ga bisa|nggak bisa|tak bisa|tidak ada|nggak ada|ga ada|unavailable|not available|missing|disabled)|tidak tersedia di (koneksi|sesi|sini|chat)|tidak (bisa|mampu) (mengakses|mengedit|menulis|menjalankan|memanggil)|can't (access|write|edit|run|call)|cannot (access|write|edit|run|call)|no (repo )?(access|permission)|belum bisa (mengedit|menulis|akses|mengakses)|belum ada hasil eksekusi|tidak ada hasil eksekusi|gagal (mengedit|menulis|edit)|belum ada (file|perubahan).{0,40}(berubah|diubah|diterapkan)/i
+  /(tool|alat|akses|access).{0,40}(tidak tersedia|ga tersedia|nggak tersedia|tak tersedia|tidak bisa|ga bisa|nggak bisa|tak bisa|tidak ada|nggak ada|ga ada|unavailable|not available|missing|disabled)|tidak tersedia di (koneksi|sesi|sini|chat)|tidak (bisa|mampu) (mengakses|mengedit|menulis|menjalankan|memanggil)|can't (access|write|edit|run|call)|cannot (access|write|edit|run|call)|no (repo )?(access|permission)|belum bisa (mengedit|menulis|akses|mengakses)|belum ada hasil eksekusi|tidak ada hasil eksekusi|gagal (mengedit|menulis|edit)|belum ada (file|perubahan).{0,40}(berubah|diubah|diterapkan)|belum bisa menyatakan|belum selesai|akan dilanjut|nanti dilanjut/i
 
 const deniesToolAccess = (text: string): boolean => DENIES_TOOL_ACCESS.test(String(text || ''))
 
