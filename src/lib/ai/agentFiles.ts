@@ -59,10 +59,12 @@ const relOf = (root: string, abs: string): string => clean(relative(root, abs))
 export class AgentPathError extends Error {}
 
 const normalizeRel = (root: string, input: string): string => {
-  const raw = String(input ?? '').trim().replace(/^["'`]+|["'`]+$/g, '')
+  let raw = String(input ?? '').trim().replace(/^["'`]+|["'`]+$/g, '')
   if (!raw) throw new AgentPathError('empty path')
-  if (isAbsolute(raw) || /^[a-zA-Z]:/.test(raw)) throw new AgentPathError('absolute paths are not allowed')
-  const abs = resolve(root, raw)
+  // Normalize Windows separators so path checks stay stable across OSes.
+  raw = raw.replace(/\\/g, '/').replace(/^\.\/+/, '')
+  // Accept absolute paths only when they resolve inside the repo root.
+  const abs = isAbsolute(raw) || /^[a-zA-Z]:/.test(raw) ? resolve(raw) : resolve(root, raw)
   const rel = relOf(root, abs)
   if (!rel || rel === '.') return ''
   if (rel === '..' || rel.startsWith('../') || isAbsolute(rel)) throw new AgentPathError('path escapes the repo')
@@ -381,9 +383,10 @@ Rules:
 - No progress chatter ("sebentar", "aku cek dulu", "aku lanjutkan"). Bot shows steps; either send tool lines or @done when finished.
 - Plan briefly if needed, then ACT. You may emit several independent read-only tools in one reply (@read/@ls/@grep/@status/@search/@fetch) to work faster.
 - Read before you write/edit. Prefer @edit for small targeted changes; @write for new files or large rewrites. Keep edits small, match existing style (ESM .ts imports, no semicolons, no comments unless asked).
-- Writable/deletable: src/, test/, docs only. Never touch config.json, sessions/, data/, .git, node_modules, deps. No new dependencies.
-- Terminal: @sh gives a real shell in the repo root (git, npm scripts, grep, node -e, etc.). It is blocked for install/network/destructive commands. On Windows it is PowerShell (use ";" not "&&"). Prefer @typecheck/@test/@status when they fit.
-- After writing, run @typecheck and fix real errors. Run @test when behaviour changed. If FAILED, fix first - never @done while failing. Rollback is automatic on verification failure.
+  - Writable/deletable: src/, test/, docs only. Never touch config.json, sessions/, data/, .git, node_modules, deps. No new dependencies. Use repo-relative paths (e.g. src/commands/main/stats.ts); absolute paths inside this repo are accepted.
+  - Terminal: @sh gives a real shell in the repo root (git, npm scripts, grep, node -e, etc.). It is blocked for install/network/destructive commands. On Windows it is PowerShell (use ";" not "&&"). Prefer @typecheck/@test/@status when they fit.
+  - After writing, run @typecheck and fix real errors. Run @test when behaviour changed. If FAILED, fix first - never @done while failing. Rollback is automatic on verification failure.
+  - Do not claim edit/write failed unless you actually emitted a tool and got a real error. If a tool errors, show the error and retry with the corrected path/block.
 - Command files: default export \`{ name, desc?, aliases?, run(ctx) } satisfies Command\` in src/commands/<category>/, auto-registered.
 - Never guess file contents - @read/@grep first. When answer IS tool output (listing/contents/errors), include the real lines/paths in your reply.
 - Explaining this repo = tool task: @read/@grep real files and name files/functions you saw. "Daftar/struktur" -> copy paths from @ls; "gimana/kenapa/cara kerja" -> explain from code, not a tree.

@@ -31,19 +31,42 @@ const collectRepoContext = async (tools: FileTools): Promise<string> => {
 }
 
 const OPEN = /^```[a-zA-Z0-9+#_-]*\s*(?:path|file)\s*[=:]\s*("[^"]+"|'[^']+'|\S+)\s*$/i
+const OPEN_ANY = /^```([a-zA-Z0-9+#_-]*)\s*(.*)$/
 const CLOSE = /^```\s*$/
+const PATH_HINT = /(?:^|\s)(?:path|file)\s*[=:]\s*("[^"]+"|'[^']+'|[^\s`]+)|(?:^|\s)((?:src|test|README(?:\.[a-z]{2})?|AGENTS|CONTRIBUTING|flowchart)\S*\.(?:ts|tsx|js|mjs|cjs|md|json|ya?ml|toml|rs|sh))\s*$/i
+
+const normPath = (p: string): string => String(p || '').replace(/^["'`]+|["'`]+$/g, '').replace(/\\/g, '/').replace(/^\.\/+/, '').trim()
 
 export const parseFileBlocks = (text: string): Array<{ path: string; content: string }> => {
   const lines = String(text ?? '').split(/\r?\n/)
   const out = new Map<string, string>()
   for (let i = 0; i < lines.length; i++) {
-    const m = OPEN.exec(lines[i].trim())
-    if (!m) continue
-    const path = m[1].replace(/^["']|["']$/g, '').trim()
+    const trimmed = lines[i].trim()
+    let path = ''
+    const m = OPEN.exec(trimmed)
+    if (m) path = normPath(m[1])
+    else {
+      // Fallback: accept fences where the path is near the fence header.
+      const any = OPEN_ANY.exec(trimmed)
+      if (!any) continue
+      const hint = PATH_HINT.exec(String(any[2] || '').trim())
+      if (hint) path = normPath(hint[1] || hint[2] || '')
+      if (!path) {
+        for (let k = i - 1; k >= 0 && k >= i - 3; k--) {
+          const prev = lines[k].trim()
+          if (!prev) continue
+          const pm = /(?:^|\s)(?:path|file)\s*[=:]\s*("[^"]+"|'[^']+'|\S+)/i.exec(prev) || /((?:src|test)\/\S+\.(?:ts|tsx|js|mjs|cjs|md))/.exec(prev)
+          if (pm) path = normPath(pm[1])
+          break
+        }
+      }
+      if (!path) continue
+    }
     const body: string[] = []
     let j = i + 1
     while (j < lines.length && !CLOSE.test(lines[j].trim())) body.push(lines[j++])
-    if (path && body.length) out.set(path, body.join('\n'))
+    const content = body.join('\n')
+    if (path && content.trim()) out.set(path, content)
     i = j
   }
   return [...out.entries()].map(([path, content]) => ({ path, content }))
@@ -95,11 +118,11 @@ export const parseDeletes = (text: string): string[] => {
 const SYSTEM = (context: string): string => `You generate code for the Wakaru repo (TypeScript, Node >= 23.6, Baileys bot).
 You are NOT an interactive agent. There is no plugin manager, no skill system, no separate executor, and no login. Never refuse and never say you lack access: the harness writes your files, then runs typecheck and tests.
 
-OUTPUT FORMAT (mandatory) - every file as one block, full content, no placeholders or "...":
+OUTPUT FORMAT (mandatory) - every file as one fenced block with path=, full content, no placeholders or "...":
 \`\`\`ts path=src/commands/main/stats.ts
 <complete file content>
 \`\`\`
-Optional last line: SUMMARY: <one sentence>
+The path= attribute is required. A normal code block without path= will be ignored. Optional last line: SUMMARY: <one sentence>
 
 DELETE (remove files) - one bare line per file, outside any fence:
 DELETE path=src/commands/main/stats.ts
@@ -153,7 +176,7 @@ export const codegenFiles = async (o: {
     const deletes = parseDeletes(reply).slice(0, BLOCKS_MAX)
     if (!blocks.length && !deletes.length) {
       errors =
-        'No file blocks or DELETE lines found. Output at least one:\n```ts path=src/commands/<category>/<name>.ts\n<complete file>\n```\nor, to remove a file:\nDELETE path=src/commands/<category>/<name>.ts'
+        'No file blocks or DELETE lines found. Output at least one code block with a path, e.g. ```ts path=src/commands/<category>/<name>.ts\n<complete file>\n``` (path= is required). Or to remove: DELETE path=src/commands/<category>/<name>.ts'
       continue
     }
     const written = blocks.map((b) => b.path)
