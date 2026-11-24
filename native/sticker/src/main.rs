@@ -54,6 +54,22 @@ fn main() -> ExitCode {
       }
     };
   }
+  // Shrink a photo until it fits a byte budget. The AI API rejects bodies
+  // over 256 KiB and base64 inflates bytes by ~4/3, so a normal WhatsApp
+  // photo (200 KB+) never fits as-is.
+  if args.first().is_some_and(|a| a == "fit") {
+    if args.len() != 4 {
+      eprintln!("usage: sticker fit <input> <output.jpg> <maxBytes>");
+      return ExitCode::FAILURE;
+    }
+    return match fit_jpeg(&args[1], &args[2], args[3].parse().unwrap_or(0_usize)) {
+      Ok(()) => ExitCode::SUCCESS,
+      Err(e) => {
+        eprintln!("fit: {e}");
+        ExitCode::FAILURE
+      }
+    };
+  }
   // optional trailing pack/author → embedded as WhatsApp sticker EXIF metadata
   if args.len() != 2 && args.len() != 4 {
     eprintln!("usage: sticker <input> <output> [pack author]");
@@ -410,6 +426,46 @@ fn brat_to_sticker(text: &str, output: &str) -> Result<(), Box<dyn std::error::E
   let bytes = enc.encode(90.0);
   writer.write_all(&bytes)?;
   Ok(())
+}
+
+// Re-encode until the JPEG fits max_bytes: step the quality down first, then
+// the longest edge. Stops at the first size that fits so quality stays high.
+fn fit_jpeg(input: &str, output: &str, max_bytes: usize) -> Result<(), Box<dyn std::error::Error>> {
+  let data = fs::read(input)?;
+  let img = image::load_from_memory(&data)?.to_rgb8();
+  if max_bytes == 0 {
+    img.save(output)?;
+    return Ok(());
+  }
+  let (w, h) = img.dimensions();
+  let mut edge = w.max(h).max(1);
+  loop {
+    let scale = edge as f32 / w.max(h) as f32;
+    let (nw, nh) = (
+      ((w as f32 * scale) as u32).max(1),
+      ((h as f32 * scale) as u32).max(1),
+    );
+    let frame = if nw == w && nh == h {
+      img.clone()
+    } else {
+      image::imageops::resize(&img, nw, nh, FilterType::Lanczos3)
+    };
+    for quality in [82_u8, 70, 58, 45] {
+      let file = fs::File::create(output)?;
+      let mut writer = BufWriter::new(file);
+      let enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, quality);
+      frame.write_with_encoder(enc)?;
+      writer.flush()?;
+      if fs::metadata(output)?.len() as usize <= max_bytes {
+        return Ok(());
+      }
+    }
+    if edge <= 256 {
+      // last resort: 256px @ 45 still too big (pathological input) — ship it
+      return Ok(());
+    }
+    edge = (edge * 3 / 4).max(256);
+  }
 }
 
 fn hd_upscale(input: &str, output: &str) -> Result<(), Box<dyn std::error::Error>> {

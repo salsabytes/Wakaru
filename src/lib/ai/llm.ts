@@ -1,5 +1,13 @@
-﻿import { wakafy, type WakafyStreamEvent } from '../api/wakafy.ts'
+﻿import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
+import { wakafy, type WakafyStreamEvent } from '../api/wakafy.ts'
 import { botAiApiKey, botAiBaseUrl, botAiModel, botAiPath, botAiProvider } from './aiConfig.ts'
+
+const exec = promisify(execFile)
 
 // One file for the AI: base64 data, plus name/mime when we know them.
 export type AiFileInput = { data: string; name?: string; mime?: string }
@@ -17,6 +25,12 @@ const TIMEOUT = 120_000
 const API_BODY_MAX = 250_000
 const MESSAGES_CHAR_MAX = 28_000
 const MSG_CLIP = 12_000
+
+// The ext endpoint rejects any body over 256 KiB ("POST body must be a JSON
+// object" — a body-read error, not a validation message). Base64 inflates
+// bytes by 4/3, so the raw photo budget is much smaller than the body budget.
+const IMAGE_B64_MAX = 180_000 // per-image ceiling, in base64 chars (~135 KB raw)
+const IMAGE_B64_MIN = 24_000 // below this a photo is unreadable, so drop it instead
 
 const clipMiddle = (content: string, keep: number): string => {
   if (content.length <= keep) return content
@@ -66,6 +80,75 @@ const toWakafyFiles = (files: AiFileInput[]): any[] =>
     return { name: f.name, mime, url }
   })
 
+// Images are the one media type the model can actually read, so shrinking them
+// beats dropping them. Everything else (pdf/audio/video) has no local resizer
+// and falls through to the size-dropping path below.
+const IMAGE_MIME = /^image\/(jpeg|jpg|png|webp)$/i
+const SIDECAR = join(
+  import.meta.dirname, '..', '..', '..', 'bin',
+  process.platform === 'win32' ? 'sticker.exe' : 'sticker',
+)
+
+// The agent loop re-sends the same messages every round, so a shrunk photo would
+// be re-encoded up to MAX_ROUNDS times. Cache by content prefix (Map + FIFO, no
+// timers) — same photo, same budget, same output.
+const shrinkCache = new Map<string, AiFileInput | undefined>()
+const SHRINK_CACHE_MAX = 16
+
+// `b64Budget` is in base64 characters (what the JSON body carries); the sidecar
+// measures the raw JPEG, so convert down before handing it the limit.
+const shrinkImage = async (f: AiFileInput, b64Budget: number): Promise<AiFileInput | undefined> => {
+  if (!IMAGE_MIME.test(String(f.mime || '')) || !existsSync(SIDECAR)) return undefined
+  const src = String(f.data || '')
+  const base64 = src.startsWith('data:') ? src.slice(src.indexOf(',') + 1) : src
+  if (!base64 || /^https?:\/\//i.test(base64)) return undefined
+  const raw = Buffer.from(base64, 'base64')
+  if (!raw.length) return undefined
+  const cacheKey = `${b64Budget}|${base64.length}|${base64.slice(0, 64)}`
+  if (shrinkCache.has(cacheKey)) return shrinkCache.get(cacheKey)
+  const rawBudget = Math.max(1, Math.floor((b64Budget * 3) / 4) - 1_024)
+  let out: AiFileInput | undefined
+  const dir = await mkdtemp(join(tmpdir(), 'wakaru-ai-img-'))
+  try {
+    const input = join(dir, 'in.bin')
+    const output = join(dir, 'out.jpg')
+    await writeFile(input, raw)
+    await exec(SIDECAR, ['fit', input, output, String(rawBudget)], { timeout: 30_000 })
+    const buf = await readFile(output)
+    if (buf.length) {
+      out = { data: buf.toString('base64'), mime: 'image/jpeg', name: String(f.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg' }
+    }
+  } catch {
+    out = undefined
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {})
+  }
+  if (shrinkCache.size >= SHRINK_CACHE_MAX) shrinkCache.delete(shrinkCache.keys().next().value!)
+  shrinkCache.set(cacheKey, out)
+  return out
+}
+
+// Keep every image that can be squeezed into its share of the body budget.
+// Anything with no local resizer (pdf/audio/video) is dropped instead, which is
+// what the old code did for everything.
+export const fitFiles = async (files: AiFileInput[], bodyRoom: number): Promise<{ files: AiFileInput[]; dropped: number }> => {
+  if (!files.length) return { files, dropped: 0 }
+  const perFile = Math.min(IMAGE_B64_MAX, Math.max(IMAGE_B64_MIN, Math.floor(bodyRoom / files.length)))
+  const out: AiFileInput[] = []
+  let dropped = 0
+  for (const f of files) {
+    const data = String(f.data || '')
+    if (Buffer.byteLength(data) <= perFile) {
+      out.push(f)
+      continue
+    }
+    const shrunk = await shrinkImage(f, perFile)
+    if (shrunk && Buffer.byteLength(shrunk.data) <= perFile) out.push(shrunk)
+    else dropped++
+  }
+  return { files: out, dropped }
+}
+
 const collectFiles = (messages: ChatMsg[], files: AiFileInput[] = []): AiFileInput[] => {
   const out: AiFileInput[] = []
   for (const m of messages) if (m.files?.length) out.push(...m.files)
@@ -111,10 +194,14 @@ const wakafyProvider: LLMProvider = {
     const AI_MODEL = botAiModel() || 'gpt-6'
     const msgs = fitMessages(cleanMessages(messages))
     if (!msgs.length) throw new Error('ai: empty prompt')
-    let allFiles = collectFiles(messages, files)
     const payload: any = { messages: msgs, model: AI_MODEL }
+    // Give images whatever body room the prompt leaves, so a normal phone photo
+    // gets shrunk instead of silently dropped. The loop below is only a backstop.
+    const room = API_BODY_MAX - Buffer.byteLength(JSON.stringify(payload)) - 2_000
+    const fitted = await fitFiles(collectFiles(messages, files), room)
+    let allFiles = fitted.files
+    let dropped = fitted.dropped
     if (allFiles.length) payload.files = toWakafyFiles(allFiles)
-    let dropped = 0
     while (allFiles.length && Buffer.byteLength(JSON.stringify(payload)) > API_BODY_MAX) {
       allFiles = allFiles.slice(1)
       dropped++
