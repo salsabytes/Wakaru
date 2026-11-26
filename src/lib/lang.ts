@@ -130,7 +130,18 @@ const STRINGS: Record<string, Record<string, string>> = {
       '😖 sumbernya nggak bisa kasih file itu sekarang. Daftar hasilnya masih aktif — balas nomor lain ya, mis. *2 mp3*.',
     stickerUsage: 'reply ke foto/video/gif, atau kirim langsung pake .sticker 🛸 — nama pack optional: .sticker <pack>|<author> (mis. .sticker rawr|buatan gweh)',
     soundstickerUsage:
-      '🔊 soundsticker: kirim satu foto/video/gif + satu suara — dua-duanya boleh di pesan ini atau di reply. caranya: (1) kirim fotonya, reply pake voice note/audio + caption .as, atau (2) kirim voice note, reply ke foto + caption .as. video sendirian juga bisa (suaranya ikut) — maksimal 10 detik (5 detik kalau dari video)',
+      '🔊 soundsticker: kirim foto/video (atau reply ke foto/video) pake caption .ss — nanti bot minta suaranya. maksimal 10 detik (5 detik kalau dari video)',
+    soundstickerAskAudio:
+      '🖼️ oke, fotonya udah aku pegang. sekarang kirim voice note / audio-nya ya — balas di chat ini, 1 menit ⏳',
+    soundstickerPickSound: '🎬 video-nya udah aku pegang. mau pake suara dari video itu, atau kirim audio sendiri?',
+    soundstickerUseVideo: '🔊 Suara video',
+    soundstickerSendAudio: '🎵 Kirim audio',
+    soundstickerAskSeparate: '🎵 siap, kirim voice note / file audio-nya ya — 1 menit ⏳',
+    soundstickerFooter: '1 menit aja ya 😉',
+    soundstickerTimeout: '⏰ waktunya habis (1 menit) — kirim ulang foto/video pake .ss ya',
+    soundstickerStale: 'sesinya udah keburu habis ⏰ ketik `.ss` lagi ya',
+    soundstickerNotYours: 'ini sesi punya @{who} — bikin sendiri pake `.ss` ya 😉',
+    soundstickerCancelled: 'oke, dibatalin 👍 — `.ss` kapan aja buat mulai lagi',
     soundstickerNotBuilt:
       'engine audio belum dibuild — jalanin: npm run build:sticker 🔧 (atau `cargo build --release` di native/audio)',
     soundstickerFailed: 'soundsticker gagal 😢 — coba lagi, atau pastiin suaranya nggak kosong/di-mute',
@@ -264,7 +275,18 @@ const STRINGS: Record<string, Record<string, string>> = {
       '😖 the source can\'t serve that file right now. The result list is still active — reply with another number, e.g. *2 mp3*.',
     stickerUsage: 'reply to a photo/video/gif, or send one directly with .sticker 🛸 — optional pack name: .sticker <pack>|<author> (e.g. .sticker rawr|made by me)',
     soundstickerUsage:
-      '🔊 soundsticker: send one photo/video/gif plus one sound — either may be in this message or in the reply. e.g. (1) send the photo, reply with a voice note/audio + caption .as, or (2) send a voice note, reply to a photo + caption .as. a video on its own works too (its own sound is used) — max 10 seconds (5 when taken from a video)',
+      '🔊 soundsticker: send a photo/video (or reply to one) with the .ss caption — the bot then asks for the sound. max 10 seconds (5 when it comes from a video)',
+    soundstickerAskAudio:
+      '🖼️ got the photo. now send the voice note / audio — just answer in this chat, 1 minute ⏳',
+    soundstickerPickSound: '🎬 got the video. use the sound from that video, or send your own audio?',
+    soundstickerUseVideo: '🔊 Video sound',
+    soundstickerSendAudio: '🎵 Send audio',
+    soundstickerAskSeparate: '🎵 alright, send the voice note / audio file — 1 minute ⏳',
+    soundstickerFooter: '1 minute only 😉',
+    soundstickerTimeout: '⏰ time is up (1 minute) — send the photo/video again with .ss',
+    soundstickerStale: 'that session already expired ⏰ type `.ss` again',
+    soundstickerNotYours: 'that session belongs to @{who} — start your own with `.ss` 😉',
+    soundstickerCancelled: 'ok, cancelled 👍 — use `.ss` whenever you want to start again',
     soundstickerNotBuilt:
       'audio engine not built — run: npm run build:sticker 🔧 (or `cargo build --release` in native/audio)',
     soundstickerFailed: 'soundsticker failed 😢 — try again, or make sure the sound is not empty/muted',

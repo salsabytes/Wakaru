@@ -12,6 +12,7 @@ import { aiHasHistory } from '../lib/ai/aiHistory.ts'
 import { rememberAiMedia } from '../lib/ai/aiMediaMemory.ts'
 import { pendingPlay, handlePlayPick, parsePick } from '../lib/play.ts'
 import { pendingF100, handleF100Answer } from '../lib/f100.ts'
+import { handleSoundStickerInput } from '../lib/soundStickerFlow.ts'
 import { handleAntilinkMaxInput } from '../commands/group/antilink.ts'
 import { participantMaps } from '../lib/wa/group.ts'
 import { resolveJid, resolveLid } from '../lib/wa/lid.ts'
@@ -136,6 +137,9 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
     if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
 
     const sender = m.fromMe ? (waka.user?.id ?? m.sender) : m.sender
+    // Pending `.ss` session: the answer is often a media-only message (voice
+    // note / audio file) that never reaches command dispatch, so it's claimed here.
+    if (await handleSoundStickerInput(msg, m, sender)) continue
     // Media-only message (no text/button): stash it so `.ai` can use it later
     if (!m.text && !m.button) {
       void rememberAiMedia(m, sender).catch((err) => logger.warn('ai media remember error:', err))
