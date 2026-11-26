@@ -283,6 +283,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "syom"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38d60edf8102a376deb2c2d673dafdb5ca0d40a7ffe7ae38958da9ffba3e6d40"
+
+[[package]]
 name = "transpose"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -299,4 +305,5 @@ dependencies = [
  "opus-pure",
  "rubato",
  "symphonia",
+ "syom",
 ]

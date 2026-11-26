@@ -7,6 +7,9 @@ edition = "2021"
 symphonia = { version = "0.6", default-features = false, features = ["mp3", "aac", "isomp4", "ogg", "vorbis", "wav", "pcm", "flac"] }
 rubato = { version = "0.16", default-features = false, features = ["fft_resampler"] }
 opus-pure = "0.2"
+# AAC fallback: symphonia's decoder is AAC-LC / 2 channels only, syom covers
+# 5.1 and HE-AAC (SBR/PS) that phone videos carry. Zero deps, pure Rust.
+syom = "0.10"
 
 [profile.release]
 strip = true
