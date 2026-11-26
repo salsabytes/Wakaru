@@ -4,8 +4,23 @@
 // refuses to play fragmented MP4 in audio messages; a normal M4A plays fine.
 use std::process::ExitCode;
 
+mod sound;
+
 fn main() -> ExitCode {
   let args: Vec<String> = std::env::args().skip(1).collect();
+  if args.first().map(String::as_str) == Some("soundsticker") {
+    // stdout is machine-readable (seconds \t bytes-free frame count); stderr keeps diagnostics
+    return match sound::parse_args(&args).and_then(|(i, o, max)| sound::run(&i, &o, max)) {
+      Ok(enc) => {
+        println!("{:.3}\t{}", enc.frames as f64 / 48_000.0, enc.channels);
+        ExitCode::SUCCESS
+      }
+      Err(e) => {
+        eprintln!("audio: {e}");
+        ExitCode::FAILURE
+      }
+    };
+  }
   // extract = audio track of a camera mp4 -> m4a; bare form = legacy ytmp3 remux
   let (data, extract) = if args.len() == 3 && args[0] == "extract" {
     match std::fs::read(&args[1]) {
@@ -26,6 +41,7 @@ fn main() -> ExitCode {
   } else {
     eprintln!("usage: audio <input.fmp4> <output.m4a>");
     eprintln!("       audio extract <input.mp4> <output.m4a>");
+    eprintln!("       audio soundsticker <input> <output.ogg> [max_seconds]");
     return ExitCode::FAILURE;
   };
   let out = match if extract { extract_audio(&data) } else { remux(&data) } {

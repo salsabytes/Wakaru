@@ -129,6 +129,11 @@ const STRINGS: Record<string, Record<string, string>> = {
     playUnavailable:
       '😖 sumbernya nggak bisa kasih file itu sekarang. Daftar hasilnya masih aktif — balas nomor lain ya, mis. *2 mp3*.',
     stickerUsage: 'reply ke foto/video/gif, atau kirim langsung pake .sticker 🛸 — nama pack optional: .sticker <pack>|<author> (mis. .sticker rawr|buatan gweh)',
+    soundstickerUsage:
+      '🔊 soundsticker: kirim satu foto/video/gif + satu suara — dua-duanya boleh di pesan ini atau di reply. caranya: (1) kirim fotonya, reply pake voice note/audio + caption .as, atau (2) kirim voice note, reply ke foto + caption .as. video sendirian juga bisa (suaranya ikut) — maksimal 10 detik (5 detik kalau dari video)',
+    soundstickerNotBuilt:
+      'engine audio belum dibuild — jalanin: npm run build:sticker 🔧 (atau `cargo build --release` di native/audio)',
+    soundstickerFailed: 'soundsticker gagal 😢 — coba lagi, atau pastiin suaranya nggak kosong/di-mute',
     toimgUsage: 'reply sticker, atau kirim sticker pake caption .toimg 🖼️',
     toimgFailed: 'toimg gagal 😢 — stickernya mungkin rusak atau formatnya aneh',
     toaudioUsage: 'reply video, atau kirim video pake caption .toaudio 🎧',
@@ -258,6 +263,11 @@ const STRINGS: Record<string, Record<string, string>> = {
     playUnavailable:
       '😖 the source can\'t serve that file right now. The result list is still active — reply with another number, e.g. *2 mp3*.',
     stickerUsage: 'reply to a photo/video/gif, or send one directly with .sticker 🛸 — optional pack name: .sticker <pack>|<author> (e.g. .sticker rawr|made by me)',
+    soundstickerUsage:
+      '🔊 soundsticker: send one photo/video/gif plus one sound — either may be in this message or in the reply. e.g. (1) send the photo, reply with a voice note/audio + caption .as, or (2) send a voice note, reply to a photo + caption .as. a video on its own works too (its own sound is used) — max 10 seconds (5 when taken from a video)',
+    soundstickerNotBuilt:
+      'audio engine not built — run: npm run build:sticker 🔧 (or `cargo build --release` in native/audio)',
+    soundstickerFailed: 'soundsticker failed 😢 — try again, or make sure the sound is not empty/muted',
     toimgUsage: 'reply to a sticker, or send a sticker with .toimg caption 🖼️',
     toimgFailed: 'toimg failed 😢 — that sticker may be corrupt or an odd format',
     toaudioUsage: 'reply to a video, or send a video with .toaudio caption 🎧',

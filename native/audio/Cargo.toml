@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+symphonia = { version = "0.6", default-features = false, features = ["mp3", "aac", "isomp4", "ogg", "vorbis", "wav", "pcm", "flac"] }
+rubato = { version = "0.16", default-features = false, features = ["fft_resampler"] }
+opus-pure = "0.2"
 
 [profile.release]
 strip = true
