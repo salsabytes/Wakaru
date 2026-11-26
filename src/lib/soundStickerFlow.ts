@@ -48,6 +48,24 @@ const sound = (t?: string, mime?: string) => isAudio(t) || isAudioDoc(t, mime)
 
 const CANCEL = new Set(['batal', 'cancel', 'gajadi', 'gak jadi', 'nggak jadi'])
 
+// Animation length of a WebP, from its ANMF chunks (16-byte frame header, the
+// duration is a 24-bit LE value at offset 12). 0 = a still image.
+export const animMs = (webp: Buffer): number => {
+  if (webp.length < 12 || webp.toString('ascii', 0, 4) !== 'RIFF') return 0
+  let i = 12
+  let ms = 0
+  while (i + 8 <= webp.length) {
+    const size = webp.readUInt32LE(i + 4)
+    if (i + 8 + size > webp.length) break
+    if (webp.toString('ascii', i, i + 4) === 'ANMF' && size >= 16) {
+      const d = i + 8 + 12
+      ms += webp[d] | (webp[d + 1] << 8) | (webp[d + 2] << 16)
+    }
+    i += 8 + size + (size & 1)
+  }
+  return ms
+}
+
 type Session = {
   chat: string
   sender: string
@@ -137,16 +155,28 @@ const build = async (
 
     const packName = cfg('stickerPack', 'Wakaru')
     const author = cfg('stickerAuthor', '')
-    const args = packName || author ? [stickerIn, stickerOut, packName, author] : [stickerIn, stickerOut]
+    // A video sticker's animation and its sound have to end together: the audio
+    // is cut at ANIMATED seconds, so the picture has to be too (sticker.exe
+    // defaults to 7 s, which leaves the tail of the sticker playing in silence).
+    const trim = s.video ? ['--max-ms', String(s.maxSeconds * 1000)] : []
+    const args = packName || author
+      ? [...trim, stickerIn, stickerOut, packName, author]
+      : [...trim, stickerIn, stickerOut]
     await exec(STICKER_BIN, args, { timeout: 30_000 })
+    const sticker = await readFile(stickerOut)
+
+    // Sound and picture must end together: an animated sticker only plays for
+    // its own length, so audio longer than that keeps going after the animation.
+    const anim = animMs(sticker)
+    const cap = anim > 0 ? Math.min(s.maxSeconds, anim / 1000) : s.maxSeconds
 
     // stdout is "seconds\tchannels" (see native/audio/src/sound.rs)
-    const { stdout } = await exec(BIN, ['soundsticker', audioIn, audioOut, String(s.maxSeconds)], { timeout: 60_000 })
+    const { stdout } = await exec(BIN, ['soundsticker', audioIn, audioOut, String(cap)], { timeout: 60_000 })
     const seconds = Number.parseFloat(stdout.trim().split('\t')[0] ?? '')
     if (!Number.isFinite(seconds) || seconds <= 0) throw new Error(`no audio encoded (stdout: ${stdout.trim()})`)
 
     await sendSoundSticker(sock, chat, {
-      sticker: await readFile(stickerOut),
+      sticker,
       audio: await readFile(audioOut),
       seconds: Math.round(seconds),
       quoted,

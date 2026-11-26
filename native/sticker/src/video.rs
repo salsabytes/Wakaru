@@ -14,7 +14,10 @@ const MAX_DURATION_MS: u32 = 7000;
 const TARGET_FPS: u32 = 24;
 const MAX_BYTES: usize = 500 * 1024;
 
-pub fn convert_video(data: &[u8], output: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn convert_video(data: &[u8], output: &str, max_ms: Option<u32>) -> Result<(), Box<dyn std::error::Error>> {
+  // a caller-trimmed sticker (sound stickers: the picture must end with the
+  // sound) can only shorten, never lengthen, the default
+  let limit = max_ms.map_or(MAX_DURATION_MS, |ms| ms.clamp(200, MAX_DURATION_MS));
   let mut mp4 = Mp4Reader::read_header(Cursor::new(data), data.len() as u64)?;
 
   let track = mp4
@@ -25,10 +28,10 @@ pub fn convert_video(data: &[u8], output: &str) -> Result<(), Box<dyn std::error
 
   let track_id = track.track_id();
   let total_raw = track.duration().as_millis() as u32;
-  let total_ms = total_raw.clamp(1, MAX_DURATION_MS);
+  let total_ms = total_raw.clamp(1, limit);
   let sample_count = track.sample_count();
-  let cap = if total_raw > MAX_DURATION_MS {
-    ((sample_count as u64 * MAX_DURATION_MS as u64) / total_raw as u64).max(1) as u32
+  let cap = if total_raw > limit {
+    ((sample_count as u64 * limit as u64) / total_raw as u64).max(1) as u32
   } else {
     sample_count
   };

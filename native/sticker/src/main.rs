@@ -70,9 +70,22 @@ fn main() -> ExitCode {
       }
     };
   }
+  // `--max-ms N` shortens a video sticker. A sound sticker needs the picture to
+  // end exactly when the sound does (WA keeps only 5 s of sound for them), so the
+  // caller trims both halves to the same length.
+  let (max_ms, args) = match args.first().map(String::as_str) {
+    Some("--max-ms") => {
+      let Some(ms) = args.get(1).and_then(|s| s.parse::<u32>().ok()) else {
+        eprintln!("sticker: --max-ms needs a millisecond value");
+        return ExitCode::FAILURE;
+      };
+      (Some(ms), &args[2..])
+    }
+    _ => (None, &args[..]),
+  };
   // optional trailing pack/author → embedded as WhatsApp sticker EXIF metadata
   if args.len() != 2 && args.len() != 4 {
-    eprintln!("usage: sticker <input> <output> [pack author]");
+    eprintln!("usage: sticker [--max-ms N] <input> <output> [pack author]");
     return ExitCode::FAILURE;
   }
   let data = match fs::read(&args[0]) {
@@ -84,7 +97,7 @@ fn main() -> ExitCode {
   };
   let result = match catch_unwind(AssertUnwindSafe(|| {
     if is_mp4(&data) {
-      video::convert_video(&data, &args[1])
+      video::convert_video(&data, &args[1], max_ms)
     } else if is_gif(&data) {
       gif::convert_gif(&data, &args[1])
     } else {

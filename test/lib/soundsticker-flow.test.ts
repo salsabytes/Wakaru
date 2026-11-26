@@ -2,7 +2,7 @@
 // "socket not ready" and gives up, which is exactly what we want here.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { startSoundSticker, handleSoundStickerInput } from '../../src/lib/soundStickerFlow.ts'
+import { startSoundSticker, handleSoundStickerInput, animMs } from '../../src/lib/soundStickerFlow.ts'
 import type { WAMessage } from 'baileys'
 
 const A = 'a@s.whatsapp.net'
@@ -97,4 +97,43 @@ test('nothing usable shows usage', async () => {
   seen.length = 0
   await startSoundSticker(ctx('t7', 'conversation'))
   assert.equal(seen.length, 1)
+})
+
+// --- sticker duration -------------------------------------------------------
+// The sound is cut to the sticker's own animation length, so the sticker and the
+// audio end together. A 7 s animation next to a 5 s sound is the bug this guards.
+
+const chunk = (fourcc: string, size: number): Buffer => {
+  const head = Buffer.alloc(8)
+  head.write(fourcc, 0, 'ascii')
+  head.writeUInt32LE(size, 4)
+  const body = Buffer.alloc(size + (size & 1)) // chunks are padded to even
+  return Buffer.concat([head, body])
+}
+
+const anmf = (ms: number): Buffer => {
+  const b = chunk('ANMF', 16)
+  b.writeUIntLE(ms, 8 + 12, 3)
+  return b
+}
+
+const riff = (...chunks: Buffer[]): Buffer => {
+  const body = Buffer.concat(chunks)
+  const head = Buffer.alloc(12)
+  head.write('RIFF', 0, 'ascii')
+  head.writeUInt32LE(4 + body.length, 4)
+  head.write('WEBP', 8, 'ascii')
+  return Buffer.concat([head, body])
+}
+
+test('animMs sums ANMF frame durations', () => {
+  assert.equal(animMs(riff(anmf(500), anmf(250))), 750)
+  // odd-sized chunk in between must not desync the walk
+  assert.equal(animMs(riff(chunk('ICCP', 3), anmf(1000))), 1000)
+})
+
+test('animMs reports 0 for a still image and for junk', () => {
+  assert.equal(animMs(riff(chunk('VP8X', 10), chunk('VP8 ', 40))), 0)
+  assert.equal(animMs(Buffer.from('not a webp at all')), 0)
+  assert.equal(animMs(Buffer.alloc(0)), 0)
 })
