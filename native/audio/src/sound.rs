@@ -60,12 +60,26 @@ pub fn run(input: &Path, output: &Path, max_secs: f32) -> Result<Encoded, String
     return Err("no audio decoded".into());
   }
 
+  // A silent decode would still produce a valid, silent Ogg that the TS side
+  // happily sends ("sticker has no sound" with no error anywhere). Peak is
+  // checked before resampling so the message names the real problem.
+  let mut peak = pcm.iter().fold(0f32, |m, v| m.max(v.abs()));
+  if peak < 1e-4 {
+    return Err("decoded audio is silent (peak 0) — muted track or a channel layout the downmix lost".into());
+  }
+
   let pcm = if rate != OUT_RATE {
     resample(&pcm, rate, channels)?
   } else {
     pcm
   };
   let frames = (pcm.len() / channels).min(frame_cap);
+  // Folding channels down can cancel out (out-of-phase stereo); re-check on the
+  // resampled buffer so a clipped-to-nothing clip is not reported as success.
+  peak = pcm.iter().fold(0f32, |m, v| m.max(v.abs()));
+  if peak < 1e-4 {
+    return Err("audio cancelled out during downmix".into());
+  }
 
   let bitrate = if channels == 1 { 24_000 } else { 32_000 };
   let mut enc = OpusEncoder::new(OUT_RATE as i32, channels, Application::Audio)
@@ -210,15 +224,25 @@ fn decode_with_symphonia(
       Ok(buf) => {
         planar.resize(buf.samples_interleaved(), 0.0);
         buf.copy_to_slice_interleaved(&mut planar);
-        // >2 channels: keep the first two rather than mixing, which would need
-        // the channel layout to be right (sticker audio is mono/stereo anyway).
+        // >2 channels: fold down with the canonical WAVE/MP4 order
+        // (FL, FR, FC, LFE, BL, BR) instead of keeping FL/FR. Plenty of clips
+        // put the whole track in the center channel, and a bare front-pair pick
+        // encodes pure silence (-91 dB measured on a center-only 5.1 wav).
+        // LFE is dropped, as every downmix does.
         if channels <= 2 {
           pcm.extend_from_slice(&planar);
         } else {
+          const HALF: f32 = 0.707;
           let frames = buf.frames();
           for f in 0..frames {
-            pcm.push(planar[f * channels]);
-            pcm.push(planar[f * channels + 1]);
+            let s = &planar[f * channels..(f + 1) * channels];
+            let fl = s[0];
+            let fr = s[1];
+            let fc = s.get(2).copied().unwrap_or(0.0);
+            let bl = s.get(4).copied().unwrap_or(0.0);
+            let br = s.get(5).copied().unwrap_or(0.0);
+            pcm.push(fl + fc * HALF + bl * HALF);
+            pcm.push(fr + fc * HALF + br * HALF);
           }
         }
       }

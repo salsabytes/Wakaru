@@ -178,7 +178,9 @@ const build = async (
     await sendSoundSticker(sock, chat, {
       sticker,
       audio: await readFile(audioOut),
-      seconds: Math.round(seconds),
+      // never 0: a sub-0.5 s clip (very short gif sticker) rounds to 0 and the
+      // client then treats the AudioMessage as empty — silent, no error.
+      seconds: Math.max(1, Math.round(seconds)),
       quoted,
     })
   } catch (err) {
