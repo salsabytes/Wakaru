@@ -31,12 +31,12 @@ export const isOwner = (sender: string) => OWNERS.includes(sender.split(/[@:]/)[
 // parsed once per process — restart to pick up config.json edits
 let cfgCache: Record<string, string> | undefined
 
-export type Mode = 'public' | 'self' | 'private'
+export type Mode = 'public' | 'all' | 'self' | 'private'
 
 let mode: Mode = (() => {
   try {
     const m = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8')).mode
-    return m === 'self' || m === 'private' ? m : 'public'
+    return m === 'all' || m === 'self' || m === 'private' ? m : 'public'
   } catch {
     return 'public'
   }

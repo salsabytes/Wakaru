@@ -74,7 +74,7 @@ npm run start           # QR
 |---|---|
 | `owners` | Numbers/JIDs allowed to use owner-only commands. Empty disables owner-only commands. |
 | `language` | Default reply language (`id`, `en`, `ja`, etc.). |
-| `mode` | `public`, `self`, or `private`. |
+| `mode` | `public`, `all` (everyone + the bot's own number), `self`, or `private`. |
 | `prefixes` | Command prefixes. |
 | `maxDownloadMB` | Download size limit. |
 | `markOnline` | Keep bot presence online on connect. |

@@ -121,7 +121,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
           m.fromMe = false
         }
       }
-      if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
+      if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self' && botMode() !== 'all') continue
       if (await checkAntilink(msg, m, m.chat)) continue
       if (!m.button) continue
       logger.info(`ðŸ”˜ ${m.chat} [append]: ${m.button.text || m.button.id}`)
@@ -134,7 +134,7 @@ export async function handleMessagesUpsert(upsert: BaileysEventMap['messages.ups
     const jid = msg.key?.remoteJid
     if (!jid || isStale(msg)) continue
     const m = await serialize(msg)
-    if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self') continue
+    if (m.fromMe && !isOwner(m.sender) && botMode() !== 'self' && botMode() !== 'all') continue
 
     const sender = m.fromMe ? (waka.user?.id ?? m.sender) : m.sender
     // Pending `.ss` session: the answer is often a media-only message (voice
@@ -375,7 +375,7 @@ async function maybeRunCommand(msg: WAMessage, m: SerializedMessage, jid: string
   if (await blockedByCooldown(sender, cmd, send)) return
   const mode = botMode()
   // DMs are inherently targeted at the bot, mode filter should ONLY apply in groups
-  if (m.isGroup && mode !== 'public' && !m.fromMe && !isOwner(sender)) return
+  if (m.isGroup && mode !== 'public' && mode !== 'all' && !m.fromMe && !isOwner(sender)) return
 
   let isAdmin = false
   let isBotAdmin = false

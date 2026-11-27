@@ -1,7 +1,7 @@
 import { botMode, setMode, type Mode } from '../../lib/config.ts'
 import { tx } from '../../lib/lang.ts'
 
-const MODES: Mode[] = ['public', 'self', 'private']
+const MODES: Mode[] = ['public', 'all', 'self', 'private']
 
 export default {
   name: 'mode',
