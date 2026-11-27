@@ -1,9 +1,33 @@
 // `.ss` two-step state machine: no socket needed, the build step just logs
 // "socket not ready" and gives up, which is exactly what we want here.
-import { test } from 'node:test'
+import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { startSoundSticker, handleSoundStickerInput, animMs } from '../../src/lib/soundStickerFlow.ts'
 import type { WAMessage } from 'baileys'
+
+// `bin/` is gitignored, so a clean CI checkout has no sidecars and `.ss` would
+// early-return "not built" before a session even exists. The flow only checks
+// they exist (the build gives up on the missing socket before exec), so empty
+// stubs are enough — created only when absent, and only ours are cleaned up.
+const BIN_DIR = fileURLToPath(new URL('../../bin/', import.meta.url))
+const sidecar = (n: string) => `${BIN_DIR}${n}${process.platform === 'win32' ? '.exe' : ''}`
+const stubbed: string[] = []
+
+before(() => {
+  for (const n of ['audio', 'sticker']) {
+    const p = sidecar(n)
+    if (existsSync(p)) continue
+    mkdirSync(BIN_DIR, { recursive: true })
+    writeFileSync(p, '')
+    stubbed.push(p)
+  }
+})
+
+after(() => {
+  for (const p of stubbed) rmSync(p, { force: true })
+})
 
 const A = 'a@s.whatsapp.net'
 const B = 'b@s.whatsapp.net'
