@@ -122,6 +122,8 @@ npm run build:sticker
 - **Replies missing on linked devices** — check for duplicate instances, relink the session, and try `markOnline: false` in `config.json` if needed.
 - **Termux sleeps** — run `termux-wake-lock`.
 - **Sticker fails** — build the sidecar with `npm run build:sticker`. `sharp` is intentionally not installed.
+- **Sticker/`.ss` rejected with `usage: sticker ...`** — `bin/` is gitignored, so a `git pull` leaves the old sidecar running. The bot rebuilds a stale sidecar at boot; if cargo is unavailable, run `npm run build:sticker` manually and restart.
+- **Running under pm2/systemd** — start it as `pm2 start src/index.ts --interpreter node` (or `pm2 start npm --name wakaru -- start`). `.update` then just exits and lets pm2 revive it; it never spawns a second bot, which would kick the session with `440`.
 - **`.ai` slow/errors** — LLM calls have a ~120s timeout; a slow or unavailable backend returns an error instead of crashing.
 
 ## Contributing

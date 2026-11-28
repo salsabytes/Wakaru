@@ -146,9 +146,20 @@ export const runUpdate = (): UpdateResult => {
   }
 }
 
+// Under pm2/systemd the supervisor owns the lifecycle: spawning a second
+// process puts two bots on the same sessions/ dir and they kick each other
+// (440 connectionReplaced). There the restart is `exit(0)` — pm2
+// (autorestart, its default) and systemd revive it by themselves.
+const supervised = (): boolean =>
+  process.env.pm_id !== undefined || process.env.PM2_HOME !== undefined || !!(process.env.INVOCATION_ID ?? '')
+
+/** True when a supervisor (pm2 / systemd) owns the process — it must not be self-spawned. */
+export const isSupervised = supervised
+
 // restart inside the SAME console: inherited stdio keeps the user's terminal,
 // detached + ignored stdio pops a separate (hidden) window on Windows
 export const relaunch = (): boolean => {
+  if (supervised()) return true
   try {
     const child = spawn(process.execPath, process.argv.slice(1), { cwd: ROOT, stdio: 'inherit' })
     child.unref()

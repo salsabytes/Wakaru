@@ -63,11 +63,12 @@ if (existsSync(audioBin)) {
   }
 }
 
-// The sidecars live in `bin/` (gitignored) and only `npm start` (native/ensure-bins.mjs)
-// rebuilds them when they are stale, `install.sh` skips a crate whose binary
-// already exists. So a binary built before a fix in native/*/src keeps running
-// old code — the bot sends a sticker with no sound, and the only trace is the
-// error reply (an old build fails the decode the newer one handles).
+// The sidecars live in `bin/` (gitignored) and the bot rebuilds them at boot
+// when they are older than native/*/src (src/lib/sidecars.ts); install.sh skips
+// a crate whose binary already exists. So a binary built before a fix in
+// native/*/src keeps running old code — the bot sends a sticker with no sound,
+// and the only trace is the error reply (an old build fails the decode the
+// newer one handles).
 const newestMtime = (dir: string): number => {
   let newest = 0
   for (const e of readdirSync(dir, { withFileTypes: true })) {

@@ -37,10 +37,9 @@ const ANIMATED = 5 // seconds, sticker from a video (WA keeps the video's own so
 
 // A `bin/sticker` built before the `--max-ms` flag existed answers with its
 // usage block and exits 1 — the whole `.ss` then failed with an error the user
-// could do nothing about. `npm start` rebuilds stale sidecars now
-// (native/ensure-bins.mjs), but a bot started another way can still be on the
-// old binary, so retry with the untrimmed argv: a 7 s sticker next to a 5 s
-// sound beats no sticker at all.
+// could do nothing about. The bot rebuilds stale sidecars at boot
+// (src/lib/sidecars.ts) but cargo may be missing, so retry with the untrimmed
+// argv: a 7 s sticker next to a 5 s sound beats no sticker at all.
 const noFlag = (err: unknown): boolean =>
   /\busage: sticker\b|(?:unexpected|unknown) argument/.test(String((err as { stderr?: string })?.stderr ?? ''))
 

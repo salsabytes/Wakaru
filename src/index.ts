@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, readdirSync, statSync } from 'node:fs'
+import { chmodSync } from 'node:fs'
 import { join } from 'node:path'
 import { connectToWhatsApp, shutdown, getSock } from './socket.ts'
 import { handleMessagesUpsert } from './handlers/messages.ts'
@@ -52,34 +52,18 @@ if (process.platform !== 'win32') {
   }
 }
 
-// `bin/` is gitignored, so a `git pull` brings new native/*/src while a running
-// bot keeps the old sidecar. `npm start` rebuilds it (native/ensure-bins.mjs);
-// under pm2/systemd a stale one is only visible in the log, so say it out loud.
-const newestMtime = (dir: string): number => {
-  let m = 0
+// `bin/` is gitignored, so a `git pull` brings new native/*/src while the old
+// sidecar keeps running — under pm2/systemd nothing else ever rebuilds it
+// (`npm start` does not run). Do it here so every launcher gets a fresh binary;
+// async so a multi-minute cargo build never delays the socket.
+void (async () => {
   try {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name)
-      const t = e.isDirectory() ? newestMtime(p) : statSync(p).mtimeMs
-      if (t > m) m = t
-    }
-  } catch {
-    // no source dir (installed without native/) — nothing to compare
+    const { ensureSidecars } = await import('./lib/sidecars.ts')
+    ensureSidecars()
+  } catch (err) {
+    logger.warn('sidecar check failed:', (err as Error).message)
   }
-  return m
-}
-for (const name of ['sticker', 'audio']) {
-  const bin = join(import.meta.dirname, '..', 'bin', process.platform === 'win32' ? `${name}.exe` : name)
-  const src = join(import.meta.dirname, '..', 'native', name, 'src')
-  try {
-    const srcAt = newestMtime(src)
-    if (srcAt && statSync(bin).mtimeMs < srcAt) {
-      logger.warn(`bin/${name} is older than native/${name}/src — rebuild: npm run build:sticker`)
-    }
-  } catch {
-    // missing binary is already handled per-command
-  }
-}
+})()
 
 process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
