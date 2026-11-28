@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync } from 'node:fs'
+import { chmodSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { connectToWhatsApp, shutdown, getSock } from './socket.ts'
 import { handleMessagesUpsert } from './handlers/messages.ts'
@@ -49,6 +49,35 @@ if (process.platform !== 'win32') {
     } catch {
       // binary not there yet — fine, the feature just stays disabled
     }
+  }
+}
+
+// `bin/` is gitignored, so a `git pull` brings new native/*/src while a running
+// bot keeps the old sidecar. `npm start` rebuilds it (native/ensure-bins.mjs);
+// under pm2/systemd a stale one is only visible in the log, so say it out loud.
+const newestMtime = (dir: string): number => {
+  let m = 0
+  try {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name)
+      const t = e.isDirectory() ? newestMtime(p) : statSync(p).mtimeMs
+      if (t > m) m = t
+    }
+  } catch {
+    // no source dir (installed without native/) — nothing to compare
+  }
+  return m
+}
+for (const name of ['sticker', 'audio']) {
+  const bin = join(import.meta.dirname, '..', 'bin', process.platform === 'win32' ? `${name}.exe` : name)
+  const src = join(import.meta.dirname, '..', 'native', name, 'src')
+  try {
+    const srcAt = newestMtime(src)
+    if (srcAt && statSync(bin).mtimeMs < srcAt) {
+      logger.warn(`bin/${name} is older than native/${name}/src — rebuild: npm run build:sticker`)
+    }
+  } catch {
+    // missing binary is already handled per-command
   }
 }
 

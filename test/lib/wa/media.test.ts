@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fmtBytes, mediaDuration } from '../../../src/lib/wa/media.ts'
+import { fmtBytes, isExpiredMedia, mediaDuration } from '../../../src/lib/wa/media.ts'
 
 test('mediaDuration reads mp4 mvhd v0', () => {
   const mp4 = Buffer.alloc(64)
@@ -30,4 +30,13 @@ test('mediaDuration estimates mp3 CBR duration', () => {
 test('fmtBytes switches to MB past a million bytes', () => {
   assert.equal(fmtBytes(3.2e6), '3.2 MB')
   assert.equal(fmtBytes(4_000), '4 KB')
+})
+
+// A quoted media whose mediaKey never arrived cannot be resurrected by any
+// retry — the user has to send it again, so it must count as expired media.
+test('isExpiredMedia treats an empty media key as an expired send', () => {
+  assert.equal(isExpiredMedia(new Error('Cannot derive from empty media key')), true)
+  assert.equal(isExpiredMedia(new Error('reupload timeout')), true)
+  assert.equal(isExpiredMedia(Object.assign(new Error('gone'), { output: { statusCode: 403 } })), true)
+  assert.equal(isExpiredMedia(new Error('not a media message')), false)
 })

@@ -4,7 +4,8 @@ import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { startSoundSticker, handleSoundStickerInput, animMs } from '../../src/lib/soundStickerFlow.ts'
+import { startSoundSticker, handleSoundStickerInput, animMs, runSticker } from '../../src/lib/soundStickerFlow.ts'
+import { join } from 'node:path'
 import type { WAMessage } from 'baileys'
 
 // `bin/` is gitignored, so a clean CI checkout has no sidecars and `.ss` would
@@ -154,6 +155,45 @@ test('animMs sums ANMF frame durations', () => {
   assert.equal(animMs(riff(anmf(500), anmf(250))), 750)
   // odd-sized chunk in between must not desync the walk
   assert.equal(animMs(riff(chunk('ICCP', 3), anmf(1000))), 1000)
+})
+
+// --- stale sidecar ----------------------------------------------------------
+// A `bin/sticker` built before the `--max-ms` flag exits 1 with its usage block.
+// That used to kill the whole `.ss` on a VPS whose bin/ was never rebuilt, so the
+// command retries with the untrimmed argv. A fake sidecar stands in: it prints
+// the old usage line for any flag and writes a stub webp otherwise.
+
+const fakeSticker = fileURLToPath(new URL('./fake-sticker.mjs', import.meta.url))
+const OLD_USAGE = 'usage: sticker <input> <output> [pack author]'
+
+test('runSticker retries without --max-ms when the binary is too old', async () => {
+  writeFileSync(
+    fakeSticker,
+    `#!${process.execPath}\n` +
+      `import { writeFileSync } from 'node:fs'\n` +
+      `const a = process.argv.slice(2)\n` +
+      `if (a[0] === '--max-ms') { console.error(${JSON.stringify(OLD_USAGE)}); process.exit(1) }\n` +
+      `writeFileSync(a[1], Buffer.from('RIFF'))\n`,
+  )
+  try {
+    const out = join(fileURLToPath(new URL('.', import.meta.url)), 'fake-sticker.webp')
+    const argv = ['--max-ms', '5000', 'in.mp4', out, 'Wakaru', '']
+    assert.equal(await runSticker(process.execPath, [fakeSticker, ...argv], [fakeSticker, ...argv.slice(2)]), false)
+    rmSync(out, { force: true })
+
+    // a build that DOES understand the flag must not be retried
+    assert.equal(await runSticker(process.execPath, [fakeSticker, 'in.mp4', out], []), true)
+    rmSync(out, { force: true })
+  } finally {
+    rmSync(fakeSticker, { force: true })
+  }
+})
+
+test('runSticker does not swallow unrelated failures', async () => {
+  await assert.rejects(
+    runSticker(process.execPath, ['-e', 'process.exit(3)'], [process.execPath, '-e', 'process.exit(0)']),
+    /Command failed/,
+  )
 })
 
 test('animMs reports 0 for a still image and for junk', () => {

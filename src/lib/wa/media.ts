@@ -16,7 +16,12 @@ export { requireUrl }
 
 export const isExpiredMedia = (err: unknown): boolean => {
   const e = err as { output?: { statusCode?: number }; status?: unknown; code?: unknown; message?: unknown }
-  if (typeof e?.message === 'string' && e.message.includes('reupload timeout')) return true
+  if (typeof e?.message === 'string') {
+    // "reupload timeout" and "Cannot derive from empty media key" (a quoted
+    // message whose mediaKey never arrived): the only cure is a fresh send
+    if (e.message.includes('reupload timeout')) return true
+    if (e.message.includes('Cannot derive from empty media key')) return true
+  }
   const s = e?.output?.statusCode ?? (typeof e?.status === 'number' ? e.status : undefined)
   if (s === 403 || s === 404 || s === 410) return true
   const c = e?.code

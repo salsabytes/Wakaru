@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { createRequire } from 'node:module'
 import { randomBytes } from 'node:crypto'
+import { pathToFileURL } from 'node:url'
 
 const exec = promisify(execFile)
 const require = createRequire(import.meta.url)
@@ -62,12 +63,11 @@ if (existsSync(audioBin)) {
   }
 }
 
-// The sidecars live in `bin/` (gitignored) and nothing rebuilds them
-// automatically: `ensure-audio.mjs` only builds when the file is MISSING, and
-// install.sh skips a crate whose binary already exists. So a binary built
-// before a fix in native/*/src keeps running old code — the bot sends a sticker
-// with no sound, and the only trace is the error reply (an old build fails the
-// decode the newer one handles).
+// The sidecars live in `bin/` (gitignored) and only `npm start` (native/ensure-bins.mjs)
+// rebuilds them when they are stale, `install.sh` skips a crate whose binary
+// already exists. So a binary built before a fix in native/*/src keeps running
+// old code — the bot sends a sticker with no sound, and the only trace is the
+// error reply (an old build fails the decode the newer one handles).
 const newestMtime = (dir: string): number => {
   let newest = 0
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -231,7 +231,7 @@ try {
   }
 
   // --- 4. wire layout ------------------------------------------------------
-  const { ensureSoundStickerEncoding } = await import(join(ROOT, 'src', 'lib', 'wa', 'soundSticker.ts'))
+  const { ensureSoundStickerEncoding } = await import(pathToFileURL(join(ROOT, 'src', 'lib', 'wa', 'soundSticker.ts')).href)
   ensureSoundStickerEncoding()
   const audioMsg = proto.Message.AudioMessage.create({
     url: 'https://mmg.whatsapp.net/x',

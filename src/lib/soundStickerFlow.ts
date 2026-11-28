@@ -35,6 +35,27 @@ const STICKER_BIN = join(
 const VISUAL = 10 // seconds, sticker from a picture / separate audio
 const ANIMATED = 5 // seconds, sticker from a video (WA keeps the video's own sound short)
 
+// A `bin/sticker` built before the `--max-ms` flag existed answers with its
+// usage block and exits 1 — the whole `.ss` then failed with an error the user
+// could do nothing about. `npm start` rebuilds stale sidecars now
+// (native/ensure-bins.mjs), but a bot started another way can still be on the
+// old binary, so retry with the untrimmed argv: a 7 s sticker next to a 5 s
+// sound beats no sticker at all.
+const noFlag = (err: unknown): boolean =>
+  /\busage: sticker\b|(?:unexpected|unknown) argument/.test(String((err as { stderr?: string })?.stderr ?? ''))
+
+/** Run the sticker sidecar; returns false when it had to drop the trim flags. */
+export const runSticker = async (bin: string, argv: string[], untrimmed: string[]): Promise<boolean> => {
+  try {
+    await exec(bin, argv, { timeout: 30_000 })
+    return true
+  } catch (err) {
+    if (!untrimmed.length || !noFlag(err)) throw err
+    await exec(bin, untrimmed, { timeout: 30_000 })
+    return false
+  }
+}
+
 const TTL = 60_000 // how long the bot waits for the sound
 const PENDING_MAX = 200
 
@@ -159,10 +180,10 @@ const build = async (
     // is cut at ANIMATED seconds, so the picture has to be too (sticker.exe
     // defaults to 7 s, which leaves the tail of the sticker playing in silence).
     const trim = s.video ? ['--max-ms', String(s.maxSeconds * 1000)] : []
-    const args = packName || author
-      ? [...trim, stickerIn, stickerOut, packName, author]
-      : [...trim, stickerIn, stickerOut]
-    await exec(STICKER_BIN, args, { timeout: 30_000 })
+    const args = packName || author ? [stickerIn, stickerOut, packName, author] : [stickerIn, stickerOut]
+    if (!(await runSticker(STICKER_BIN, [...trim, ...args], trim.length ? args : []))) {
+      logger.warn('stale bin/sticker (no --max-ms): sticker may outlast its sound — rebuild with: npm run build:sticker')
+    }
     const sticker = await readFile(stickerOut)
 
     // Sound and picture must end together: an animated sticker only plays for

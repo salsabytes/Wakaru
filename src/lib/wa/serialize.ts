@@ -90,9 +90,12 @@ const withReupload = (msg: WAMessage, download: () => Promise<Buffer>): (() => P
     try {
       return await download()
     } catch (err) {
-      logger.error('download failed, trying reupload:', (err as Error)?.message ?? err)
+      // only a dead CDN link can be reuploaded; anything else (a quoted message
+      // with no mediaKey, "not a media message") is rethrown untouched and
+      // logging "trying reupload" for it just sends the next debugger on a hunt
       const s = statusOf(err)
       if (!waka || (s !== 403 && s !== 404 && s !== 410 && !netDead(err))) throw err
+      logger.warn('media download failed, asking for a reupload:', (err as Error)?.message ?? err)
       const fresh = await Promise.race([
         waka.updateMediaMessage(msg),
         new Promise<never>((_, rej) => setTimeout(() => rej(new Error('reupload timeout')), 15_000)),
