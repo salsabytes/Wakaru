@@ -157,6 +157,10 @@ const STRINGS: Record<string, Record<string, string>> = {
     wikiNotFound: 'nggak nemu artikel buat "{query}" 😢 coba kata kunci lain',
     wikiFailed: 'wiki gagal 😢 — coba lagi ntar ya',
     groupOnly: 'command ini khusus grup ya 📛',
+    groupStatusUsage:
+      '📸 kirim foto/video dengan caption {prefix}groupstatus, atau reply foto/video pake {prefix}swgc — teks doang juga bisa: {prefix}swgc <teks>',
+    groupStatusTooBig: 'medianya kegedean buat status (maks ~64 MB) 😅 kompres dulu ya',
+    groupStatusFailed: '❌ gagal posting status grup: {msg}',
     toggleOn: 'ON ✅',
     toggleOff: 'OFF ⛔',
     enableButton: '✅ Aktifkan',
@@ -302,6 +306,10 @@ const STRINGS: Record<string, Record<string, string>> = {
     wikiNotFound: 'no article found for "{query}" 😢 try another keyword',
     wikiFailed: 'wiki failed 😢 — try again later',
     groupOnly: 'this command works in groups only 📛',
+    groupStatusUsage:
+      '📸 send a photo/video with the {prefix}groupstatus caption, or reply to one with {prefix}swgc — text only works too: {prefix}swgc <text>',
+    groupStatusTooBig: 'that media is too big for a status (max ~64 MB) 😅 compress it first',
+    groupStatusFailed: '❌ failed to post the group status: {msg}',
     toggleOn: 'ON ✅',
     toggleOff: 'OFF ⛔',
     enableButton: '✅ Enable',
